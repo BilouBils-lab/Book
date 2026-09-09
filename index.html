@@ -451,7 +451,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.1 IA</div>
+  <div class="version-tag">v3.2</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -516,7 +516,7 @@
     }
 
     function fermerParametres() {
-      document.getElementById('settings-modal'].classList.remove('active');
+      document.getElementById('settings-modal').classList.remove('active');
     }
 
     function configurerCleAPI() {
@@ -552,7 +552,6 @@
       loader.style.display = 'flex';
 
       try {
-        // Convertir l'image en Base64
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = async function() {
@@ -581,7 +580,6 @@
           if (data.candidates && data.candidates[0].content.parts[0].text) {
             const resultat = JSON.parse(data.candidates[0].content.parts[0].text);
             
-            // Permettre à l'utilisateur de vérifier ou corriger le résultat de l'IA
             const titreFinal = prompt("L'IA a détecté :", resultat.titre || "");
             if (titreFinal) {
               let tomeNum = parseInt(prompt("Numéro du tome :", resultat.tome || 1)) || 1;
