@@ -38,7 +38,6 @@
       padding-bottom: 90px;
     }
 
-    /* Navigation Onglets Haut */
     header {
       position: sticky;
       top: 0;
@@ -102,7 +101,6 @@
       margin: 0 auto;
     }
 
-    /* Cartes Liste Collection */
     .series-card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
@@ -113,7 +111,7 @@
       gap: 12px;
       align-items: center;
       cursor: pointer;
-      transition: transform 0.1s ease, border-color 0.2s ease;
+      transition: transform 0.1s ease;
     }
 
     .series-card:active {
@@ -147,7 +145,6 @@
       color: var(--text-sub);
     }
 
-    /* Barre de progression */
     .progress-bar-bg {
       width: 100%;
       height: 6px;
@@ -170,7 +167,6 @@
       padding-left: 4px;
     }
 
-    /* Item Pile à lire */
     .pal-item {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
@@ -210,7 +206,6 @@
       cursor: pointer;
     }
 
-    /* Actions Bottom Bar */
     .actions-bar {
       position: fixed;
       bottom: 20px;
@@ -247,7 +242,6 @@
       color: white;
     }
 
-    /* Modal Détail Série */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -305,7 +299,6 @@
       cursor: pointer;
     }
 
-    /* Grille de Tomes */
     .volumes-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
@@ -327,6 +320,7 @@
       user-select: none;
       border: 1px solid transparent;
       transition: all 0.15s ease;
+      position: relative;
     }
 
     .tome-box.owned {
@@ -359,7 +353,6 @@
       pointer-events: none;
     }
 
-    /* Viewport Scanner */
     #interactive.viewport {
       width: 100%;
       max-width: 360px;
@@ -393,20 +386,16 @@
   </header>
 
   <main>
-    <!-- Vue Onglet 1 : PAL -->
     <div id="view-pal" style="display: none;"></div>
-
-    <!-- Vue Onglet 2 : Collection -->
     <div id="view-collection"></div>
   </main>
 
-  <!-- Barre d'actions -->
   <div class="actions-bar">
     <button class="btn" onclick="ouvrirScanner()">📷 Scanner ISBN</button>
     <button class="btn btn-secondary" onclick="ajouterManuel()">➕ Saisie</button>
   </div>
 
-  <div class="version-tag">v2.0</div>
+  <div class="version-tag">v2.1</div>
 
   <!-- Modal Détail Série -->
   <div id="detail-modal" class="modal-overlay">
@@ -422,8 +411,8 @@
         </div>
       </div>
 
-      <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-sub);">
-        Tomes (Gris = non possédé, Bleu = possédé, Plein = lu)
+      <div style="font-size: 12px; margin-bottom: 8px; color: var(--text-sub); display: flex; justify-content: space-between; align-items: center;">
+        <span>Clic: Changer statut | Appui long: Supprimer tome</span>
       </div>
       
       <div id="modal-volumes-grid" class="volumes-grid"></div>
@@ -452,6 +441,7 @@
     let ongletActif = 'collection';
     let serieIndexActive = null;
     let codeReader = null;
+    let longPressTimer = null;
 
     function sauvegarder() {
       localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
@@ -473,7 +463,6 @@
       let totalPossedes = 0;
       let elementsPAL = [];
 
-      // Calcul des statistiques globale et préparation PAL
       bibliotheque.forEach((serie, sIndex) => {
         serie.tomes.forEach((tome, tIndex) => {
           if (tome.possede) {
@@ -492,7 +481,7 @@
       const containerPAL = document.getElementById('view-pal');
       containerPAL.innerHTML = '';
       if (elementsPAL.length === 0) {
-        containerPAL.innerHTML = `<div class="empty-state">Aucun manga dans la pile à lire. Bravo ! 🎉</div>`;
+        containerPAL.innerHTML = `<div class="empty-state">Aucun manga dans la pile à lire. 🎉</div>`;
       } else {
         elementsPAL.forEach(item => {
           const div = document.createElement('div');
@@ -512,11 +501,10 @@
       const containerCol = document.getElementById('view-collection');
       containerCol.innerHTML = '';
       if (bibliotheque.length === 0) {
-        containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Utilise le scanner pour ajouter tes mangas.</div>`;
+        containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Scanne un ISBN pour débuter.</div>`;
       } else {
         bibliotheque.forEach((serie, index) => {
           const possedes = serie.tomes.filter(t => t.possede).length;
-          const lus = serie.tomes.filter(t => t.lu).length;
           const totalRef = serie.tomesParus || serie.tomes.length;
           const pourcentage = totalRef > 0 ? Math.min(100, Math.round((possedes / totalRef) * 100)) : 0;
 
@@ -538,8 +526,7 @@
         });
       }
 
-      // Si le modal d'une série est ouvert, rafraîchir son contenu
-      if (serieIndexActive !== null) {
+      if (serieIndexActive !== null && bibliotheque[serieIndexActive]) {
         remplirModalSerie(serieIndexActive);
       }
     }
@@ -579,7 +566,24 @@
         const box = document.createElement('div');
         box.className = classe;
         box.innerText = tome.numero;
+        
+        // Clic simple (cycle statut)
         box.onclick = () => toggleTomeState(index, tIndex);
+        
+        // Appui long / Clic droit (suppression d'un seul tome)
+        box.oncontextmenu = (e) => {
+          e.preventDefault();
+          supprimerTomeUnique(index, tIndex);
+        };
+
+        box.ontouchstart = () => {
+          longPressTimer = setTimeout(() => {
+            supprimerTomeUnique(index, tIndex);
+          }, 600);
+        };
+        box.ontouchend = () => clearTimeout(longPressTimer);
+        box.ontouchmove = () => clearTimeout(longPressTimer);
+
         grid.appendChild(box);
       });
     }
@@ -596,6 +600,14 @@
         tome.lu = false;
       }
       sauvegarder();
+    }
+
+    function supprimerTomeUnique(sIndex, tIndex) {
+      const tome = bibliotheque[sIndex].tomes[tIndex];
+      if (confirm(`Supprimer le tome ${tome.numero} de la liste ?`)) {
+        bibliotheque[sIndex].tomes.splice(tIndex, 1);
+        sauvegarder();
+      }
     }
 
     function ajouterNouveauTomeModal() {
@@ -695,7 +707,7 @@
       }
     }
 
-    /* Ajout & Scan */
+    /* Ajout & Scan avec option de rattrapage des tomes */
     function ajouterManuel() {
       const titre = prompt("Titre de la série :");
       if (!titre) return;
@@ -752,21 +764,34 @@
 
     function ajouterMangaDirect(titreSerie, numeroTome, auteur, couverture) {
       let mangaIndex = bibliotheque.findIndex(m => m.titre.toLowerCase() === titreSerie.toLowerCase());
+      let inclurePrecedents = false;
+
+      // Option : demande si l'utilisateur possède les tomes antérieurs
+      if (numeroTome > 1) {
+        inclurePrecedents = confirm(`Tu ajoutes le tome ${numeroTome} de "${titreSerie}".\n\nPossèdes-tu aussi tous les tomes de 1 à ${numeroTome - 1} ?`);
+      }
 
       if (mangaIndex !== -1) {
         let manga = bibliotheque[mangaIndex];
-        let tomeExist = manga.tomes.find(t => t.numero === numeroTome);
-        if (tomeExist) {
-          tomeExist.possede = true;
-        } else {
-          manga.tomes.push({ numero: numeroTome, possede: true, lu: false });
-          manga.tomes.sort((a, b) => a.numero - b.numero);
+        
+        for (let i = 1; i <= numeroTome; i++) {
+          const estLeTomeTarget = (i === numeroTome);
+          if (estLeTomeTarget || inclurePrecedents) {
+            let tomeExist = manga.tomes.find(t => t.numero === i);
+            if (tomeExist) {
+              tomeExist.possede = true;
+            } else {
+              manga.tomes.push({ numero: i, possede: true, lu: false });
+            }
+          }
         }
+        manga.tomes.sort((a, b) => a.numero - b.numero);
         if (!manga.couverture && couverture) manga.couverture = couverture;
       } else {
         let initialTomes = [];
         for (let i = 1; i <= numeroTome; i++) {
-          initialTomes.push({ numero: i, possede: (i === numeroTome), lu: false });
+          const estPossede = (i === numeroTome) || inclurePrecedents;
+          initialTomes.push({ numero: i, possede: estPossede, lu: false });
         }
         bibliotheque.push({
           titre: titreSerie,
