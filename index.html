@@ -5,14 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Mes Mangas</title>
 
-  <!-- Configuration iOS PWA (Sans manifest inline data-uri instable sur iOS) -->
+  <!-- Configuration iOS PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Mangas">
   <link rel="apple-touch-icon" href="https://img.icons8.com/color/180/manga.png">
-
-  <!-- OCR Tesseract.js -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
     :root {
@@ -395,7 +392,7 @@
       margin-top: 20px;
     }
 
-    #loader-ocr {
+    #loader-ia {
       display: none;
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -443,18 +440,18 @@
   </main>
 
   <div class="actions-bar">
-    <button class="btn-fab btn-fab-secondary" onclick="document.getElementById('ocr-file-input').click()">📷 Scan Jaquette</button>
+    <button class="btn-fab btn-fab-secondary" onclick="declencherScanIA()">📷 Scan IA</button>
     <button class="btn-fab" onclick="ajouterManuel()">➕ Saisie</button>
   </div>
 
-  <input type="file" id="ocr-file-input" style="display: none;" accept="image/*" capture="environment" onchange="traiterScanJaquette(event)">
+  <input type="file" id="ia-file-input" style="display: none;" accept="image/*" capture="environment" onchange="analyserImageJaquette(event)">
 
-  <div id="loader-ocr">
+  <div id="loader-ia">
     <div class="spinner"></div>
-    <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette...</div>
+    <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v2.9</div>
+  <div class="version-tag">v3.1 IA</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -463,6 +460,7 @@
       <h2 style="font-size: 18px; margin-bottom: 16px;">Paramètres</h2>
       
       <div class="settings-list">
+        <button class="btn btn-secondary" onclick="configurerCleAPI()">🔑 Définir / Modifier la clé API Gemini</button>
         <button class="btn btn-secondary" onclick="exporterSauvegarde()">📥 Exporter la sauvegarde (JSON)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📤 Importer la sauvegarde (JSON)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('csv-input').click()">📊 Importer un fichier CSV (Sheets)</button>
@@ -518,50 +516,84 @@
     }
 
     function fermerParametres() {
-      document.getElementById('settings-modal').classList.remove('active');
+      document.getElementById('settings-modal'].classList.remove('active');
     }
 
-    /* Traitement OCR Tesseract.js (Création dynamique à la demande) */
-    async function traiterScanJaquette(event) {
+    function configurerCleAPI() {
+      let cleActuelle = localStorage.getItem('gemini_api_key') || '';
+      let nouvelleCle = prompt("Colle ta clé API Google AI Studio (Gemini) :", cleActuelle);
+      if (nouvelleCle !== null) {
+        localStorage.setItem('gemini_api_key', nouvelleCle.trim());
+        alert("Clé API enregistrée avec succès !");
+      }
+    }
+
+    function declencherScanIA() {
+      let cle = localStorage.getItem('gemini_api_key');
+      if (!cle) {
+        configurerCleAPI();
+        cle = localStorage.getItem('gemini_api_key');
+        if (!cle) return;
+      }
+      document.getElementById('ia-file-input').click();
+    }
+
+    async function analyserImageJaquette(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      const loader = document.getElementById('loader-ocr');
-      const loaderStatus = document.getElementById('loader-status');
+      const cle = localStorage.getItem('gemini_api_key');
+      if (!cle) {
+        alert("Clé API manquante.");
+        return;
+      }
+
+      const loader = document.getElementById('loader-ia');
       loader.style.display = 'flex';
-      loaderStatus.innerText = "Analyse de l'image...";
 
       try {
-        if (typeof Tesseract === 'undefined') {
-          throw new Error("Tesseract non chargé");
-        }
+        // Convertir l'image en Base64
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async function() {
+          const base64Data = reader.result.split(',')[1];
 
-        const worker = await Tesseract.createWorker('eng+fra');
-        const ret = await worker.recognize(file);
-        await worker.terminate();
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cle}`;
+          const payload = {
+            contents: [{
+              parts: [
+                { text: "Analyse cette jaquette de manga. Réponds UNIQUEMENT sous forme d'un objet JSON strict avec deux clés exactes : 'titre' (le nom de la série en string) et 'tome' (le numéro du tome en entier, mets 1 si introuvable)." },
+                { inline_data: { mime_type: file.type || "image/jpeg", data: base64Data } }
+              ]
+            }],
+            generationConfig: { response_mime_type: "application/json" }
+          };
 
-        const lignes = ret.data.text.split('\n')
-          .map(l => l.trim())
-          .filter(l => l.length > 2 && !/^\d+$/.test(l));
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
 
-        loader.style.display = 'none';
+          const data = await response.json();
+          loader.style.display = 'none';
 
-        if (lignes.length === 0) {
-          alert("Titre introuvable sur la photo. Merci de le saisir manuellement.");
-          ajouterManuel();
-          return;
-        }
-
-        const texteSuggere = lignes[0];
-        const titreFinal = prompt("Titre détecté (à ajuster si besoin) :", texteSuggere);
-        
-        if (titreFinal) {
-          let tomeNum = parseInt(prompt("Numéro du tome :", "1")) || 1;
-          enregistrerSerie(titreFinal.trim(), tomeNum);
-        }
+          if (data.candidates && data.candidates[0].content.parts[0].text) {
+            const resultat = JSON.parse(data.candidates[0].content.parts[0].text);
+            
+            // Permettre à l'utilisateur de vérifier ou corriger le résultat de l'IA
+            const titreFinal = prompt("L'IA a détecté :", resultat.titre || "");
+            if (titreFinal) {
+              let tomeNum = parseInt(prompt("Numéro du tome :", resultat.tome || 1)) || 1;
+              enregistrerSerie(titreFinal.trim(), tomeNum);
+            }
+          } else {
+            alert("L'IA n'a pas pu analyser l'image. Essaie à nouveau.");
+          }
+        };
       } catch (e) {
         loader.style.display = 'none';
-        alert("Erreur lors du traitement OCR.");
+        alert("Erreur lors de la communication avec l'API Gemini.");
       }
       event.target.value = '';
     }
