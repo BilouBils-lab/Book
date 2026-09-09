@@ -288,7 +288,7 @@
     <button class="btn btn-secondary" onclick="ajouterManuel()">➕ Manuel</button>
   </div>
 
-  <div class="app-version">v1.2.0</div>
+  <div class="app-version">v1.2.1</div>
 
   <div id="scanner-modal" class="modal">
     <h3 style="margin-bottom: 15px;">Scanne le code-barres (ISBN)</h3>
@@ -370,61 +370,73 @@
       document.getElementById('stat-total').innerText = totalTomes;
     }
 
-    // --- RECHERCHE AUTOMATIQUE SUR MANGADEX + GOOGLE BOOKS ---
+    // --- RECHERCHE AUTOMATIQUE SÉCURISÉE (PROXY CORS & FALLBACK) ---
     async function synchroniserManga(mangaIndex) {
       const manga = bibliotheque[mangaIndex];
       const btn = document.getElementById(`btn-p-${mangaIndex}`);
-      if (btn) btn.innerText = "🔍 Recherche en cours...";
+      if (btn) btn.innerText = "🔍 Recherche...";
 
       let jaquetteTrouvee = null;
       let tomesMax = 0;
 
+      // 1. Tentative via MangaDex (avec Proxy CORS)
       try {
-        // 1. API MangaDex (Très efficace pour les mangas)
-        const resMD = await fetch(`https://api.mangadex.org/manga?title=${encodeURIComponent(manga.titre)}&limit=1&includes[]=cover_art`);
-        const dataMD = await resMD.json();
+        const targetUrl = `https://api.mangadex.org/manga?title=${encodeURIComponent(manga.titre)}&limit=1&includes[]=cover_art`;
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        
+        const resMD = await fetch(proxyUrl);
+        if (resMD.ok) {
+          const dataMD = await resMD.json();
+          if (dataMD.data && dataMD.data.length > 0) {
+            const mData = dataMD.data[0];
+            const lastVol = parseInt(mData.attributes.lastVolume);
+            if (!isNaN(lastVol)) tomesMax = lastVol;
 
-        if (dataMD.data && dataMD.data.length > 0) {
-          const mData = dataMD.data[0];
-          const lastVol = parseInt(mData.attributes.lastVolume);
-          if (!isNaN(lastVol)) tomesMax = lastVol;
-
-          // Récupération de l'image de couverture MangaDex
-          const coverRel = mData.relationships.find(r => r.type === 'cover_art');
-          if (coverRel && coverRel.attributes) {
-            jaquetteTrouvee = `https://uploads.mangadex.org/covers/${mData.id}/${coverRel.attributes.fileName}.256.jpg`;
+            const coverRel = mData.relationships.find(r => r.type === 'cover_art');
+            if (coverRel && coverRel.attributes) {
+              jaquetteTrouvee = `https://uploads.mangadex.org/covers/${mData.id}/${coverRel.attributes.fileName}.256.jpg`;
+            }
           }
         }
+      } catch (e) {
+        console.warn("Échec MangaDex via proxy, passage à Google Books", e);
+      }
 
-        // 2. Fallback Google Books si tomes ou jaquette manquante
-        if (tomesMax === 0 || !jaquetteTrouvee) {
+      // 2. Fallback Google Books
+      if (tomesMax === 0 || !jaquetteTrouvee) {
+        try {
           const resGB = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent('intitle:' + manga.titre + ' manga')}&maxResults=20`);
-          const dataGB = await resGB.json();
-
-          if (dataGB.items) {
-            dataGB.items.forEach(item => {
-              const title = item.volumeInfo.title || '';
-              const match = title.match(/(?:Vol\.|Tome|T\.)\s*(\d+)/i);
-              if (match) {
-                const num = parseInt(match[1]);
-                if (num > tomesMax) tomesMax = num;
-              }
-              if (!jaquetteTrouvee && item.volumeInfo.imageLinks?.thumbnail) {
-                jaquetteTrouvee = item.volumeInfo.imageLinks.thumbnail.replace('http://', 'https://');
-              }
-            });
+          if (resGB.ok) {
+            const dataGB = await resGB.json();
+            if (dataGB.items) {
+              dataGB.items.forEach(item => {
+                const title = item.volumeInfo.title || '';
+                const match = title.match(/(?:Vol\.|Tome|T\.)\s*(\d+)/i);
+                if (match) {
+                  const num = parseInt(match[1]);
+                  if (num > tomesMax) tomesMax = num;
+                }
+                if (!jaquetteTrouvee && item.volumeInfo.imageLinks?.thumbnail) {
+                  jaquetteTrouvee = item.volumeInfo.imageLinks.thumbnail.replace('http://', 'https://');
+                }
+              });
+            }
           }
+        } catch (e) {
+          console.warn("Échec Google Books", e);
         }
+      }
 
-        // Application des résultats
+      // 3. Mise à jour des données
+      if (tomesMax > 0 || jaquetteTrouvee) {
         if (tomesMax > 0) manga.tomesParus = tomesMax;
         if (jaquetteTrouvee && !manga.couverture) manga.couverture = jaquetteTrouvee;
-
         sauvegarder();
-
-      } catch (e) {
-        alert("Erreur lors de la synchronisation réseau.");
-        if (btn) btn.innerText = "🔄 Réessayer";
+      } else {
+        if (btn) btn.innerText = "⚠️ Non trouvé";
+        setTimeout(() => {
+          if (btn) btn.innerText = "🔄 Auto-détecter parutions & jaquette";
+        }, 3000);
       }
     }
 
@@ -463,7 +475,7 @@
 
       let tomeNum = parseInt(prompt("Numéro du tome :", "1")) || 1;
       ajouterMangaDirect(titre, tomeNum, "", "");
-      // Auto-synchro en arrière-plan
+      
       const index = bibliotheque.findIndex(m => m.titre.toLowerCase() === titre.toLowerCase());
       if (index !== -1) synchroniserManga(index);
     }
