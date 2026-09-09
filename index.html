@@ -11,10 +11,10 @@
   <meta name="apple-mobile-web-app-title" content="Mangas">
   <link rel="apple-touch-icon" href="https://img.icons8.com/color/180/manga.png">
 
-  <!-- Manifest Inline (Data URI) pour compatibilité PWA immédiate -->
+  <!-- Manifest Inline -->
   <link rel="manifest" href='data:application/manifest+json,{"name":"Suivi Manga","short_name":"Mangas","start_url":"./index.html","display":"standalone","background_color":"#121212","theme_color":"#121212"}'>
 
-  <!-- Style CSS moderne -->
+  <!-- Style CSS -->
   <style>
     :root {
       --bg-color: #121212;
@@ -183,6 +183,19 @@
       color: white;
     }
 
+    /* Version tag en bas à droite */
+    .app-version {
+      position: fixed;
+      bottom: 8px;
+      right: 12px;
+      font-size: 10px;
+      color: var(--text-sub);
+      opacity: 0.6;
+      z-index: 98;
+      font-family: monospace;
+      pointer-events: none;
+    }
+
     /* Modal / Scanner */
     .modal {
       display: none;
@@ -223,7 +236,7 @@
     }
   </style>
 
-  <!-- Librairie Scanner ZXing -->
+  <!-- Librairie ZXing -->
   <script src="https://unpkg.com/@zxing/library@latest"></script>
 </head>
 <body>
@@ -247,6 +260,9 @@
       ➕ Manuel
     </button>
   </div>
+
+  <!-- Tag de version -->
+  <div class="app-version">v1.0.0</div>
 
   <!-- Modal Scanner Caméra -->
   <div id="scanner-modal" class="modal">
@@ -307,7 +323,7 @@
         });
 
         card.innerHTML = `
-          <img class="cover" src="${manga.couverture || 'https://via.placeholder.com/70x105?text=Manga'}" alt="Couverture">
+          <img class="cover" src="${manga.couverture || 'https://via.placeholder.com/70x105?text=Manga'}" alt="Couverture" onerror="this.src='https://via.placeholder.com/70x105?text=Pas+d\'image'">
           <div class="manga-info">
             <div>
               <div class="manga-title">${manga.titre}</div>
@@ -347,66 +363,78 @@
       sauvegarder();
     }
 
-    function ajouterManuel() {
+    // --- SAISIE MANUELLE AVEC RECHERCHE DE JAQUETTE ---
+    async function ajouterManuel() {
       const titre = prompt("Titre de la série :");
       if (!titre) return;
+
+      let tomeNum = parseInt(prompt("Numéro du tome :", "1")) || 1;
       
-      bibliotheque.push({
-        titre: titre,
-        auteur: "",
-        couverture: "",
-        tomes: [{ numero: 1, possede: true, lu: false }]
-      });
-      sauvegarder();
+      let couverture = await chercherCouvertureParTitre(titre);
+      
+      if (!couverture) {
+        couverture = prompt("URL de la jaquette (optionnel) :", "") || "";
+      }
+
+      ajouterMangaDirect(titre, tomeNum, "", couverture);
     }
 
-    // --- RECHERCHE MULTI-API (Google Books + Open Library) ---
+    // --- RECHERCHE MULTI-API PAR ISBN ---
     async function chercherISBN(isbn) {
       document.getElementById('scan-status').innerText = "Analyse de l'ISBN " + isbn + "...";
 
-      // 1. TENTATIVE VIA GOOGLE BOOKS
+      // 1. Google Books par ISBN
       try {
         const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
         const data = await res.json();
-
         if (data.totalItems > 0) {
           const book = data.items[0].volumeInfo;
           traiterEtAjouterManga(book.title, book.authors ? book.authors.join(', ') : '', book.imageLinks?.thumbnail);
           return;
         }
-      } catch (e) {
-        console.log("Échec Google Books, bascule sur Open Library...");
-      }
+      } catch (e) { console.log("Échec ISBN Google Books"); }
 
-      // 2. TENTATIVE DE SECOURS VIA OPEN LIBRARY
+      // 2. Open Library par ISBN
       try {
-        const resOL = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+        const resOL = await fetch(`https://openlibrary.org/search.json?q=${isbn}`);
         const dataOL = await resOL.json();
-        const bookKey = `ISBN:${isbn}`;
-
-        if (dataOL[bookKey]) {
-          const book = dataOL[bookKey];
-          const titre = book.title;
-          const auteur = book.authors ? book.authors.map(a => a.name).join(', ') : '';
-          const couverture = book.cover?.medium || '';
-
-          traiterEtAjouterManga(titre, auteur, couverture);
+        if (dataOL.numFound > 0) {
+          const book = dataOL.docs[0];
+          const coverId = book.cover_i;
+          const couverture = coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : '';
+          traiterEtAjouterManga(book.title, book.author_name ? book.author_name.join(', ') : '', couverture);
           return;
         }
-      } catch (e) {
-        console.log("Échec Open Library");
-      }
+      } catch (e) { console.log("Échec ISBN Open Library"); }
 
-      // 3. MODE DEGRADÉ : Saisie manuelle guidée si l'ISBN n'est pas dans les API
+      // 3. Fallback : Saisie manuelle guidée + recherche automatique par Titre
       fermerScanner();
-      let titreManuel = prompt(`Tome non trouvé dans les bases (ISBN: ${isbn}).\nIndique le titre de la série :`);
+      let titreManuel = prompt(`ISBN ${isbn} non trouvé dans les bases.\nSaisis le titre du manga :`);
       if (titreManuel) {
         let tomeNum = parseInt(prompt("Numéro du tome :", "1")) || 1;
-        ajouterMangaDirect(titreManuel, tomeNum, "", "");
+        let imgUrl = await chercherCouvertureParTitre(titreManuel);
+        if (!imgUrl) {
+          imgUrl = prompt("URL de la jaquette (optionnel) :", "") || "";
+        }
+        ajouterMangaDirect(titreManuel, tomeNum, "", imgUrl);
       }
     }
 
-    // --- TRAITEMENT ET EXTRACTION DU TITRE / TOME ---
+    // --- RECHERCHE D'IMAGE PAR TITRE ---
+    async function chercherCouvertureParTitre(titre) {
+      try {
+        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(titre + ' manga')}`);
+        const data = await res.json();
+        if (data.totalItems > 0 && data.items[0].volumeInfo.imageLinks) {
+          return data.items[0].volumeInfo.imageLinks.thumbnail.replace('http://', 'https://');
+        }
+      } catch (e) {
+        console.log("Erreur recherche image par titre");
+      }
+      return "";
+    }
+
+    // --- TRAITEMENT DU TITRE ---
     function traiterEtAjouterManga(titreBrut, auteur, couverture) {
       couverture = couverture ? couverture.replace('http://', 'https://') : '';
 
@@ -422,7 +450,7 @@
       ajouterMangaDirect(titreSerie, numeroTome, auteur, couverture);
     }
 
-    // --- AJOUT ET MISE À JOUR DE LA BASE ---
+    // --- AJOUT EN BASE ---
     function ajouterMangaDirect(titreSerie, numeroTome, auteur, couverture) {
       let manga = bibliotheque.find(m => m.titre.toLowerCase() === titreSerie.toLowerCase());
 
@@ -474,7 +502,7 @@
       document.getElementById('scanner-modal').classList.remove('active');
     }
 
-    // Initialisation au chargement
+    // Initialisation
     afficherBibliotheque();
   </script>
 </body>
