@@ -35,7 +35,7 @@
     body {
       background-color: var(--bg-color);
       color: var(--text-main);
-      padding-bottom: 110px;
+      padding-bottom: 90px;
     }
 
     header {
@@ -56,10 +56,25 @@
       margin-bottom: 12px;
     }
 
+    .app-title-group {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
     .app-title {
       font-size: 20px;
       font-weight: 700;
       letter-spacing: -0.5px;
+    }
+
+    .settings-btn {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      color: var(--text-sub);
+      cursor: pointer;
+      padding: 4px;
     }
 
     .tabs-nav {
@@ -212,32 +227,39 @@
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      flex-wrap: wrap;
       justify-content: center;
-      gap: 8px;
-      background: rgba(26, 26, 30, 0.95);
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-      padding: 8px 12px;
-      border-radius: 24px;
-      border: 1px solid var(--card-border);
-      box-shadow: 0 10px 25px rgba(0,0,0,0.6);
       z-index: 99;
-      max-width: 95vw;
+    }
+
+    .btn-fab {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 24px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .btn {
       background: var(--accent);
       color: white;
       border: none;
-      padding: 8px 12px;
-      border-radius: 16px;
+      padding: 10px 14px;
+      border-radius: 12px;
       font-weight: 600;
-      font-size: 12px;
+      font-size: 13px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 4px;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
     }
 
     .btn-secondary {
@@ -357,31 +379,23 @@
       pointer-events: none;
     }
 
-    #interactive.viewport {
-      width: 100%;
-      max-width: 360px;
-      height: 240px;
-      border-radius: 12px;
-      overflow: hidden;
-      margin: 10px auto;
-      background: #000;
-    }
-
-    #interactive.viewport video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+    .settings-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 20px;
     }
   </style>
-
-  <script src="https://unpkg.com/@zxing/library@latest"></script>
 </head>
 <body>
 
   <header>
     <div class="top-bars">
-      <div class="app-title">Ma MangaThèque</div>
-      <div style="font-size: 12px; color: var(--text-sub);" id="total-count">0 tomes</div>
+      <div class="app-title-group">
+        <div class="app-title">Ma MangaThèque</div>
+        <div style="font-size: 12px; color: var(--text-sub);" id="total-count">0 tomes</div>
+      </div>
+      <button class="settings-btn" onclick="ouvrirParametres()" aria-label="Réglages">⚙️</button>
     </div>
     <div class="tabs-nav">
       <button class="tab-btn" id="tab-pal-btn" onclick="changerOnglet('pal')">Pile à lire (<span id="pal-count">0</span>)</button>
@@ -395,18 +409,28 @@
   </main>
 
   <div class="actions-bar">
-    <button class="btn" onclick="ouvrirScanner()">📷 Scan</button>
-    <button class="btn btn-secondary" onclick="ajouterManuel()">➕ Saisie</button>
-    <button class="btn btn-secondary" onclick="exporterSauvegarde()">📥 Exporter</button>
-    <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📤 Importer JSON</button>
-    <button class="btn btn-secondary" onclick="document.getElementById('csv-input').click()">📊 Importer CSV</button>
-    
-    <input type="file" id="file-input" style="display: none;" accept=".json" onchange="importerSauvegarde(event)">
-    <input type="file" id="csv-input" style="display: none;" accept=".csv" onchange="importerCSV(event)">
-    <input type="file" id="cover-file-input" style="display: none;" accept="image/*" onchange="chargerJaquetteFichier(event)">
+    <button class="btn-fab" onclick="ajouterManuel()">➕ Ajouter une série</button>
   </div>
 
-  <div class="version-tag">v2.4</div>
+  <div class="version-tag">v2.5</div>
+
+  <!-- Modal Réglages / Paramètres -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="close-modal" onclick="fermerParametres()">×</button>
+      <h2 style="font-size: 18px; margin-bottom: 16px;">Paramètres</h2>
+      
+      <div class="settings-list">
+        <button class="btn btn-secondary" onclick="exporterSauvegarde()">📥 Exporter la sauvegarde (JSON)</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📤 Importer la sauvegarde (JSON)</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('csv-input').click()">📊 Importer un fichier CSV (Sheets)</button>
+      </div>
+
+      <input type="file" id="file-input" style="display: none;" accept=".json" onchange="importerSauvegarde(event)">
+      <input type="file" id="csv-input" style="display: none;" accept=".csv" onchange="importerCSV(event)">
+      <input type="file" id="cover-file-input" style="display: none;" accept="image/*" onchange="chargerJaquetteFichier(event)">
+    </div>
+  </div>
 
   <!-- Modal Détail Série -->
   <div id="detail-modal" class="modal-overlay">
@@ -432,21 +456,9 @@
       <div id="modal-volumes-grid" class="volumes-grid"></div>
       
       <div style="margin-top: 16px; display: flex; justify-content: space-between;">
-        <button class="btn btn-secondary" style="font-size: 12px;" onclick="ajouterNouveauTomeModal()">+ Ajouter tome</button>
-        <button class="btn btn-secondary" style="font-size: 12px; background: rgba(239,68,68,0.2); color: #ef4444;" onclick="supprimerSerieActuelle()">Supprimer la série</button>
+        <button class="btn btn-secondary" style="font-size: 12px; width: auto;" onclick="ajouterNouveauTomeModal()">+ Ajouter tome</button>
+        <button class="btn btn-secondary" style="font-size: 12px; width: auto; background: rgba(239,68,68,0.2); color: #ef4444;" onclick="supprimerSerieActuelle()">Supprimer la série</button>
       </div>
-    </div>
-  </div>
-
-  <!-- Modal Scanner -->
-  <div id="scanner-modal" class="modal-overlay">
-    <div class="modal-content" style="text-align: center;">
-      <h3 style="margin-bottom: 10px;">Scanne le code-barres (ISBN)</h3>
-      <div id="interactive" class="viewport">
-        <video id="video"></video>
-      </div>
-      <p id="scan-status" style="margin-top: 10px; color: var(--text-sub); font-size: 13px;">Initialisation caméra...</p>
-      <button class="btn btn-secondary" style="margin: 15px auto 0 auto;" onclick="fermerScanner()">Fermer</button>
     </div>
   </div>
 
@@ -454,12 +466,19 @@
     let bibliotheque = JSON.parse(localStorage.getItem('mangas_db')) || [];
     let ongletActif = 'collection';
     let serieIndexActive = null;
-    let codeReader = null;
     let longPressTimer = null;
 
     function sauvegarder() {
       localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
       rendreVues();
+    }
+
+    function ouvrirParametres() {
+      document.getElementById('settings-modal').classList.add('active');
+    }
+
+    function fermerParametres() {
+      document.getElementById('settings-modal').classList.remove('active');
     }
 
     function ouvrirMenuImage() {
@@ -513,7 +532,6 @@
       reader.readAsDataURL(file);
     }
 
-    /* Parser CSV robuste pour gérer les virgules et la structure spécifique */
     function parseCSVLine(text) {
       let p = '', c = '', r = [];
       let q = false;
@@ -542,7 +560,7 @@
         let ajouts = 0;
 
         lignes.forEach((ligne, index) => {
-          if (!ligne.trim() || index === 0) return; // Sauter la ligne d'en-tête
+          if (!ligne.trim() || index === 0) return;
           
           const cols = parseCSVLine(ligne);
           if (cols.length < 2) return;
@@ -557,6 +575,7 @@
           }
         });
 
+        fermerParametres();
         alert(`${ajouts} série(s) importée(s) avec succès !`);
       };
       reader.readAsText(file);
@@ -564,8 +583,6 @@
 
     function importerMangaDepuisCSV(titreSerie, stringTomes, nbTomesLus) {
       let setPossedes = new Set();
-      
-      // Extraction des numéros possédés (ex: "1, 2, 3, 4, 7" ou "12")
       const matches = stringTomes.match(/\d+/g);
       if (matches) {
         if (stringTomes.includes(',') || stringTomes.includes(';')) {
@@ -634,6 +651,7 @@
             if (confirm("Remplacer la bibliothèque actuelle par cette sauvegarde ?")) {
               bibliotheque = importedData;
               sauvegarder();
+              fermerParametres();
               alert("Bibliothèque restaurée avec succès !");
             }
           } else {
@@ -697,7 +715,7 @@
       const containerCol = document.getElementById('view-collection');
       containerCol.innerHTML = '';
       if (bibliotheque.length === 0) {
-        containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Scanne un ISBN ou importe un CSV pour débuter.</div>`;
+        containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Clique sur ⚙️ pour importer un CSV ou sur ➕ pour ajouter une série.</div>`;
       } else {
         bibliotheque.forEach((serie, index) => {
           const possedes = serie.tomes.filter(t => t.possede).length;
@@ -889,70 +907,18 @@
       const titre = prompt("Titre de la série :");
       if (!titre) return;
       let tomeNum = parseInt(prompt("Numéro du tome possédé :", "1")) || 1;
-      ajouterMangaDirect(titre, tomeNum, "", "");
-    }
-
-    async function chercherISBN(isbn) {
-      document.getElementById('scan-status').innerText = "Recherche ISBN " + isbn + "...";
-
-      try {
-        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-        const data = await res.json();
-        if (data.totalItems > 0) {
-          const book = data.items[0].volumeInfo;
-          traiterEtAjouterManga(book.title, book.authors ? book.authors.join(', ') : '', book.imageLinks?.thumbnail);
-          return;
-        }
-      } catch (e) {}
-
-      try {
-        const resOL = await fetch(`https://openlibrary.org/search.json?q=${isbn}`);
-        const dataOL = await resOL.json();
-        if (dataOL.numFound > 0) {
-          const book = dataOL.docs[0];
-          const coverId = book.cover_i;
-          const couverture = coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : '';
-          traiterEtAjouterManga(book.title, book.author_name ? book.author_name.join(', ') : '', couverture);
-          return;
-        }
-      } catch (e) {}
-
-      fermerScanner();
-      let titreManuel = prompt(`ISBN non trouvé (${isbn}).\nTitre du manga :`);
-      if (titreManuel) {
-        let tomeNum = parseInt(prompt("Numéro du tome possédé :", "1")) || 1;
-        ajouterMangaDirect(titreManuel, tomeNum, "", "");
-      }
-    }
-
-    function traiterEtAjouterManga(titreBrut, auteur, couverture) {
-      couverture = couverture ? couverture.replace('http://', 'https://') : '';
-      let numeroTome = 1;
-      let match = titreBrut.match(/(.*?)(?:\s*(?:Vol\.|Tome|T\.)\s*(\d+))/i);
-      let titreSerie = titreBrut;
-
-      if (match) {
-        titreSerie = match[1].trim();
-        numeroTome = parseInt(match[2]) || 1;
-      }
-
-      ajouterMangaDirect(titreSerie, numeroTome, auteur, couverture);
-    }
-
-    function ajouterMangaDirect(titreSerie, numeroTome, auteur, couverture) {
-      let mangaIndex = bibliotheque.findIndex(m => m.titre.toLowerCase() === titreSerie.toLowerCase());
+      
+      let mangaIndex = bibliotheque.findIndex(m => m.titre.toLowerCase() === titre.toLowerCase());
       let inclurePrecedents = false;
 
-      if (numeroTome > 1) {
-        inclurePrecedents = confirm(`Tu ajoutes le tome ${numeroTome} de "${titreSerie}".\n\nPossèdes-tu aussi tous les tomes de 1 à ${numeroTome - 1} ?`);
+      if (tomeNum > 1) {
+        inclurePrecedents = confirm(`Tu ajoutes le tome ${tomeNum} de "${titre}".\n\nPossèdes-tu aussi tous les tomes de 1 à ${tomeNum - 1} ?`);
       }
 
       if (mangaIndex !== -1) {
         let manga = bibliotheque[mangaIndex];
-        
-        for (let i = 1; i <= numeroTome; i++) {
-          const estLeTomeTarget = (i === numeroTome);
-          if (estLeTomeTarget || inclurePrecedents) {
+        for (let i = 1; i <= tomeNum; i++) {
+          if ((i === tomeNum) || inclurePrecedents) {
             let tomeExist = manga.tomes.find(t => t.numero === i);
             if (tomeExist) {
               tomeExist.possede = true;
@@ -962,17 +928,16 @@
           }
         }
         manga.tomes.sort((a, b) => a.numero - b.numero);
-        if (!manga.couverture && couverture) manga.couverture = couverture;
       } else {
         let initialTomes = [];
-        for (let i = 1; i <= numeroTome; i++) {
-          const estPossede = (i === numeroTome) || inclurePrecedents;
+        for (let i = 1; i <= tomeNum; i++) {
+          const estPossede = (i === tomeNum) || inclurePrecedents;
           initialTomes.push({ numero: i, possede: estPossede, lu: false });
         }
         bibliotheque.push({
-          titre: titreSerie,
-          auteur: auteur,
-          couverture: couverture,
+          titre: titre,
+          auteur: '',
+          couverture: '',
           tomesParus: null,
           tomes: initialTomes
         });
@@ -980,29 +945,7 @@
       }
 
       sauvegarder();
-      fermerScanner();
       synchroniserManga(mangaIndex);
-    }
-
-    function ouvrirScanner() {
-      document.getElementById('scanner-modal').classList.add('active');
-      document.getElementById('scan-status').innerText = "Analyse en cours...";
-
-      codeReader = new ZXing.BrowserMultiFormatReader();
-      codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
-        if (result) {
-          let code = result.getText();
-          if (codeReader) codeReader.reset();
-          chercherISBN(code);
-        }
-      }).catch(err => {
-        document.getElementById('scan-status').innerText = "Caméra indisponible.";
-      });
-    }
-
-    function fermerScanner() {
-      if (codeReader) codeReader.reset();
-      document.getElementById('scanner-modal').classList.remove('active');
     }
 
     rendreVues();
