@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Ma Bibliothèque Manga</title>
+  <title>Mes Mangas</title>
 
   <!-- PWA iOS -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,13 +14,14 @@
 
   <style>
     :root {
-      --bg-color: #121212;
-      --card-bg: #1e1e1e;
-      --accent: #007aff;
-      --accent-green: #34c759;
-      --text-main: #ffffff;
-      --text-sub: #a0a0a0;
-      --border-color: #2c2c2e;
+      --bg-color: #0f0f12;
+      --card-bg: #1a1a1e;
+      --card-border: #2a2a30;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --success: #10b981;
+      --text-main: #f3f4f6;
+      --text-sub: #9ca3af;
     }
 
     * {
@@ -37,166 +38,193 @@
       padding-bottom: 90px;
     }
 
+    /* Navigation Onglets Haut */
     header {
       position: sticky;
       top: 0;
-      background-color: rgba(18, 18, 18, 0.85);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      padding: 16px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border-color);
+      background-color: rgba(15, 15, 18, 0.9);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 12px 16px 0 16px;
+      border-bottom: 1px solid var(--card-border);
       z-index: 100;
     }
 
-    header h1 {
-      font-size: 22px;
+    .top-bars {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .app-title {
+      font-size: 20px;
       font-weight: 700;
+      letter-spacing: -0.5px;
     }
 
-    .stats {
-      font-size: 13px;
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
       color: var(--text-sub);
-      text-align: right;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      position: relative;
+      text-align: center;
     }
 
-    .stats strong {
-      color: var(--accent);
-      font-size: 15px;
+    .tab-btn.active {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 15%;
+      width: 70%;
+      height: 3px;
+      background-color: var(--accent);
+      border-radius: 3px 3px 0 0;
     }
 
     main {
       padding: 16px;
-      max-width: 600px;
+      max-width: 650px;
       margin: 0 auto;
     }
 
-    .manga-card {
+    /* Cartes Liste Collection */
+    .series-card {
       background: var(--card-bg);
-      border-radius: 14px;
-      padding: 14px;
-      margin-bottom: 16px;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
       display: flex;
-      gap: 14px;
-      border: 1px solid var(--border-color);
-      position: relative;
+      gap: 12px;
+      align-items: center;
+      cursor: pointer;
+      transition: transform 0.1s ease, border-color 0.2s ease;
     }
 
-    .cover-container {
-      position: relative;
-      cursor: pointer;
+    .series-card:active {
+      transform: scale(0.99);
+    }
+
+    .cover-thumb {
+      width: 65px;
+      height: 95px;
+      border-radius: 6px;
+      object-fit: cover;
+      background-color: #2a2a30;
       flex-shrink: 0;
     }
 
-    .cover {
-      width: 75px;
-      height: 110px;
-      border-radius: 8px;
-      object-fit: cover;
-      background-color: #2c2c2e;
-      display: block;
-    }
-
-    .cover-edit-badge {
-      position: absolute;
-      bottom: 4px;
-      right: 4px;
-      background: rgba(0, 0, 0, 0.7);
-      border-radius: 50%;
-      width: 22px;
-      height: 22px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-    }
-
-    .manga-info {
+    .series-details {
       flex: 1;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      gap: 6px;
     }
 
-    .manga-title {
-      font-size: 17px;
+    .series-title {
+      font-size: 16px;
       font-weight: 600;
-      margin-bottom: 2px;
+      color: var(--text-main);
     }
 
-    .manga-author {
+    .series-meta {
       font-size: 13px;
       color: var(--text-sub);
     }
 
-    .manga-parution {
-      font-size: 12px;
-      color: var(--accent-green);
+    /* Barre de progression */
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background-color: #2a2a30;
+      border-radius: 3px;
+      overflow: hidden;
       margin-top: 4px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background-color: var(--accent);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .chevron {
+      color: var(--text-sub);
+      font-size: 18px;
+      padding-left: 4px;
+    }
+
+    /* Item Pile à lire */
+    .pal-item {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .pal-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .pal-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .pal-tome {
+      font-size: 13px;
+      color: var(--accent);
       font-weight: 500;
     }
 
-    .btn-check-parution {
-      background: transparent;
-      border: 1px solid var(--border-color);
-      color: var(--text-sub);
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 12px;
-      cursor: pointer;
-      margin-top: 6px;
-    }
-
-    .volumes-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 10px;
-    }
-
-    .volume-badge {
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      background: #2c2c2e;
-      color: var(--text-sub);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .btn-read-action {
+      background: #2a2a30;
+      border: none;
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 16px;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      user-select: none;
-      transition: all 0.2s ease;
     }
 
-    .volume-badge.owned {
-      background: rgba(0, 122, 255, 0.2);
-      color: var(--accent);
-      border: 1px solid var(--accent);
-    }
-
-    .volume-badge.read {
-      background: var(--accent);
-      color: #fff;
-    }
-
+    /* Actions Bottom Bar */
     .actions-bar {
       position: fixed;
       bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      gap: 12px;
-      background: rgba(30, 30, 30, 0.9);
+      gap: 10px;
+      background: rgba(26, 26, 30, 0.95);
       backdrop-filter: blur(15px);
       -webkit-backdrop-filter: blur(15px);
       padding: 8px 16px;
       border-radius: 30px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      border: 1px solid var(--card-border);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.6);
       z-index: 99;
     }
 
@@ -204,10 +232,10 @@
       background: var(--accent);
       color: white;
       border: none;
-      padding: 10px 18px;
+      padding: 10px 16px;
       border-radius: 20px;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -215,45 +243,130 @@
     }
 
     .btn-secondary {
-      background: #2c2c2e;
+      background: #2a2a30;
       color: white;
     }
 
-    .app-version {
+    /* Modal Détail Série */
+    .modal-overlay {
+      display: none;
       position: fixed;
-      bottom: 8px;
-      right: 12px;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 200;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .modal-overlay.active {
+      display: block;
+    }
+
+    .modal-content {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      max-width: 500px;
+      margin: 20px auto;
+      padding: 20px;
+      position: relative;
+    }
+
+    .modal-header {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .modal-cover {
+      width: 90px;
+      height: 135px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #2a2a30;
+    }
+
+    .modal-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .close-modal {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      font-size: 24px;
+      background: none;
+      border: none;
+      color: var(--text-sub);
+      cursor: pointer;
+    }
+
+    /* Grille de Tomes */
+    .volumes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .tome-box {
+      height: 42px;
+      border-radius: 8px;
+      background: #2a2a30;
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+
+    .tome-box.owned {
+      background: rgba(37, 99, 235, 0.15);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .tome-box.read {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-sub);
+      font-size: 14px;
+    }
+
+    .version-tag {
+      position: fixed;
+      bottom: 6px;
+      right: 10px;
       font-size: 10px;
       color: var(--text-sub);
-      opacity: 0.6;
-      z-index: 98;
+      opacity: 0.5;
       font-family: monospace;
       pointer-events: none;
     }
 
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.9);
-      z-index: 200;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-    }
-
-    .modal.active {
-      display: flex;
-    }
-
+    /* Viewport Scanner */
     #interactive.viewport {
       width: 100%;
-      max-width: 400px;
-      height: 300px;
-      border-radius: 16px;
+      max-width: 360px;
+      height: 240px;
+      border-radius: 12px;
       overflow: hidden;
-      position: relative;
+      margin: 10px auto;
       background: #000;
     }
 
@@ -262,12 +375,6 @@
       height: 100%;
       object-fit: cover;
     }
-
-    .empty-state {
-      text-align: center;
-      padding: 50px 20px;
-      color: var(--text-sub);
-    }
   </style>
 
   <script src="https://unpkg.com/@zxing/library@latest"></script>
@@ -275,111 +382,263 @@
 <body>
 
   <header>
-    <h1>Ma bibliothèque</h1>
-    <div class="stats">
-      <span id="stat-read"><strong>0</strong></span> / <span id="stat-total">0</span> lus
+    <div class="top-bars">
+      <div class="app-title">Ma MangaThèque</div>
+      <div style="font-size: 12px; color: var(--text-sub);" id="total-count">0 tomes</div>
+    </div>
+    <div class="tabs-nav">
+      <button class="tab-btn" id="tab-pal-btn" onclick="changerOnglet('pal')">Pile à lire (<span id="pal-count">0</span>)</button>
+      <button class="tab-btn active" id="tab-col-btn" onclick="changerOnglet('collection')">Collection</button>
     </div>
   </header>
 
-  <main id="manga-list"></main>
+  <main>
+    <!-- Vue Onglet 1 : PAL -->
+    <div id="view-pal" style="display: none;"></div>
 
+    <!-- Vue Onglet 2 : Collection -->
+    <div id="view-collection"></div>
+  </main>
+
+  <!-- Barre d'actions -->
   <div class="actions-bar">
     <button class="btn" onclick="ouvrirScanner()">📷 Scanner ISBN</button>
-    <button class="btn btn-secondary" onclick="ajouterManuel()">➕ Manuel</button>
+    <button class="btn btn-secondary" onclick="ajouterManuel()">➕ Saisie</button>
   </div>
 
-  <div class="app-version">v1.2.1</div>
+  <div class="version-tag">v2.0</div>
 
-  <div id="scanner-modal" class="modal">
-    <h3 style="margin-bottom: 15px;">Scanne le code-barres (ISBN)</h3>
-    <div id="interactive" class="viewport">
-      <video id="video"></video>
+  <!-- Modal Détail Série -->
+  <div id="detail-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="close-modal" onclick="fermerModal()">×</button>
+      <div class="modal-header">
+        <img id="modal-cover" class="modal-cover" src="" alt="Jaquette" onclick="modifierJaquetteActuelle()">
+        <div class="modal-info">
+          <h2 id="modal-title" style="font-size: 18px;"></h2>
+          <div id="modal-author" style="font-size: 13px; color: var(--text-sub);"></div>
+          <div id="modal-status" style="font-size: 12px; color: var(--success); margin-top: 4px;"></div>
+          <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 8px; margin-top: 6px; width: fit-content;" id="btn-sync-modal">🔄 Auto-détecter parutions</button>
+        </div>
+      </div>
+
+      <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-sub);">
+        Tomes (Gris = non possédé, Bleu = possédé, Plein = lu)
+      </div>
+      
+      <div id="modal-volumes-grid" class="volumes-grid"></div>
+      
+      <div style="margin-top: 16px; display: flex; justify-content: space-between;">
+        <button class="btn btn-secondary" style="font-size: 12px;" onclick="ajouterNouveauTomeModal()">+ Ajouter tome</button>
+        <button class="btn btn-secondary" style="font-size: 12px; background: rgba(239,68,68,0.2); color: #ef4444;" onclick="supprimerSerieActuelle()">Supprimer la série</button>
+      </div>
     </div>
-    <p id="scan-status" style="margin-top: 15px; color: var(--text-sub); font-size: 14px;">Initialisation de la caméra...</p>
-    <button class="btn btn-secondary" style="margin-top: 20px;" onclick="fermerScanner()">Fermer</button>
+  </div>
+
+  <!-- Modal Scanner -->
+  <div id="scanner-modal" class="modal-overlay">
+    <div class="modal-content" style="text-align: center;">
+      <h3 style="margin-bottom: 10px;">Scanne le code-barres (ISBN)</h3>
+      <div id="interactive" class="viewport">
+        <video id="video"></video>
+      </div>
+      <p id="scan-status" style="margin-top: 10px; color: var(--text-sub); font-size: 13px;">Initialisation caméra...</p>
+      <button class="btn btn-secondary" style="margin: 15px auto 0 auto;" onclick="fermerScanner()">Fermer</button>
+    </div>
   </div>
 
   <script>
     let bibliotheque = JSON.parse(localStorage.getItem('mangas_db')) || [];
+    let ongletActif = 'collection';
+    let serieIndexActive = null;
     let codeReader = null;
 
     function sauvegarder() {
       localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
-      afficherBibliotheque();
+      rendreVues();
     }
 
-    function afficherBibliotheque() {
-      const container = document.getElementById('manga-list');
-      container.innerHTML = '';
+    function changerOnglet(onglet) {
+      ongletActif = onglet;
+      document.getElementById('tab-pal-btn').classList.toggle('active', onglet === 'pal');
+      document.getElementById('tab-col-btn').classList.toggle('active', onglet === 'collection');
+      
+      document.getElementById('view-pal').style.display = onglet === 'pal' ? 'block' : 'none';
+      document.getElementById('view-collection').style.display = onglet === 'collection' ? 'block' : 'none';
+      
+      rendreVues();
+    }
 
-      let totalLus = 0;
-      let totalTomes = 0;
+    function rendreVues() {
+      let totalPossedes = 0;
+      let elementsPAL = [];
 
-      if (bibliotheque.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <p>Aucun manga dans ta collection.</p>
-            <p style="font-size: 13px; margin-top: 8px;">Scanne un code-barres pour démarrer !</p>
-          </div>`;
-        document.getElementById('stat-read').innerText = 0;
-        document.getElementById('stat-total').innerText = 0;
-        return;
-      }
-
-      bibliotheque.forEach((manga, mangaIndex) => {
-        const card = document.createElement('div');
-        card.className = 'manga-card';
-
-        let volumesHTML = '';
-        manga.tomes.forEach((tome, tomeIndex) => {
-          totalTomes++;
-          if (tome.lu) totalLus++;
-
-          let classe = 'volume-badge';
-          if (tome.lu) classe += ' read';
-          else if (tome.possede) classe += ' owned';
-
-          volumesHTML += `<div class="${classe}" onclick="toggleTome(${mangaIndex}, ${tomeIndex})">${tome.numero}</div>`;
+      // Calcul des statistiques globale et préparation PAL
+      bibliotheque.forEach((serie, sIndex) => {
+        serie.tomes.forEach((tome, tIndex) => {
+          if (tome.possede) {
+            totalPossedes++;
+            if (!tome.lu) {
+              elementsPAL.push({ serieIndex: sIndex, tomeIndex: tIndex, titre: serie.titre, numero: tome.numero });
+            }
+          }
         });
-
-        const parutionTxt = manga.tomesParus 
-          ? `<div class="manga-parution">📚 ${manga.tomesParus} tome(s) disponible(s)</div>`
-          : `<button class="btn-check-parution" id="btn-p-${mangaIndex}" onclick="synchroniserManga(${mangaIndex})">🔄 Auto-détecter parutions & jaquette</button>`;
-
-        card.innerHTML = `
-          <div class="cover-container" onclick="modifierJaquette(${mangaIndex})" title="Modifier l'image">
-            <img class="cover" src="${manga.couverture || 'https://via.placeholder.com/75x110?text=Manga'}" alt="Couverture" onerror="this.src='https://via.placeholder.com/75x110?text=Pas+d\'image'">
-            <div class="cover-edit-badge">✏️</div>
-          </div>
-          <div class="manga-info">
-            <div>
-              <div class="manga-title">${manga.titre}</div>
-              <div class="manga-author">${manga.auteur || 'Auteur inconnu'}</div>
-              ${parutionTxt}
-            </div>
-            <div class="volumes-grid">
-              ${volumesHTML}
-              <div class="volume-badge" style="background:#007aff22; color:#007aff;" onclick="ajouterTome(${mangaIndex})">+</div>
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
       });
 
-      document.getElementById('stat-read').innerText = totalLus;
-      document.getElementById('stat-total').innerText = totalTomes;
+      document.getElementById('total-count').innerText = `${totalPossedes} tome(s)`;
+      document.getElementById('pal-count').innerText = elementsPAL.length;
+
+      // Render PAL
+      const containerPAL = document.getElementById('view-pal');
+      containerPAL.innerHTML = '';
+      if (elementsPAL.length === 0) {
+        containerPAL.innerHTML = `<div class="empty-state">Aucun manga dans la pile à lire. Bravo ! 🎉</div>`;
+      } else {
+        elementsPAL.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'pal-item';
+          div.innerHTML = `
+            <div class="pal-info">
+              <div class="pal-title">${item.titre}</div>
+              <div class="pal-tome">Tome ${item.numero}</div>
+            </div>
+            <button class="btn-read-action" onclick="marquerCommeLu(${item.serieIndex}, ${item.tomeIndex})">Marquer lu ✓</button>
+          `;
+          containerPAL.appendChild(div);
+        });
+      }
+
+      // Render Collection
+      const containerCol = document.getElementById('view-collection');
+      containerCol.innerHTML = '';
+      if (bibliotheque.length === 0) {
+        containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Utilise le scanner pour ajouter tes mangas.</div>`;
+      } else {
+        bibliotheque.forEach((serie, index) => {
+          const possedes = serie.tomes.filter(t => t.possede).length;
+          const lus = serie.tomes.filter(t => t.lu).length;
+          const totalRef = serie.tomesParus || serie.tomes.length;
+          const pourcentage = totalRef > 0 ? Math.min(100, Math.round((possedes / totalRef) * 100)) : 0;
+
+          const card = document.createElement('div');
+          card.className = 'series-card';
+          card.onclick = () => ouvrirModalSerie(index);
+          card.innerHTML = `
+            <img class="cover-thumb" src="${serie.couverture || 'https://via.placeholder.com/65x95?text=Manga'}" alt="Jaquette" onerror="this.src='https://via.placeholder.com/65x95?text=No+Cover'">
+            <div class="series-details">
+              <div class="series-title">${serie.titre}</div>
+              <div class="series-meta">${possedes}/${totalRef} tomes possédé(s)</div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width: ${pourcentage}%;"></div>
+              </div>
+            </div>
+            <div class="chevron">›</div>
+          `;
+          containerCol.appendChild(card);
+        });
+      }
+
+      // Si le modal d'une série est ouvert, rafraîchir son contenu
+      if (serieIndexActive !== null) {
+        remplirModalSerie(serieIndexActive);
+      }
     }
 
-    // --- RECHERCHE AUTOMATIQUE SÉCURISÉE (PROXY CORS & FALLBACK) ---
+    function marquerCommeLu(sIndex, tIndex) {
+      bibliotheque[sIndex].tomes[tIndex].lu = true;
+      sauvegarder();
+    }
+
+    /* Modal Détail Série */
+    function ouvrirModalSerie(index) {
+      serieIndexActive = index;
+      remplirModalSerie(index);
+      document.getElementById('detail-modal').classList.add('active');
+    }
+
+    function remplirModalSerie(index) {
+      const serie = bibliotheque[index];
+      document.getElementById('modal-title').innerText = serie.titre;
+      document.getElementById('modal-author').innerText = serie.auteur || 'Auteur inconnu';
+      document.getElementById('modal-cover').src = serie.couverture || 'https://via.placeholder.com/90x135?text=Manga';
+      
+      const statusTxt = serie.tomesParus ? `📚 ${serie.tomesParus} tome(s) paru(s) au total` : 'Nombre de parutions non synchronisé';
+      document.getElementById('modal-status').innerText = statusTxt;
+
+      const btnSync = document.getElementById('btn-sync-modal');
+      btnSync.onclick = () => synchroniserManga(index);
+
+      const grid = document.getElementById('modal-volumes-grid');
+      grid.innerHTML = '';
+
+      serie.tomes.forEach((tome, tIndex) => {
+        let classe = 'tome-box';
+        if (tome.lu) classe += ' read';
+        else if (tome.possede) classe += ' owned';
+
+        const box = document.createElement('div');
+        box.className = classe;
+        box.innerText = tome.numero;
+        box.onclick = () => toggleTomeState(index, tIndex);
+        grid.appendChild(box);
+      });
+    }
+
+    function toggleTomeState(sIndex, tIndex) {
+      const tome = bibliotheque[sIndex].tomes[tIndex];
+      if (!tome.possede) {
+        tome.possede = true;
+        tome.lu = false;
+      } else if (tome.possede && !tome.lu) {
+        tome.lu = true;
+      } else {
+        tome.possede = false;
+        tome.lu = false;
+      }
+      sauvegarder();
+    }
+
+    function ajouterNouveauTomeModal() {
+      if (serieIndexActive === null) return;
+      const serie = bibliotheque[serieIndexActive];
+      const maxNum = serie.tomes.length > 0 ? serie.tomes[serie.tomes.length - 1].numero : 0;
+      serie.tomes.push({ numero: maxNum + 1, possede: true, lu: false });
+      sauvegarder();
+    }
+
+    function supprimerSerieActuelle() {
+      if (serieIndexActive === null) return;
+      if (confirm(`Supprimer complètement "${bibliotheque[serieIndexActive].titre}" de ta collection ?`)) {
+        bibliotheque.splice(serieIndexActive, 1);
+        fermerModal();
+        sauvegarder();
+      }
+    }
+
+    function modifierJaquetteActuelle() {
+      if (serieIndexActive === null) return;
+      const serie = bibliotheque[serieIndexActive];
+      const url = prompt("Coller l'URL de la nouvelle jaquette :", serie.couverture || "");
+      if (url !== null) {
+        serie.couverture = url.trim();
+        sauvegarder();
+      }
+    }
+
+    function fermerModal() {
+      document.getElementById('detail-modal').classList.remove('active');
+      serieIndexActive = null;
+    }
+
+    /* Synchronisation réseau (Proxy CORS + Fallback) */
     async function synchroniserManga(mangaIndex) {
       const manga = bibliotheque[mangaIndex];
-      const btn = document.getElementById(`btn-p-${mangaIndex}`);
+      const btn = document.getElementById('btn-sync-modal');
       if (btn) btn.innerText = "🔍 Recherche...";
 
       let jaquetteTrouvee = null;
       let tomesMax = 0;
 
-      // 1. Tentative via MangaDex (avec Proxy CORS)
       try {
         const targetUrl = `https://api.mangadex.org/manga?title=${encodeURIComponent(manga.titre)}&limit=1&includes[]=cover_art`;
         const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
@@ -399,10 +658,9 @@
           }
         }
       } catch (e) {
-        console.warn("Échec MangaDex via proxy, passage à Google Books", e);
+        console.warn("Échec MangaDex", e);
       }
 
-      // 2. Fallback Google Books
       if (tomesMax === 0 || !jaquetteTrouvee) {
         try {
           const resGB = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent('intitle:' + manga.titre + ' manga')}&maxResults=20`);
@@ -427,61 +685,26 @@
         }
       }
 
-      // 3. Mise à jour des données
       if (tomesMax > 0 || jaquetteTrouvee) {
         if (tomesMax > 0) manga.tomesParus = tomesMax;
         if (jaquetteTrouvee && !manga.couverture) manga.couverture = jaquetteTrouvee;
         sauvegarder();
       } else {
         if (btn) btn.innerText = "⚠️ Non trouvé";
-        setTimeout(() => {
-          if (btn) btn.innerText = "🔄 Auto-détecter parutions & jaquette";
-        }, 3000);
+        setTimeout(() => { if (btn) btn.innerText = "🔄 Auto-détecter parutions"; }, 3000);
       }
     }
 
-    function modifierJaquette(mangaIndex) {
-      const manga = bibliotheque[mangaIndex];
-      const nouvelleUrl = prompt(`Coller l'URL de la jaquette pour "${manga.titre}" :`, manga.couverture || "");
-      if (nouvelleUrl !== null) {
-        manga.couverture = nouvelleUrl.trim();
-        sauvegarder();
-      }
-    }
-
-    function toggleTome(mangaIndex, tomeIndex) {
-      const tome = bibliotheque[mangaIndex].tomes[tomeIndex];
-      if (!tome.possede) {
-        tome.possede = true;
-      } else if (tome.possede && !tome.lu) {
-        tome.lu = true;
-      } else {
-        tome.possede = false;
-        tome.lu = false;
-      }
-      sauvegarder();
-    }
-
-    function ajouterTome(mangaIndex) {
-      const manga = bibliotheque[mangaIndex];
-      const dernierNumero = manga.tomes.length > 0 ? manga.tomes[manga.tomes.length - 1].numero : 0;
-      manga.tomes.push({ numero: dernierNumero + 1, possede: true, lu: false });
-      sauvegarder();
-    }
-
-    async function ajouterManuel() {
+    /* Ajout & Scan */
+    function ajouterManuel() {
       const titre = prompt("Titre de la série :");
       if (!titre) return;
-
-      let tomeNum = parseInt(prompt("Numéro du tome :", "1")) || 1;
+      let tomeNum = parseInt(prompt("Numéro du tome possédé :", "1")) || 1;
       ajouterMangaDirect(titre, tomeNum, "", "");
-      
-      const index = bibliotheque.findIndex(m => m.titre.toLowerCase() === titre.toLowerCase());
-      if (index !== -1) synchroniserManga(index);
     }
 
     async function chercherISBN(isbn) {
-      document.getElementById('scan-status').innerText = "Analyse ISBN " + isbn + "...";
+      document.getElementById('scan-status').innerText = "Recherche ISBN " + isbn + "...";
 
       try {
         const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
@@ -506,9 +729,9 @@
       } catch (e) {}
 
       fermerScanner();
-      let titreManuel = prompt(`ISBN non trouvé (${isbn}).\nSaisis le titre du manga :`);
+      let titreManuel = prompt(`ISBN non trouvé (${isbn}).\nTitre du manga :`);
       if (titreManuel) {
-        let tomeNum = parseInt(prompt("Numéro du tome :", "1")) || 1;
+        let tomeNum = parseInt(prompt("Numéro du tome possédé :", "1")) || 1;
         ajouterMangaDirect(titreManuel, tomeNum, "", "");
       }
     }
@@ -532,7 +755,10 @@
 
       if (mangaIndex !== -1) {
         let manga = bibliotheque[mangaIndex];
-        if (!manga.tomes.some(t => t.numero === numeroTome)) {
+        let tomeExist = manga.tomes.find(t => t.numero === numeroTome);
+        if (tomeExist) {
+          tomeExist.possede = true;
+        } else {
           manga.tomes.push({ numero: numeroTome, possede: true, lu: false });
           manga.tomes.sort((a, b) => a.numero - b.numero);
         }
@@ -578,7 +804,8 @@
       document.getElementById('scanner-modal').classList.remove('active');
     }
 
-    afficherBibliotheque();
+    // Démarrage
+    rendreVues();
   </script>
 </body>
 </html>
