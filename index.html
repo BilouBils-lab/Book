@@ -1,637 +1,443 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>Ma bibliothèque</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --paper: #F3F0E8;
-    --paper-raised: #EAE5D8;
-    --ink: #201E1B;
-    --ink-soft: #4A453E;
-    --muted: #8C8577;
-    --line: #D3CCBB;
-    --accent: #A6321F;
-    --accent-soft: #EADAD3;
-  }
-  *{ box-sizing: border-box; }
-  html,body{ margin:0; padding:0; }
-  body{
-    background: var(--paper);
-    color: var(--ink);
-    font-family: 'Zen Kaku Gothic New', sans-serif;
-    min-height: 100vh;
-    padding-bottom: 100px;
-  }
-  header{
-    padding: 28px 20px 18px;
-    border-bottom: 2px solid var(--ink);
-    display:flex;
-    justify-content: space-between;
-    align-items: flex-end;
-  }
-  header h1{
-    margin:0;
-    font-size: 24px;
-    font-weight: 900;
-    letter-spacing: 0.01em;
-  }
-  header .stat{
-    text-align:right;
-    line-height:1.2;
-  }
-  header .stat .num{
-    font-size: 20px;
-    font-weight: 700;
-    display:block;
-  }
-  header .stat .lbl{
-    font-size: 11px;
-    color: var(--muted);
-  }
-  main{
-    padding: 6px 20px 20px;
-  }
-  .empty{
-    margin-top: 60px;
-    text-align: center;
-    color: var(--muted);
-    font-size: 15px;
-    line-height: 1.6;
-    padding: 0 20px;
-  }
-  .series{
-    padding: 22px 0;
-    border-bottom: 1px solid var(--line);
-    display:flex;
-    gap: 14px;
-  }
-  .cover{
-    width: 60px;
-    height: 86px;
-    object-fit: cover;
-    border: 1.5px solid var(--ink);
-    background: var(--paper-raised);
-    flex-shrink:0;
-  }
-  .cover-ph{
-    width: 60px;
-    height: 86px;
-    border: 1.5px solid var(--line);
-    background: var(--paper-raised);
-    color: var(--muted);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size: 22px;
-    font-weight: 700;
-    flex-shrink:0;
-  }
-  .series-body{
-    flex:1;
-    min-width:0;
-  }
-  .series-top{
-    display:flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 10px;
-  }
-  .series-title{
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0;
-    flex: 1;
-  }
-  .edit-btn{
-    background:none;
-    border:none;
-    color: var(--muted);
-    font-size: 16px;
-    cursor:pointer;
-    padding: 2px 4px;
-    line-height:1;
-    flex-shrink:0;
-  }
-  .edit-btn:focus-visible, .tile:focus-visible, .fab:focus-visible, button:focus-visible, input:focus-visible{
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .series-meta{
-    margin: 4px 0 12px;
-    font-size: 13px;
-    color: var(--ink-soft);
-    display:flex;
-    align-items:center;
-    gap: 8px;
-  }
-  .stamp{
-    display:inline-block;
-    border: 1.5px solid var(--accent);
-    color: var(--accent);
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 1px 6px;
-    border-radius: 2px;
-    transform: rotate(-3deg);
-  }
-  .next-tag{
-    color: var(--muted);
-  }
-  .tiles{
-    display:flex;
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-  .tile{
-    width: 30px;
-    height: 30px;
-    border: 1.5px solid var(--ink);
-    background: transparent;
-    color: var(--ink);
-    font-size: 11px;
-    font-weight: 500;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    cursor: pointer;
-    padding:0;
-    border-radius: 2px;
-    font-family: inherit;
-  }
-  .tile.read{
-    background: var(--ink);
-    color: var(--paper);
-  }
-  .fab{
-    position: fixed;
-    right: 20px;
-    bottom: 26px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--ink);
-    color: var(--paper);
-    border: none;
-    font-size: 28px;
-    line-height: 1;
-    cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
-  }
-  .fab-scan{
-    position: fixed;
-    right: 26px;
-    bottom: 94px;
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    background: var(--paper);
-    color: var(--ink);
-    border: 1.5px solid var(--ink);
-    font-size: 19px;
-    line-height: 1;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  }
-  .scanner{
-    position: fixed;
-    inset: 0;
-    background: var(--ink);
-    z-index: 30;
-    display: none;
-    flex-direction: column;
-  }
-  .scanner.show{
-    display: flex;
-  }
-  .scanner video{
-    flex: 1;
-    width: 100%;
-    object-fit: cover;
-  }
-  .scanner-bar{
-    position: absolute;
-    top: 0; left:0; right:0;
-    padding: calc(16px + env(safe-area-inset-top)) 16px 16px;
-    display:flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    background: linear-gradient(rgba(0,0,0,0.55), transparent);
-  }
-  .scanner-status{
-    color: var(--paper);
-    font-size: 13px;
-    max-width: 75%;
-  }
-  .scanner-close{
-    background: rgba(243,240,232,0.15);
-    border: 1.5px solid var(--paper);
-    color: var(--paper);
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    font-size: 16px;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-  .overlay{
-    position: fixed;
-    inset:0;
-    background: rgba(32,30,27,0.35);
-    opacity:0;
-    pointer-events:none;
-    transition: opacity 0.2s ease;
-  }
-  .overlay.show{
-    opacity:1;
-    pointer-events:auto;
-  }
-  .sheet{
-    position: fixed;
-    left:0; right:0; bottom:0;
-    background: var(--paper);
-    border-top: 2px solid var(--ink);
-    padding: 22px 20px calc(24px + env(safe-area-inset-bottom));
-    transform: translateY(100%);
-    transition: transform 0.25s ease;
-    z-index: 10;
-  }
-  .sheet.show{
-    transform: translateY(0);
-  }
-  .sheet h2{
-    margin: 0 0 16px;
-    font-size: 17px;
-    font-weight: 700;
-  }
-  .field{
-    margin-bottom: 14px;
-  }
-  .field label{
-    display:block;
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 5px;
-  }
-  .field input{
-    width:100%;
-    font-family: inherit;
-    font-size: 16px;
-    padding: 10px 12px;
-    border: 1.5px solid var(--line);
-    border-radius: 3px;
-    background: white;
-    color: var(--ink);
-  }
-  .sheet-actions{
-    display:flex;
-    gap: 10px;
-    margin-top: 18px;
-  }
-  .btn{
-    flex:1;
-    padding: 12px;
-    border-radius: 3px;
-    font-size: 15px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor:pointer;
-    border: 1.5px solid var(--ink);
-  }
-  .btn-primary{
-    background: var(--ink);
-    color: var(--paper);
-  }
-  .btn-secondary{
-    background: transparent;
-    color: var(--ink);
-  }
-  .btn-delete{
-    background: transparent;
-    color: var(--accent);
-    border-color: var(--accent);
-  }
-  @media (prefers-reduced-motion: reduce){
-    .sheet, .overlay{ transition: none; }
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Ma Bibliothèque Manga</title>
+
+  <!-- Configuration PWA pour iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mangas">
+  <link rel="apple-touch-icon" href="https://img.icons8.com/color/180/manga.png">
+
+  <!-- Style CSS -->
+  <style>
+    :root {
+      --bg-color: #121212;
+      --card-bg: #1e1e1e;
+      --accent: #007aff;
+      --accent-green: #34c759;
+      --text-main: #ffffff;
+      --text-sub: #a0a0a0;
+      --border-color: #2c2c2e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding-bottom: 90px;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      background-color: rgba(18, 18, 18, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      z-index: 100;
+    }
+
+    header h1 {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .stats {
+      font-size: 13px;
+      color: var(--text-sub);
+      text-align: right;
+    }
+
+    .stats strong {
+      color: var(--accent);
+      font-size: 15px;
+    }
+
+    main {
+      padding: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .manga-card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 14px;
+      border: 1px solid var(--border-color);
+    }
+
+    .cover {
+      width: 70px;
+      height: 105px;
+      border-radius: 8px;
+      object-fit: cover;
+      background-color: #2c2c2e;
+      flex-shrink: 0;
+    }
+
+    .manga-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .manga-title {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .manga-author {
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+
+    .volumes-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .volume-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #2c2c2e;
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+    }
+
+    .volume-badge.owned {
+      background: rgba(0, 122, 255, 0.2);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .volume-badge.read {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .actions-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      background: rgba(30, 30, 30, 0.9);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      padding: 8px 16px;
+      border-radius: 30px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      z-index: 99;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-secondary {
+      background: #2c2c2e;
+      color: white;
+    }
+
+    /* Modal / Scanner */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.9);
+      z-index: 200;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    #interactive.viewport {
+      width: 100%;
+      max-width: 400px;
+      height: 300px;
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+      background: #000;
+    }
+
+    #interactive.viewport video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 50px 20px;
+      color: var(--text-sub);
+    }
+  </style>
+
+  <!-- Librairie Scanner ZXing -->
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
 </head>
 <body>
 
-<header>
-  <h1>Ma bibliothèque</h1>
-  <div class="stat">
-    <span class="num" id="statNum">0/0</span>
-    <span class="lbl">tomes lus</span>
-  </div>
-</header>
+  <header>
+    <h1>Ma bibliothèque</h1>
+    <div class="stats">
+      <span id="stat-read"><strong>0</strong></span> / <span id="stat-total">0</span> lus
+    </div>
+  </header>
 
-<main id="list"></main>
+  <main id="manga-list">
+    <!-- Liste générée dynamiquement -->
+  </main>
 
-<button class="fab" id="fabAdd" aria-label="Ajouter une série">+</button>
-<button class="fab-scan" id="fabScan" aria-label="Scanner un code-barres">📷</button>
-<div class="scanner" id="scanner">
-  <video id="scannerVideo" muted playsinline autoplay></video>
-  <div class="scanner-bar">
-    <p class="scanner-status" id="scannerStatus">Initialisation de la caméra…</p>
-    <button class="scanner-close" id="scannerClose" aria-label="Fermer">✕</button>
+  <div class="actions-bar">
+    <button class="btn" onclick="ouvrirScanner()">
+      📷 Scanner ISBN
+    </button>
+    <button class="btn btn-secondary" onclick="ajouterManuel()">
+      ➕ Manuel
+    </button>
   </div>
-</div>
-<div class="overlay" id="overlay"></div>
-<div class="sheet" id="sheet">
-  <h2 id="sheetTitle">Nouvelle série</h2>
-  <div class="field">
-    <label for="fTitle">Titre</label>
-    <input id="fTitle" type="text" placeholder="Ex. Chainsaw Man" autocomplete="off">
-  </div>
-  <div class="field">
-    <label for="fTotal">Nombre de tomes possédés</label>
-    <input id="fTotal" type="number" min="1" inputmode="numeric" placeholder="Ex. 12">
-  </div>
-  <div class="sheet-actions">
-    <button class="btn btn-secondary" id="btnCancel">Annuler</button>
-    <button class="btn btn-primary" id="btnSave">Enregistrer</button>
-  </div>
-  <div class="sheet-actions" id="deleteRow" style="display:none;">
-    <button class="btn btn-delete" id="btnDelete">Supprimer cette série</button>
-  </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@latest/umd/index.min.js"></script>
-<script>
-let library = [];
-let editingId = null;
+  <!-- Modal Scanner Camera -->
+  <div id="scanner-modal" class="modal">
+    <h3 style="margin-bottom: 15px;">Scanne le code-barres (ISBN)</h3>
+    <div id="interactive" class="viewport">
+      <video id="video"></video>
+    </div>
+    <p id="scan-status" style="margin-top: 15px; color: var(--text-sub); font-size: 14px;">Recherche de la caméra...</p>
+    <button class="btn btn-secondary" style="margin-top: 20px;" onclick="fermerScanner()">Fermer</button>
+  </div>
 
-const listEl = document.getElementById('list');
-const statNum = document.getElementById('statNum');
-const sheet = document.getElementById('sheet');
-const overlay = document.getElementById('overlay');
-const fTitle = document.getElementById('fTitle');
-const fTotal = document.getElementById('fTotal');
-const sheetTitle = document.getElementById('sheetTitle');
-const deleteRow = document.getElementById('deleteRow');
+  <script>
+    // --- STATE & LOCALSTORAGE ---
+    let bibliotheque = JSON.parse(localStorage.getItem('mangas_db')) || [];
+    let codeReader = null;
 
-async function loadLibrary(){
-  try{
-    if(window.storage){
-      const result = await window.storage.get('manga-library', false);
-      library = result ? JSON.parse(result.value) : [];
-    }else{
-      const raw = localStorage.getItem('manga-library');
-      library = raw ? JSON.parse(raw) : [];
+    function sauvegarder() {
+      localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
+      afficherBibliotheque();
     }
-  }catch(e){
-    library = [];
-  }
-  render();
-}
 
-async function saveLibrary(){
-  try{
-    if(window.storage){
-      await window.storage.set('manga-library', JSON.stringify(library), false);
-    }else{
-      localStorage.setItem('manga-library', JSON.stringify(library));
-    }
-  }catch(e){
-    console.error('Erreur de sauvegarde', e);
-  }
-}
+    // --- AFFICHAGE ---
+    function afficherBibliotheque() {
+      const container = document.getElementById('manga-list');
+      container.innerHTML = '';
 
-function nextUnread(series){
-  for(let i=1;i<=series.total;i++){
-    if(!series.read.includes(i)) return i;
-  }
-  return null;
-}
+      let totalLus = 0;
+      let totalTomes = 0;
 
-function render(){
-  let totalRead = 0, totalVol = 0;
-  library.forEach(s=>{ totalRead += s.read.length; totalVol += s.total; });
-  statNum.textContent = totalRead + '/' + totalVol;
-
-  if(library.length === 0){
-    listEl.innerHTML = '<p class="empty">Ta bibliothèque est vide.<br>Ajoute ta première série avec le bouton +.</p>';
-    return;
-  }
-
-  listEl.innerHTML = library.map(s=>{
-    const nu = nextUnread(s);
-    const complete = nu === null;
-    const tiles = [];
-    for(let i=1;i<=s.total;i++){
-      const isRead = s.read.includes(i);
-      tiles.push('<button class="tile' + (isRead?' read':'') + '" data-series="'+s.id+'" data-vol="'+i+'" aria-pressed="'+isRead+'">'+i+'</button>');
-    }
-    const coverHtml = s.cover
-      ? '<img class="cover" src="'+s.cover+'" alt="" loading="lazy">'
-      : '<div class="cover-ph">'+escapeHtml(s.title.charAt(0).toUpperCase())+'</div>';
-    return '<div class="series">' +
-      coverHtml +
-      '<div class="series-body">' +
-        '<div class="series-top">' +
-          '<p class="series-title">'+escapeHtml(s.title)+'</p>' +
-          '<button class="edit-btn" data-edit="'+s.id+'" aria-label="Modifier">✎</button>' +
-        '</div>' +
-        '<div class="series-meta">' +
-          '<span>Tome '+s.read.length+' / '+s.total+' lus</span>' +
-          (complete ? '<span class="stamp">Terminé</span>' : '<span class="next-tag">· prochain : tome '+nu+'</span>') +
-        '</div>' +
-        '<div class="tiles">'+tiles.join('')+'</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-}
-
-function escapeHtml(str){
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
-}
-
-async function fetchCover(title){
-  try{
-    const res = await fetch('https://api.jikan.moe/v4/manga?q='+encodeURIComponent(title)+'&limit=1');
-    if(!res.ok) return null;
-    const data = await res.json();
-    const item = data.data && data.data[0];
-    if(!item || !item.images || !item.images.jpg) return null;
-    return item.images.jpg.large_image_url || item.images.jpg.image_url || null;
-  }catch(e){
-    console.error('Recherche de jaquette impossible', e);
-    return null;
-  }
-}
-
-function parseIsbnResult(data){
-  const item = data.items && data.items[0];
-  if(!item) return null;
-  const info = item.volumeInfo || {};
-  let raw = info.title || '';
-  if(info.subtitle) raw += ' ' + info.subtitle;
-  const m = raw.match(/(?:vol(?:ume)?\.?|tome|t\.?)\s*(\d+)/i) || raw.match(/(\d+)\s*$/);
-  const volume = m ? parseInt(m[1], 10) : null;
-  let title = raw.replace(/[,:\-–]?\s*(?:vol(?:ume)?\.?|tome|t\.?)\s*\d+.*$/i, '').trim();
-  if(!title) title = raw.trim();
-  return { title, volume };
-}
-
-async function lookupIsbn(isbn){
-  try{
-    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:'+encodeURIComponent(isbn));
-    if(!res.ok) return null;
-    const data = await res.json();
-    return parseIsbnResult(data);
-  }catch(e){
-    console.error('Recherche ISBN impossible', e);
-    return null;
-  }
-}
-
-let codeReader = null;
-
-function openScanner(){
-  document.getElementById('scanner').classList.add('show');
-  const statusEl = document.getElementById('scannerStatus');
-  statusEl.textContent = 'Initialisation de la caméra…';
-  if(typeof ZXingBrowser === 'undefined'){
-    statusEl.textContent = "Le lecteur de codes-barres n'a pas pu se charger. Vérifie ta connexion et réessaie.";
-    return;
-  }
-  try{
-    codeReader = new ZXingBrowser.BrowserMultiFormatReader();
-    codeReader.decodeFromVideoDevice(undefined, 'scannerVideo', (result, err) => {
-      if(result){
-        const code = result.getText();
-        closeScanner();
-        handleScannedIsbn(code);
+      if (bibliotheque.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <p>Aucun manga dans ta collection.</p>
+            <p style="font-size: 13px; margin-top: 8px;">Scanne le code-barres au dos d'un tome pour commencer !</p>
+          </div>`;
+        document.getElementById('stat-read').innerText = 0;
+        document.getElementById('stat-total').innerText = 0;
+        return;
       }
-    });
-    statusEl.textContent = 'Vise le code-barres au dos du tome';
-  }catch(e){
-    statusEl.textContent = "Impossible d'accéder à la caméra. Vérifie les autorisations dans les réglages.";
-  }
-}
 
-function closeScanner(){
-  if(codeReader){
-    try{ codeReader.reset(); }catch(e){}
-    codeReader = null;
-  }
-  document.getElementById('scanner').classList.remove('show');
-}
+      bibliotheque.forEach((manga, mangaIndex) => {
+        const card = document.createElement('div');
+        card.className = 'manga-card';
 
-async function handleScannedIsbn(isbn){
-  const parsed = await lookupIsbn(isbn);
-  const normalize = t => t.trim().toLowerCase();
-  const match = parsed ? library.find(s => normalize(s.title) === normalize(parsed.title)) : null;
-  if(match){
-    openSheet(match.id);
-    if(parsed.volume && parsed.volume > match.total){
-      fTotal.value = parsed.volume;
+        let volumesHTML = '';
+        manga.tomes.forEach((tome, tomeIndex) => {
+          totalTomes++;
+          if (tome.lu) totalLus++;
+
+          let classe = 'volume-badge';
+          if (tome.lu) classe += ' read';
+          else if (tome.possede) classe += ' owned';
+
+          volumesHTML += `
+            <div class="${classe}" onclick="toggleTome(${mangaIndex}, ${tomeIndex})">
+              ${tome.numero}
+            </div>`;
+        });
+
+        card.innerHTML = `
+          <img class="cover" src="${manga.couverture || 'https://via.placeholder.com/70x105?text=Manga'}" alt="Couverture">
+          <div class="manga-info">
+            <div>
+              <div class="manga-title">${manga.titre}</div>
+              <div class="manga-author">${manga.auteur || 'Auteur inconnu'}</div>
+            </div>
+            <div class="volumes-grid">
+              ${volumesHTML}
+              <div class="volume-badge" style="background:#007aff22; color:#007aff;" onclick="ajouterTome(${mangaIndex})">+</div>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      document.getElementById('stat-read').innerText = totalLus;
+      document.getElementById('stat-total').innerText = totalTomes;
     }
-  }else{
-    openSheet(null);
-    fTitle.value = parsed ? parsed.title : '';
-    fTotal.value = parsed && parsed.volume ? parsed.volume : '';
-  }
-}
 
-listEl.addEventListener('click', (e)=>{
-  const tile = e.target.closest('.tile');
-  if(tile){
-    const id = tile.dataset.series;
-    const vol = parseInt(tile.dataset.vol, 10);
-    const s = library.find(x=>x.id === id);
-    if(!s) return;
-    const idx = s.read.indexOf(vol);
-    if(idx >= 0) s.read.splice(idx,1);
-    else s.read.push(vol);
-    saveLibrary();
-    render();
-    return;
-  }
-  const editBtn = e.target.closest('[data-edit]');
-  if(editBtn){
-    openSheet(editBtn.dataset.edit);
-  }
-});
-
-function openSheet(id){
-  editingId = id || null;
-  if(editingId){
-    const s = library.find(x=>x.id === editingId);
-    sheetTitle.textContent = 'Modifier la série';
-    fTitle.value = s.title;
-    fTotal.value = s.total;
-    deleteRow.style.display = 'flex';
-  }else{
-    sheetTitle.textContent = 'Nouvelle série';
-    fTitle.value = '';
-    fTotal.value = '';
-    deleteRow.style.display = 'none';
-  }
-  sheet.classList.add('show');
-  overlay.classList.add('show');
-  setTimeout(()=>fTitle.focus(), 100);
-}
-
-function closeSheet(){
-  sheet.classList.remove('show');
-  overlay.classList.remove('show');
-  editingId = null;
-}
-
-document.getElementById('fabAdd').addEventListener('click', ()=>openSheet(null));
-document.getElementById('fabScan').addEventListener('click', openScanner);
-document.getElementById('scannerClose').addEventListener('click', closeScanner);
-document.getElementById('btnCancel').addEventListener('click', closeSheet);
-overlay.addEventListener('click', closeSheet);
-
-document.getElementById('btnSave').addEventListener('click', async ()=>{
-  const title = fTitle.value.trim();
-  const total = parseInt(fTotal.value, 10);
-  if(!title || !total || total < 1){
-    fTitle.focus();
-    return;
-  }
-  let target, needsCover;
-  if(editingId){
-    target = library.find(x=>x.id === editingId);
-    needsCover = target.title !== title || !target.cover;
-    target.title = title;
-    target.total = total;
-    target.read = target.read.filter(v=>v <= total);
-  }else{
-    target = { id: Date.now().toString(), title, total, read: [], cover: null };
-    library.push(target);
-    needsCover = true;
-  }
-  saveLibrary();
-  render();
-  closeSheet();
-
-  if(needsCover){
-    const cover = await fetchCover(title);
-    if(cover){
-      target.cover = cover;
-      saveLibrary();
-      render();
+    // --- ACTIONS TOMES ---
+    function toggleTome(mangaIndex, tomeIndex) {
+      const tome = bibliotheque[mangaIndex].tomes[tomeIndex];
+      if (!tome.possede) {
+        tome.possede = true;
+      } else if (tome.possede && !tome.lu) {
+        tome.lu = true;
+      } else {
+        tome.possede = false;
+        tome.lu = false;
+      }
+      sauvegarder();
     }
-  }
-});
 
-document.getElementById('btnDelete').addEventListener('click', ()=>{
-  library = library.filter(x=>x.id !== editingId);
-  saveLibrary();
-  render();
-  closeSheet();
-});
+    function ajouterTome(mangaIndex) {
+      const manga = bibliotheque[mangaIndex];
+      const dernierNumero = manga.tomes.length > 0 ? manga.tomes[manga.tomes.length - 1].numero : 0;
+      manga.tomes.push({ numero: dernierNumero + 1, possede: true, lu: false });
+      sauvegarder();
+    }
 
-loadLibrary();
-</script>
+    function ajouterManuel() {
+      const titre = prompt("Titre de la série :");
+      if (!titre) return;
+      
+      bibliotheque.push({
+        titre: titre,
+        auteur: "",
+        couverture: "",
+        tomes: [{ numero: 1, possede: true, lu: false }]
+      });
+      sauvegarder();
+    }
+
+    // --- RECHERCHE GOOGLE BOOKS ---
+    async function chercherISBN(isbn) {
+      document.getElementById('scan-status').innerText = "Recherche de " + isbn + "...";
+      try {
+        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+        const data = await res.json();
+
+        if (data.totalItems > 0) {
+          const book = data.items[0].volumeInfo;
+          let titreBrut = book.title;
+          let auteur = book.authors ? book.authors.join(', ') : '';
+          let couverture = book.imageLinks?.thumbnail?.replace('http://', 'https://') || '';
+
+          // Séparer titre et numéro de tome
+          let numeroTome = 1;
+          let match = titreBrut.match(/(.*?)(?:\s*(?:Vol\.|Tome|T\.)\s*(\d+))/i);
+          let titreSerie = titreBrut;
+
+          if (match) {
+            titreSerie = match[1].trim();
+            numeroTome = parseInt(match[2]) || 1;
+          }
+
+          // Ajouter ou Mettre à jour dans la DB
+          let manga = bibliotheque.find(m => m.titre.toLowerCase() === titreSerie.toLowerCase());
+          
+          if (manga) {
+            if (!manga.tomes.some(t => t.numero === numeroTome)) {
+              manga.tomes.push({ numero: numeroTome, possede: true, lu: false });
+              manga.tomes.sort((a, b) => a.numero - b.numero);
+            }
+          } else {
+            let initialTomes = [];
+            for (let i = 1; i <= numeroTome; i++) {
+              initialTomes.push({ numero: i, possede: (i === numeroTome), lu: false });
+            }
+            bibliotheque.push({
+              titre: titreSerie,
+              auteur: auteur,
+              couverture: couverture,
+              tomes: initialTomes
+            });
+          }
+
+          sauvegarder();
+          fermerScanner();
+          alert(`Ajouté : ${titreSerie} (Tome ${numeroTome})`);
+        } else {
+          document.getElementById('scan-status').innerText = "ISBN inconnu sur Google Books.";
+        }
+      } catch (e) {
+        document.getElementById('scan-status').innerText = "Erreur de connexion.";
+      }
+    }
+
+    // --- SCANNER CAMERA ---
+    function ouvrirScanner() {
+      document.getElementById('scanner-modal').classList.add('active');
+      document.getElementById('scan-status').innerText = "Analyse en cours...";
+
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
+        if (result) {
+          let code = result.getText();
+          if (codeReader) codeReader.reset();
+          chercherISBN(code);
+        }
+      }).catch(err => {
+        document.getElementById('scan-status').innerText = "Accès caméra refusé.";
+      });
+    }
+
+    function fermerScanner() {
+      if (codeReader) {
+        codeReader.reset();
+      }
+      document.getElementById('scanner-modal').classList.remove('active');
+    }
+
+    // Initialisation
+    afficherBibliotheque();
+  </script>
 </body>
 </html>
