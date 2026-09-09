@@ -35,7 +35,7 @@
     body {
       background-color: var(--bg-color);
       color: var(--text-main);
-      padding-bottom: 90px;
+      padding-bottom: 110px;
     }
 
     header {
@@ -212,29 +212,32 @@
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
       background: rgba(26, 26, 30, 0.95);
       backdrop-filter: blur(15px);
       -webkit-backdrop-filter: blur(15px);
-      padding: 8px 16px;
-      border-radius: 30px;
+      padding: 8px 12px;
+      border-radius: 24px;
       border: 1px solid var(--card-border);
       box-shadow: 0 10px 25px rgba(0,0,0,0.6);
       z-index: 99;
+      max-width: 95vw;
     }
 
     .btn {
       background: var(--accent);
       color: white;
       border: none;
-      padding: 10px 16px;
-      border-radius: 20px;
+      padding: 8px 12px;
+      border-radius: 16px;
       font-weight: 600;
-      font-size: 13px;
+      font-size: 12px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
     }
 
     .btn-secondary {
@@ -278,6 +281,7 @@
       border-radius: 8px;
       object-fit: cover;
       background: #2a2a30;
+      cursor: pointer;
     }
 
     .modal-info {
@@ -391,18 +395,28 @@
   </main>
 
   <div class="actions-bar">
-    <button class="btn" onclick="ouvrirScanner()">📷 Scanner ISBN</button>
+    <button class="btn" onclick="ouvrirScanner()">📷 Scan</button>
     <button class="btn btn-secondary" onclick="ajouterManuel()">➕ Saisie</button>
+    <button class="btn btn-secondary" onclick="exporterSauvegarde()">📥 Exporter</button>
+    <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📤 Importer JSON</button>
+    <button class="btn btn-secondary" onclick="document.getElementById('csv-input').click()">📊 Importer CSV</button>
+    
+    <input type="file" id="file-input" style="display: none;" accept=".json" onchange="importerSauvegarde(event)">
+    <input type="file" id="csv-input" style="display: none;" accept=".csv" onchange="importerCSV(event)">
+    <input type="file" id="cover-file-input" style="display: none;" accept="image/*" onchange="chargerJaquetteFichier(event)">
   </div>
 
-  <div class="version-tag">v2.1</div>
+  <div class="version-tag">v2.3</div>
 
   <!-- Modal Détail Série -->
   <div id="detail-modal" class="modal-overlay">
     <div class="modal-content">
       <button class="close-modal" onclick="fermerModal()">×</button>
       <div class="modal-header">
-        <img id="modal-cover" class="modal-cover" src="" alt="Jaquette" onclick="modifierJaquetteActuelle()">
+        <div style="position: relative;">
+          <img id="modal-cover" class="modal-cover" src="" alt="Jaquette" onclick="ouvrirMenuImage()">
+          <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); color: white; padding: 2px 4px; border-radius: 4px; font-size: 10px;">✏️</div>
+        </div>
         <div class="modal-info">
           <h2 id="modal-title" style="font-size: 18px;"></h2>
           <div id="modal-author" style="font-size: 13px; color: var(--text-sub);"></div>
@@ -412,7 +426,7 @@
       </div>
 
       <div style="font-size: 12px; margin-bottom: 8px; color: var(--text-sub); display: flex; justify-content: space-between; align-items: center;">
-        <span>Clic: Changer statut | Appui long: Supprimer tome</span>
+        <span>Clic: Statut | Appui long: Supprimer tome</span>
       </div>
       
       <div id="modal-volumes-grid" class="volumes-grid"></div>
@@ -446,6 +460,145 @@
     function sauvegarder() {
       localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
       rendreVues();
+    }
+
+    /* Gestion avancée de la Jaquette */
+    function ouvrirMenuImage() {
+      const choix = prompt("Option jaquette :\n1 = Importer une image depuis ton téléphone\n2 = Coller un lien URL d'image", "1");
+      if (choix === "1") {
+        document.getElementById('cover-file-input').click();
+      } else if (choix === "2") {
+        const url = prompt("Lien de l'image :");
+        if (url) {
+          bibliotheque[serieIndexActive].couverture = url.trim();
+          sauvegarder();
+        }
+      }
+    }
+
+    function chargerJaquetteFichier(e) {
+      const file = e.target.files[0];
+      if (!file || serieIndexActive === null) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        // Compression légère de l'image pour optimiser le localStorage
+        const img = new Image();
+        img.src = evt.target.result;
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const maxDim = 300; // Taille optimale pour les jaquettes PWA
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height *= maxDim / width;
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width *= maxDim / height;
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          bibliotheque[serieIndexActive].couverture = canvas.toDataURL('image/jpeg', 0.8);
+          sauvegarder();
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+
+    /* Import de fichiers CSV (depuis Google Sheets / Excel) */
+    function importerCSV(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const lignes = e.target.result.split('\n');
+        let ajouts = 0;
+
+        lignes.forEach(ligne => {
+          if (!ligne.trim()) return;
+          const cols = ligne.split(',');
+          const titre = cols[0] ? cols[0].trim() : '';
+          const tomeMax = parseInt(cols[1]) || 1;
+
+          if (titre && titre.toLowerCase() !== 'titre' && titre.toLowerCase() !== 'manga') {
+            ajouterMangaDirectCSV(titre, tomeMax);
+            ajouts++;
+          }
+        });
+
+        alert(`${ajouts} série(s) importée(s) depuis le fichier CSV !`);
+      };
+      reader.readAsText(file);
+    }
+
+    function ajouterMangaDirectCSV(titreSerie, maxTomes) {
+      let mangaIndex = bibliotheque.findIndex(m => m.titre.toLowerCase() === titreSerie.toLowerCase());
+
+      if (mangaIndex === -1) {
+        let initialTomes = [];
+        for (let i = 1; i <= maxTomes; i++) {
+          initialTomes.push({ numero: i, possede: true, lu: false });
+        }
+        bibliotheque.push({
+          titre: titreSerie,
+          auteur: '',
+          couverture: '',
+          tomesParus: null,
+          tomes: initialTomes
+        });
+        sauvegarder();
+        synchroniserManga(bibliotheque.length - 1);
+      }
+    }
+
+    /* Sauvegarde & Restauration */
+    function exporterSauvegarde() {
+      if (bibliotheque.length === 0) {
+        alert("Ta bibliothèque est vide, rien à exporter.");
+        return;
+      }
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bibliotheque, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `mangas_backup_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importerSauvegarde(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          if (Array.isArray(importedData)) {
+            if (confirm("Remplacer la bibliothèque actuelle par cette sauvegarde ?")) {
+              bibliotheque = importedData;
+              sauvegarder();
+              alert("Bibliothèque restaurée avec succès !");
+            }
+          } else {
+            alert("Format de fichier invalide.");
+          }
+        } catch (err) {
+          alert("Erreur lors de la lecture du fichier JSON.");
+        }
+      };
+      reader.readAsText(file);
     }
 
     function changerOnglet(onglet) {
@@ -501,7 +654,7 @@
       const containerCol = document.getElementById('view-collection');
       containerCol.innerHTML = '';
       if (bibliotheque.length === 0) {
-        containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Scanne un ISBN pour débuter.</div>`;
+        containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Scanne un ISBN ou importe un CSV pour débuter.</div>`;
       } else {
         bibliotheque.forEach((serie, index) => {
           const possedes = serie.tomes.filter(t => t.possede).length;
@@ -515,7 +668,7 @@
             <img class="cover-thumb" src="${serie.couverture || 'https://via.placeholder.com/65x95?text=Manga'}" alt="Jaquette" onerror="this.src='https://via.placeholder.com/65x95?text=No+Cover'">
             <div class="series-details">
               <div class="series-title">${serie.titre}</div>
-              <div class="series-meta">${possedes}/${totalRef} tomes possédé(s)</div>
+              <div class="series-meta">${possedes}/${totalRef} tome(s) possédé(s)</div>
               <div class="progress-bar-bg">
                 <div class="progress-bar-fill" style="width: ${pourcentage}%;"></div>
               </div>
@@ -536,7 +689,6 @@
       sauvegarder();
     }
 
-    /* Modal Détail Série */
     function ouvrirModalSerie(index) {
       serieIndexActive = index;
       remplirModalSerie(index);
@@ -567,10 +719,8 @@
         box.className = classe;
         box.innerText = tome.numero;
         
-        // Clic simple (cycle statut)
         box.onclick = () => toggleTomeState(index, tIndex);
         
-        // Appui long / Clic droit (suppression d'un seul tome)
         box.oncontextmenu = (e) => {
           e.preventDefault();
           supprimerTomeUnique(index, tIndex);
@@ -627,22 +777,11 @@
       }
     }
 
-    function modifierJaquetteActuelle() {
-      if (serieIndexActive === null) return;
-      const serie = bibliotheque[serieIndexActive];
-      const url = prompt("Coller l'URL de la nouvelle jaquette :", serie.couverture || "");
-      if (url !== null) {
-        serie.couverture = url.trim();
-        sauvegarder();
-      }
-    }
-
     function fermerModal() {
       document.getElementById('detail-modal').classList.remove('active');
       serieIndexActive = null;
     }
 
-    /* Synchronisation réseau (Proxy CORS + Fallback) */
     async function synchroniserManga(mangaIndex) {
       const manga = bibliotheque[mangaIndex];
       const btn = document.getElementById('btn-sync-modal');
@@ -669,9 +808,7 @@
             }
           }
         }
-      } catch (e) {
-        console.warn("Échec MangaDex", e);
-      }
+      } catch (e) {}
 
       if (tomesMax === 0 || !jaquetteTrouvee) {
         try {
@@ -692,9 +829,7 @@
               });
             }
           }
-        } catch (e) {
-          console.warn("Échec Google Books", e);
-        }
+        } catch (e) {}
       }
 
       if (tomesMax > 0 || jaquetteTrouvee) {
@@ -707,7 +842,6 @@
       }
     }
 
-    /* Ajout & Scan avec option de rattrapage des tomes */
     function ajouterManuel() {
       const titre = prompt("Titre de la série :");
       if (!titre) return;
@@ -766,7 +900,6 @@
       let mangaIndex = bibliotheque.findIndex(m => m.titre.toLowerCase() === titreSerie.toLowerCase());
       let inclurePrecedents = false;
 
-      // Option : demande si l'utilisateur possède les tomes antérieurs
       if (numeroTome > 1) {
         inclurePrecedents = confirm(`Tu ajoutes le tome ${numeroTome} de "${titreSerie}".\n\nPossèdes-tu aussi tous les tomes de 1 à ${numeroTome - 1} ?`);
       }
@@ -829,7 +962,6 @@
       document.getElementById('scanner-modal').classList.remove('active');
     }
 
-    // Démarrage
     rendreVues();
   </script>
 </body>
