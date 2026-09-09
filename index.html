@@ -84,6 +84,12 @@
       display: flex;
       gap: 14px;
       border: 1px solid var(--border-color);
+      position: relative;
+    }
+
+    .cover-container {
+      position: relative;
+      cursor: pointer;
     }
 
     .cover {
@@ -93,6 +99,21 @@
       object-fit: cover;
       background-color: #2c2c2e;
       flex-shrink: 0;
+      display: block;
+    }
+
+    .cover-edit-badge {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
     }
 
     .manga-info {
@@ -102,15 +123,39 @@
       justify-content: space-between;
     }
 
+    .manga-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
     .manga-title {
       font-size: 17px;
       font-weight: 600;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .manga-author {
       font-size: 13px;
       color: var(--text-sub);
+    }
+
+    .manga-parution {
+      font-size: 11px;
+      color: var(--accent-green);
+      margin-top: 2px;
+      font-weight: 500;
+    }
+
+    .btn-check-parution {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-sub);
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 4px;
     }
 
     .volumes-grid {
@@ -183,7 +228,6 @@
       color: white;
     }
 
-    /* Version tag en bas à droite */
     .app-version {
       position: fixed;
       bottom: 8px;
@@ -196,7 +240,6 @@
       pointer-events: none;
     }
 
-    /* Modal / Scanner */
     .modal {
       display: none;
       position: fixed;
@@ -261,8 +304,7 @@
     </button>
   </div>
 
-  <!-- Tag de version -->
-  <div class="app-version">v1.0.0</div>
+  <div class="app-version">v1.1.0</div>
 
   <!-- Modal Scanner Caméra -->
   <div id="scanner-modal" class="modal">
@@ -322,12 +364,20 @@
             </div>`;
         });
 
+        const parutionTxt = manga.tomesParus 
+          ? `<div class="manga-parution">📚 ${manga.tomesParus} tome(s) paru(s) en FR</div>`
+          : `<button class="btn-check-parution" onclick="verifierParution(${mangaIndex})">🔍 Vérifier parutions FR</button>`;
+
         card.innerHTML = `
-          <img class="cover" src="${manga.couverture || 'https://via.placeholder.com/70x105?text=Manga'}" alt="Couverture" onerror="this.src='https://via.placeholder.com/70x105?text=Pas+d\'image'">
+          <div class="cover-container" onclick="modifierJaquette(${mangaIndex})" title="Changer l'image">
+            <img class="cover" src="${manga.couverture || 'https://via.placeholder.com/70x105?text=Manga'}" alt="Couverture" onerror="this.src='https://via.placeholder.com/70x105?text=Pas+d\'image'">
+            <div class="cover-edit-badge">✏️</div>
+          </div>
           <div class="manga-info">
             <div>
               <div class="manga-title">${manga.titre}</div>
               <div class="manga-author">${manga.auteur || 'Auteur inconnu'}</div>
+              ${parutionTxt}
             </div>
             <div class="volumes-grid">
               ${volumesHTML}
@@ -340,6 +390,51 @@
 
       document.getElementById('stat-read').innerText = totalLus;
       document.getElementById('stat-total').innerText = totalTomes;
+    }
+
+    // --- MODIFIER LA JAQUETTE ---
+    function modifierJaquette(mangaIndex) {
+      const manga = bibliotheque[mangaIndex];
+      const nouvelleUrl = prompt(`Colle l'URL de la nouvelle jaquette pour "${manga.titre}" :`, manga.couverture || "");
+      if (nouvelleUrl !== null) {
+        manga.couverture = nouvelleUrl.trim();
+        sauvegarder();
+      }
+    }
+
+    // --- CHERCHER LE NOMBRE DE TOMES PARUS EN FR ---
+    async function verifierParution(mangaIndex) {
+      const manga = bibliotheque[mangaIndex];
+      try {
+        const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent('intitle:' + manga.titre + ' manga')}&maxResults=40&langRestrict=fr`);
+        const data = await res.json();
+        
+        let tomeMax = 0;
+        if (data.items) {
+          data.items.forEach(item => {
+            const title = item.volumeInfo.title || '';
+            const match = title.match(/(?:Vol\.|Tome|T\.)\s*(\d+)/i);
+            if (match) {
+              const num = parseInt(match[1]);
+              if (num > tomeMax) tomeMax = num;
+            }
+          });
+        }
+
+        if (tomeMax > 0) {
+          manga.tomesParus = tomeMax;
+          sauvegarder();
+          alert(`Trouvé : environ ${tomeMax} tome(s) référencé(s) pour la version française.`);
+        } else {
+          let manuel = prompt(`Impossible de détecter le nombre exact.\nIndique manuellement le nombre de tomes parus pour "${manga.titre}" :`);
+          if (manuel) {
+            manga.tomesParus = parseInt(manuel) || 0;
+            sauvegarder();
+          }
+        }
+      } catch (e) {
+        alert("Erreur lors de la recherche sur le réseau.");
+      }
     }
 
     // --- GESTION DES TOMES ---
@@ -363,13 +458,12 @@
       sauvegarder();
     }
 
-    // --- SAISIE MANUELLE AVEC RECHERCHE DE JAQUETTE ---
+    // --- SAISIE MANUELLE ---
     async function ajouterManuel() {
       const titre = prompt("Titre de la série :");
       if (!titre) return;
 
       let tomeNum = parseInt(prompt("Numéro du tome :", "1")) || 1;
-      
       let couverture = await chercherCouvertureParTitre(titre);
       
       if (!couverture) {
@@ -383,7 +477,6 @@
     async function chercherISBN(isbn) {
       document.getElementById('scan-status').innerText = "Analyse de l'ISBN " + isbn + "...";
 
-      // 1. Google Books par ISBN
       try {
         const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
         const data = await res.json();
@@ -394,7 +487,6 @@
         }
       } catch (e) { console.log("Échec ISBN Google Books"); }
 
-      // 2. Open Library par ISBN
       try {
         const resOL = await fetch(`https://openlibrary.org/search.json?q=${isbn}`);
         const dataOL = await resOL.json();
@@ -407,7 +499,6 @@
         }
       } catch (e) { console.log("Échec ISBN Open Library"); }
 
-      // 3. Fallback : Saisie manuelle guidée + recherche automatique par Titre
       fermerScanner();
       let titreManuel = prompt(`ISBN ${isbn} non trouvé dans les bases.\nSaisis le titre du manga :`);
       if (titreManuel) {
@@ -469,6 +560,7 @@
           titre: titreSerie,
           auteur: auteur,
           couverture: couverture,
+          tomesParus: null,
           tomes: initialTomes
         });
       }
