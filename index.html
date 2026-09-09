@@ -406,7 +406,7 @@
     <input type="file" id="cover-file-input" style="display: none;" accept="image/*" onchange="chargerJaquetteFichier(event)">
   </div>
 
-  <div class="version-tag">v2.3</div>
+  <div class="version-tag">v2.4</div>
 
   <!-- Modal Détail Série -->
   <div id="detail-modal" class="modal-overlay">
@@ -462,7 +462,6 @@
       rendreVues();
     }
 
-    /* Gestion avancée de la Jaquette */
     function ouvrirMenuImage() {
       const choix = prompt("Option jaquette :\n1 = Importer une image depuis ton téléphone\n2 = Coller un lien URL d'image", "1");
       if (choix === "1") {
@@ -482,13 +481,12 @@
 
       const reader = new FileReader();
       reader.onload = function(evt) {
-        // Compression légère de l'image pour optimiser le localStorage
         const img = new Image();
         img.src = evt.target.result;
         img.onload = function() {
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          const maxDim = 300; // Taille optimale pour les jaquettes PWA
+          const maxDim = 300;
           let width = img.width;
           let height = img.height;
 
@@ -515,41 +513,85 @@
       reader.readAsDataURL(file);
     }
 
-    /* Import de fichiers CSV (depuis Google Sheets / Excel) */
+    /* Parser CSV robuste pour gérer les virgules et la structure spécifique */
+    function parseCSVLine(text) {
+      let p = '', c = '', r = [];
+      let q = false;
+      for (let i = 0; i < text.length; i++) {
+        c = text[i];
+        if (c === '"') {
+          q = !q;
+        } else if (c === ',' && !q) {
+          r.push(p.trim());
+          p = '';
+        } else {
+          p += c;
+        }
+      }
+      r.push(p.trim());
+      return r;
+    }
+
     function importerCSV(event) {
       const file = event.target.files[0];
       if (!file) return;
 
       const reader = new FileReader();
       reader.onload = function(e) {
-        const lignes = e.target.result.split('\n');
+        const lignes = e.target.result.split(/\r?\n/);
         let ajouts = 0;
 
-        lignes.forEach(ligne => {
-          if (!ligne.trim()) return;
-          const cols = ligne.split(',');
-          const titre = cols[0] ? cols[0].trim() : '';
-          const tomeMax = parseInt(cols[1]) || 1;
+        lignes.forEach((ligne, index) => {
+          if (!ligne.trim() || index === 0) return; // Sauter la ligne d'en-tête
+          
+          const cols = parseCSVLine(ligne);
+          if (cols.length < 2) return;
 
-          if (titre && titre.toLowerCase() !== 'titre' && titre.toLowerCase() !== 'manga') {
-            ajouterMangaDirectCSV(titre, tomeMax);
+          const titre = cols[1] ? cols[1].replace(/^"|"$/g, '').trim() : '';
+          const brutTomesPossedes = cols[2] ? cols[2].replace(/^"|"$/g, '').trim() : '';
+          const tomesLusVal = cols[3] ? parseInt(cols[3].trim()) || 0 : 0;
+
+          if (titre && titre.toLowerCase() !== 'série') {
+            importerMangaDepuisCSV(titre, brutTomesPossedes, tomesLusVal);
             ajouts++;
           }
         });
 
-        alert(`${ajouts} série(s) importée(s) depuis le fichier CSV !`);
+        alert(`${ajouts} série(s) importée(s) avec succès !`);
       };
       reader.readAsText(file);
     }
 
-    function ajouterMangaDirectCSV(titreSerie, maxTomes) {
+    function importerMangaDepuisCSV(titreSerie, stringTomes, nbTomesLus) {
+      let setPossedes = new Set();
+      
+      // Extraction des numéros possédés (ex: "1, 2, 3, 4, 7" ou "12")
+      const matches = stringTomes.match(/\d+/g);
+      if (matches) {
+        if (stringTomes.includes(',') || stringTomes.includes(';')) {
+          matches.forEach(num => setPossedes.add(parseInt(num)));
+        } else {
+          const max = parseInt(matches[0]);
+          for (let i = 1; i <= max; i++) setPossedes.add(i);
+        }
+      }
+
+      const maxTomeCount = setPossedes.size > 0 ? Math.max(...Array.from(setPossedes), nbTomesLus) : (nbTomesLus || 1);
+
+      let initialTomes = [];
+      for (let i = 1; i <= maxTomeCount; i++) {
+        const estPossede = setPossedes.has(i) || (matches && matches.length === 1 && i <= parseInt(matches[0]));
+        const estLu = i <= nbTomesLus;
+        initialTomes.push({
+          numero: i,
+          possede: estPossede || estLu,
+          lu: estLu
+        });
+      }
+
       let mangaIndex = bibliotheque.findIndex(m => m.titre.toLowerCase() === titreSerie.toLowerCase());
 
       if (mangaIndex === -1) {
-        let initialTomes = [];
-        for (let i = 1; i <= maxTomes; i++) {
-          initialTomes.push({ numero: i, possede: true, lu: false });
-        }
         bibliotheque.push({
           titre: titreSerie,
           auteur: '',
@@ -557,12 +599,15 @@
           tomesParus: null,
           tomes: initialTomes
         });
-        sauvegarder();
-        synchroniserManga(bibliotheque.length - 1);
+        mangaIndex = bibliotheque.length - 1;
+      } else {
+        bibliotheque[mangaIndex].tomes = initialTomes;
       }
+
+      sauvegarder();
+      synchroniserManga(mangaIndex);
     }
 
-    /* Sauvegarde & Restauration */
     function exporterSauvegarde() {
       if (bibliotheque.length === 0) {
         alert("Ta bibliothèque est vide, rien à exporter.");
@@ -630,7 +675,6 @@
       document.getElementById('total-count').innerText = `${totalPossedes} tome(s)`;
       document.getElementById('pal-count').innerText = elementsPAL.length;
 
-      // Render PAL
       const containerPAL = document.getElementById('view-pal');
       containerPAL.innerHTML = '';
       if (elementsPAL.length === 0) {
@@ -650,7 +694,6 @@
         });
       }
 
-      // Render Collection
       const containerCol = document.getElementById('view-collection');
       containerCol.innerHTML = '';
       if (bibliotheque.length === 0) {
