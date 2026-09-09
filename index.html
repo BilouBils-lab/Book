@@ -12,6 +12,9 @@
   <link rel="apple-touch-icon" href="https://img.icons8.com/color/180/manga.png">
   <link rel="manifest" href='data:application/manifest+json,{"name":"Suivi Manga","short_name":"Mangas","start_url":"./index.html","display":"standalone","background_color":"#121212","theme_color":"#121212"}'>
 
+  <!-- Library OCR Tesseract.js -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
   <style>
     :root {
       --bg-color: #0f0f12;
@@ -227,7 +230,7 @@
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      justify-content: center;
+      gap: 10px;
       z-index: 99;
     }
 
@@ -235,7 +238,7 @@
       background: var(--accent);
       color: white;
       border: none;
-      padding: 12px 24px;
+      padding: 12px 18px;
       border-radius: 24px;
       font-weight: 600;
       font-size: 14px;
@@ -244,6 +247,13 @@
       display: flex;
       align-items: center;
       gap: 6px;
+    }
+
+    .btn-fab-secondary {
+      background: #2a2a30;
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
     }
 
     .btn {
@@ -385,6 +395,31 @@
       gap: 12px;
       margin-top: 20px;
     }
+
+    #loader-ocr {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 15, 18, 0.9);
+      z-index: 300;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--card-border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -409,10 +444,18 @@
   </main>
 
   <div class="actions-bar">
-    <button class="btn-fab" onclick="ajouterManuel()">➕ Ajouter une série</button>
+    <button class="btn-fab btn-fab-secondary" onclick="document.getElementById('ocr-file-input').click()">📷 Scan</button>
+    <button class="btn-fab" onclick="ajouterManuel()">➕ Ajouter</button>
   </div>
 
-  <div class="version-tag">v2.5</div>
+  <input type="file" id="ocr-file-input" style="display: none;" accept="image/*" capture="environment" onchange="traiterScanJaquette(event)">
+
+  <div id="loader-ocr">
+    <div class="spinner"></div>
+    <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette...</div>
+  </div>
+
+  <div class="version-tag">v2.7</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -444,8 +487,6 @@
         <div class="modal-info">
           <h2 id="modal-title" style="font-size: 18px;"></h2>
           <div id="modal-author" style="font-size: 13px; color: var(--text-sub);"></div>
-          <div id="modal-status" style="font-size: 12px; color: var(--success); margin-top: 4px;"></div>
-          <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 8px; margin-top: 6px; width: fit-content;" id="btn-sync-modal">🔄 Auto-détecter parutions</button>
         </div>
       </div>
 
@@ -479,6 +520,45 @@
 
     function fermerParametres() {
       document.getElementById('settings-modal').classList.remove('active');
+    }
+
+    async function traiterScanJaquette(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const loader = document.getElementById('loader-ocr');
+      const loaderStatus = document.getElementById('loader-status');
+      loader.style.display = 'flex';
+      loaderStatus.innerText = "Lecture du texte...";
+
+      try {
+        const worker = await Tesseract.createWorker('eng+fra');
+        const ret = await worker.recognize(file);
+        await worker.terminate();
+
+        const lignes = ret.data.text.split('\n')
+          .map(l => l.trim())
+          .filter(l => l.length > 2 && !/^\d+$/.test(l));
+
+        loader.style.display = 'none';
+
+        if (lignes.length === 0) {
+          alert("Impossible de lire le titre sur l'image. Essaie avec un éclairage plus direct.");
+          return;
+        }
+
+        const texteSuggere = lignes[0];
+        const titreFinal = prompt("Titre détecté (à ajuster si besoin) :", texteSuggere);
+        
+        if (titreFinal) {
+          let tomeNum = parseInt(prompt("Numéro du tome :", "1")) || 1;
+          enregistrerSerie(titreFinal.trim(), tomeNum);
+        }
+      } catch (e) {
+        loader.style.display = 'none';
+        alert("Erreur lors de l'analyse OCR.");
+      }
+      event.target.value = '';
     }
 
     function ouvrirMenuImage() {
@@ -613,7 +693,6 @@
           titre: titreSerie,
           auteur: '',
           couverture: '',
-          tomesParus: null,
           tomes: initialTomes
         });
         mangaIndex = bibliotheque.length - 1;
@@ -622,7 +701,6 @@
       }
 
       sauvegarder();
-      synchroniserManga(mangaIndex);
     }
 
     function exporterSauvegarde() {
@@ -719,8 +797,9 @@
       } else {
         bibliotheque.forEach((serie, index) => {
           const possedes = serie.tomes.filter(t => t.possede).length;
-          const totalRef = serie.tomesParus || serie.tomes.length;
-          const pourcentage = totalRef > 0 ? Math.min(100, Math.round((possedes / totalRef) * 100)) : 0;
+          const lus = serie.tomes.filter(t => t.lu).length;
+          const totalRef = serie.tomes.length;
+          const pourcentage = totalRef > 0 ? Math.min(100, Math.round((lus / totalRef) * 100)) : 0;
 
           const card = document.createElement('div');
           card.className = 'series-card';
@@ -729,7 +808,7 @@
             <img class="cover-thumb" src="${serie.couverture || 'https://via.placeholder.com/65x95?text=Manga'}" alt="Jaquette" onerror="this.src='https://via.placeholder.com/65x95?text=No+Cover'">
             <div class="series-details">
               <div class="series-title">${serie.titre}</div>
-              <div class="series-meta">${possedes}/${totalRef} tome(s) possédé(s)</div>
+              <div class="series-meta">${possedes} possédé(s) · ${lus}/${totalRef} lu(s)</div>
               <div class="progress-bar-bg">
                 <div class="progress-bar-fill" style="width: ${pourcentage}%;"></div>
               </div>
@@ -761,12 +840,6 @@
       document.getElementById('modal-title').innerText = serie.titre;
       document.getElementById('modal-author').innerText = serie.auteur || 'Auteur inconnu';
       document.getElementById('modal-cover').src = serie.couverture || 'https://via.placeholder.com/90x135?text=Manga';
-      
-      const statusTxt = serie.tomesParus ? `📚 ${serie.tomesParus} tome(s) paru(s) au total` : 'Nombre de parutions non synchronisé';
-      document.getElementById('modal-status').innerText = statusTxt;
-
-      const btnSync = document.getElementById('btn-sync-modal');
-      btnSync.onclick = () => synchroniserManga(index);
 
       const grid = document.getElementById('modal-volumes-grid');
       grid.innerHTML = '';
@@ -843,71 +916,7 @@
       serieIndexActive = null;
     }
 
-    async function synchroniserManga(mangaIndex) {
-      const manga = bibliotheque[mangaIndex];
-      const btn = document.getElementById('btn-sync-modal');
-      if (btn) btn.innerText = "🔍 Recherche...";
-
-      let jaquetteTrouvee = null;
-      let tomesMax = 0;
-
-      try {
-        const targetUrl = `https://api.mangadex.org/manga?title=${encodeURIComponent(manga.titre)}&limit=1&includes[]=cover_art`;
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-        
-        const resMD = await fetch(proxyUrl);
-        if (resMD.ok) {
-          const dataMD = await resMD.json();
-          if (dataMD.data && dataMD.data.length > 0) {
-            const mData = dataMD.data[0];
-            const lastVol = parseInt(mData.attributes.lastVolume);
-            if (!isNaN(lastVol)) tomesMax = lastVol;
-
-            const coverRel = mData.relationships.find(r => r.type === 'cover_art');
-            if (coverRel && coverRel.attributes) {
-              jaquetteTrouvee = `https://uploads.mangadex.org/covers/${mData.id}/${coverRel.attributes.fileName}.256.jpg`;
-            }
-          }
-        }
-      } catch (e) {}
-
-      if (tomesMax === 0 || !jaquetteTrouvee) {
-        try {
-          const resGB = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent('intitle:' + manga.titre + ' manga')}&maxResults=20`);
-          if (resGB.ok) {
-            const dataGB = await resGB.json();
-            if (dataGB.items) {
-              dataGB.items.forEach(item => {
-                const title = item.volumeInfo.title || '';
-                const match = title.match(/(?:Vol\.|Tome|T\.)\s*(\d+)/i);
-                if (match) {
-                  const num = parseInt(match[1]);
-                  if (num > tomesMax) tomesMax = num;
-                }
-                if (!jaquetteTrouvee && item.volumeInfo.imageLinks?.thumbnail) {
-                  jaquetteTrouvee = item.volumeInfo.imageLinks.thumbnail.replace('http://', 'https://');
-                }
-              });
-            }
-          }
-        } catch (e) {}
-      }
-
-      if (tomesMax > 0 || jaquetteTrouvee) {
-        if (tomesMax > 0) manga.tomesParus = tomesMax;
-        if (jaquetteTrouvee && !manga.couverture) manga.couverture = jaquetteTrouvee;
-        sauvegarder();
-      } else {
-        if (btn) btn.innerText = "⚠️ Non trouvé";
-        setTimeout(() => { if (btn) btn.innerText = "🔄 Auto-détecter parutions"; }, 3000);
-      }
-    }
-
-    function ajouterManuel() {
-      const titre = prompt("Titre de la série :");
-      if (!titre) return;
-      let tomeNum = parseInt(prompt("Numéro du tome possédé :", "1")) || 1;
-      
+    function enregistrerSerie(titre, tomeNum) {
       let mangaIndex = bibliotheque.findIndex(m => m.titre.toLowerCase() === titre.toLowerCase());
       let inclurePrecedents = false;
 
@@ -938,14 +947,19 @@
           titre: titre,
           auteur: '',
           couverture: '',
-          tomesParus: null,
           tomes: initialTomes
         });
         mangaIndex = bibliotheque.length - 1;
       }
 
       sauvegarder();
-      synchroniserManga(mangaIndex);
+    }
+
+    function ajouterManuel() {
+      const titre = prompt("Titre de la série :");
+      if (!titre) return;
+      let tomeNum = parseInt(prompt("Numéro du tome possédé :", "1")) || 1;
+      enregistrerSerie(titre.trim(), tomeNum);
     }
 
     rendreVues();
