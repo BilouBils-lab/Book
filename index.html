@@ -12,9 +12,6 @@
   <link rel="apple-touch-icon" href="https://img.icons8.com/color/180/manga.png">
   <link rel="manifest" href='data:application/manifest+json,{"name":"Suivi Manga","short_name":"Mangas","start_url":"./index.html","display":"standalone","background_color":"#121212","theme_color":"#121212"}'>
 
-  <!-- Library OCR Tesseract.js -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-
   <style>
     :root {
       --bg-color: #0f0f12;
@@ -230,7 +227,7 @@
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      gap: 10px;
+      justify-content: center;
       z-index: 99;
     }
 
@@ -238,7 +235,7 @@
       background: var(--accent);
       color: white;
       border: none;
-      padding: 12px 18px;
+      padding: 12px 24px;
       border-radius: 24px;
       font-weight: 600;
       font-size: 14px;
@@ -247,13 +244,6 @@
       display: flex;
       align-items: center;
       gap: 6px;
-    }
-
-    .btn-fab-secondary {
-      background: #2a2a30;
-      color: var(--text-main);
-      border: 1px solid var(--card-border);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
     }
 
     .btn {
@@ -395,31 +385,6 @@
       gap: 12px;
       margin-top: 20px;
     }
-
-    #loader-ocr {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(15, 15, 18, 0.9);
-      z-index: 300;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-    }
-
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid var(--card-border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
   </style>
 </head>
 <body>
@@ -444,18 +409,10 @@
   </main>
 
   <div class="actions-bar">
-    <button class="btn-fab btn-fab-secondary" onclick="document.getElementById('ocr-file-input').click()">📷 Scan</button>
-    <button class="btn-fab" onclick="ajouterManuel()">➕ Ajouter</button>
+    <button class="btn-fab" onclick="ajouterManuel()">➕ Ajouter une série</button>
   </div>
 
-  <input type="file" id="ocr-file-input" style="display: none;" accept="image/*" capture="environment" onchange="traiterScanJaquette(event)">
-
-  <div id="loader-ocr">
-    <div class="spinner"></div>
-    <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette...</div>
-  </div>
-
-  <div class="version-tag">v2.7</div>
+  <div class="version-tag">v2.8</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -520,45 +477,6 @@
 
     function fermerParametres() {
       document.getElementById('settings-modal').classList.remove('active');
-    }
-
-    async function traiterScanJaquette(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const loader = document.getElementById('loader-ocr');
-      const loaderStatus = document.getElementById('loader-status');
-      loader.style.display = 'flex';
-      loaderStatus.innerText = "Lecture du texte...";
-
-      try {
-        const worker = await Tesseract.createWorker('eng+fra');
-        const ret = await worker.recognize(file);
-        await worker.terminate();
-
-        const lignes = ret.data.text.split('\n')
-          .map(l => l.trim())
-          .filter(l => l.length > 2 && !/^\d+$/.test(l));
-
-        loader.style.display = 'none';
-
-        if (lignes.length === 0) {
-          alert("Impossible de lire le titre sur l'image. Essaie avec un éclairage plus direct.");
-          return;
-        }
-
-        const texteSuggere = lignes[0];
-        const titreFinal = prompt("Titre détecté (à ajuster si besoin) :", texteSuggere);
-        
-        if (titreFinal) {
-          let tomeNum = parseInt(prompt("Numéro du tome :", "1")) || 1;
-          enregistrerSerie(titreFinal.trim(), tomeNum);
-        }
-      } catch (e) {
-        loader.style.display = 'none';
-        alert("Erreur lors de l'analyse OCR.");
-      }
-      event.target.value = '';
     }
 
     function ouvrirMenuImage() {
@@ -695,7 +613,6 @@
           couverture: '',
           tomes: initialTomes
         });
-        mangaIndex = bibliotheque.length - 1;
       } else {
         bibliotheque[mangaIndex].tomes = initialTomes;
       }
@@ -949,7 +866,6 @@
           couverture: '',
           tomes: initialTomes
         });
-        mangaIndex = bibliotheque.length - 1;
       }
 
       sauvegarder();
