@@ -461,6 +461,7 @@
       
       <div class="settings-list">
         <button class="btn btn-secondary" onclick="configurerCleAPI()">🔑 Définir / Modifier la clé API Gemini</button>
+        <p style="font-size: 11px; color: var(--text-sub); margin-top: -6px;">⚠️ Clé stockée sur cet appareil et visible dans les requêtes réseau. Restreins-la (quota, référent) dans Google AI Studio.</p>
         <button class="btn btn-secondary" onclick="exporterSauvegarde()">📥 Exporter la sauvegarde (JSON)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📤 Importer la sauvegarde (JSON)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('csv-input').click()">📊 Importer un fichier CSV (Sheets)</button>
@@ -538,6 +539,33 @@
       document.getElementById('ia-file-input').click();
     }
 
+    function redimensionnerImage(dataUrl, maxDim) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxDim) { height *= maxDim / width; width = maxDim; }
+          } else {
+            if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.onerror = reject;
+        img.src = dataUrl;
+      });
+    }
+
+    function normaliserTitre(t) {
+      return (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+    }
+
     async function analyserImageJaquette(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -545,55 +573,81 @@
       const cle = localStorage.getItem('gemini_api_key');
       if (!cle) {
         alert("Clé API manquante.");
+        event.target.value = '';
         return;
       }
 
       const loader = document.getElementById('loader-ia');
+      const loaderStatus = document.getElementById('loader-status');
+      loaderStatus.textContent = "Analyse de la jaquette par l'IA...";
       loader.style.display = 'flex';
 
       try {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = async function() {
-          const base64Data = reader.result.split(',')[1];
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const base64Data = dataUrl.split(',')[1];
 
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cle}`;
-          const payload = {
-            contents: [{
-              parts: [
-                { text: "Analyse cette jaquette de manga. Réponds UNIQUEMENT sous forme d'un objet JSON strict avec deux clés exactes : 'titre' (le nom de la série en string) et 'tome' (le numéro du tome en entier, mets 1 si introuvable)." },
-                { inline_data: { mime_type: file.type || "image/jpeg", data: base64Data } }
-              ]
-            }],
-            generationConfig: { response_mime_type: "application/json" }
-          };
-
-          const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-
-          const data = await response.json();
-          loader.style.display = 'none';
-
-          if (data.candidates && data.candidates[0].content.parts[0].text) {
-            const resultat = JSON.parse(data.candidates[0].content.parts[0].text);
-            
-            const titreFinal = prompt("L'IA a détecté :", resultat.titre || "");
-            if (titreFinal) {
-              let tomeNum = parseInt(prompt("Numéro du tome :", resultat.tome || 1)) || 1;
-              enregistrerSerie(titreFinal.trim(), tomeNum);
-            }
-          } else {
-            alert("L'IA n'a pas pu analyser l'image. Essaie à nouveau.");
-          }
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cle}`;
+        const payload = {
+          contents: [{
+            parts: [
+              { text: "Analyse cette jaquette de manga. Réponds UNIQUEMENT sous forme d'un objet JSON strict avec deux clés exactes : 'titre' (le nom de la série en string) et 'tome' (le numéro du tome en entier, mets 1 si introuvable)." },
+              { inline_data: { mime_type: file.type || "image/jpeg", data: base64Data } }
+            ]
+          }],
+          generationConfig: { response_mime_type: "application/json" }
         };
-      } catch (e) {
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error('Erreur HTTP ' + response.status);
+        }
+
+        const data = await response.json();
+        const texteJson = data.candidates && data.candidates[0] && data.candidates[0].content
+          && data.candidates[0].content.parts && data.candidates[0].content.parts[0]
+          && data.candidates[0].content.parts[0].text;
+
+        if (!texteJson) {
+          const raison = data.candidates && data.candidates[0] && data.candidates[0].finishReason;
+          throw new Error(raison ? ('analyse bloquée : ' + raison) : 'réponse IA vide');
+        }
+
+        const resultat = JSON.parse(texteJson);
         loader.style.display = 'none';
-        alert("Erreur lors de la communication avec l'API Gemini.");
+
+        const titreFinal = prompt("L'IA a détecté :", resultat.titre || "");
+        if (titreFinal) {
+          let tomeNum = parseInt(prompt("Numéro du tome :", resultat.tome || 1)) || 1;
+          enregistrerSerie(titreFinal.trim(), tomeNum);
+
+          try {
+            const couvertureRedim = await redimensionnerImage(dataUrl, 300);
+            const idx = bibliotheque.findIndex(m => normaliserTitre(m.titre) === normaliserTitre(titreFinal));
+            if (idx !== -1) {
+              bibliotheque[idx].couverture = couvertureRedim;
+              sauvegarder();
+            }
+          } catch (e) {
+            console.error('Redimensionnement jaquette impossible', e);
+          }
+        }
+      } catch (e) {
+        console.error('Erreur scan IA', e);
+        alert("L'IA n'a pas pu analyser l'image (" + e.message + "). Réessaie ou ajoute la série manuellement.");
+      } finally {
+        loader.style.display = 'none';
+        event.target.value = '';
       }
-      event.target.value = '';
     }
 
     function ouvrirMenuImage() {
@@ -614,35 +668,14 @@
       if (!file || serieIndexActive === null) return;
 
       const reader = new FileReader();
-      reader.onload = function(evt) {
-        const img = new Image();
-        img.src = evt.target.result;
-        img.onload = function() {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const maxDim = 300;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > maxDim) {
-              height *= maxDim / width;
-              width = maxDim;
-            }
-          } else {
-            if (height > maxDim) {
-              width *= maxDim / height;
-              height = maxDim;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          bibliotheque[serieIndexActive].couverture = canvas.toDataURL('image/jpeg', 0.8);
+      reader.onload = async function(evt) {
+        try {
+          const couvertureRedim = await redimensionnerImage(evt.target.result, 300);
+          bibliotheque[serieIndexActive].couverture = couvertureRedim;
           sauvegarder();
-        };
+        } catch (err) {
+          alert("Impossible de charger cette image.");
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -721,7 +754,7 @@
         });
       }
 
-      let mangaIndex = bibliotheque.findIndex(m => m.titre.toLowerCase() === titreSerie.toLowerCase());
+      let mangaIndex = bibliotheque.findIndex(m => normaliserTitre(m.titre) === normaliserTitre(titreSerie));
 
       if (mangaIndex === -1) {
         bibliotheque.push({
@@ -742,13 +775,22 @@
         alert("Ta bibliothèque est vide, rien à exporter.");
         return;
       }
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bibliotheque, null, 2));
+      const blob = new Blob([JSON.stringify(bibliotheque, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
       const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `mangas_backup_${new Date().toISOString().slice(0,10)}.json`);
+      downloadAnchor.href = url;
+      downloadAnchor.download = `mangas_backup_${new Date().toISOString().slice(0,10)}.json`;
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function bibliothequeValide(data) {
+      return Array.isArray(data) && data.every(item =>
+        item && typeof item.titre === 'string' && Array.isArray(item.tomes) &&
+        item.tomes.every(t => typeof t.numero === 'number')
+      );
     }
 
     function importerSauvegarde(event) {
@@ -759,7 +801,7 @@
       reader.onload = function(e) {
         try {
           const importedData = JSON.parse(e.target.result);
-          if (Array.isArray(importedData)) {
+          if (bibliothequeValide(importedData)) {
             if (confirm("Remplacer la bibliothèque actuelle par cette sauvegarde ?")) {
               bibliotheque = importedData;
               sauvegarder();
@@ -767,7 +809,7 @@
               alert("Bibliothèque restaurée avec succès !");
             }
           } else {
-            alert("Format de fichier invalide.");
+            alert("Fichier invalide : ce n'est pas une sauvegarde reconnue de cette application.");
           }
         } catch (err) {
           alert("Erreur lors de la lecture du fichier JSON.");
@@ -887,19 +929,32 @@
         box.className = classe;
         box.innerText = tome.numero;
         
-        box.onclick = () => toggleTomeState(index, tIndex);
-        
+        let suppressionDeclenchee = false;
+
+        box.onclick = () => {
+          if (suppressionDeclenchee) {
+            suppressionDeclenchee = false;
+            return;
+          }
+          toggleTomeState(index, tIndex);
+        };
+
         box.oncontextmenu = (e) => {
           e.preventDefault();
           supprimerTomeUnique(index, tIndex);
         };
 
         box.ontouchstart = () => {
+          suppressionDeclenchee = false;
           longPressTimer = setTimeout(() => {
+            suppressionDeclenchee = true;
             supprimerTomeUnique(index, tIndex);
           }, 600);
         };
-        box.ontouchend = () => clearTimeout(longPressTimer);
+        box.ontouchend = (e) => {
+          clearTimeout(longPressTimer);
+          if (suppressionDeclenchee) e.preventDefault();
+        };
         box.ontouchmove = () => clearTimeout(longPressTimer);
 
         grid.appendChild(box);
@@ -951,7 +1006,7 @@
     }
 
     function enregistrerSerie(titre, tomeNum) {
-      let mangaIndex = bibliotheque.findIndex(m => m.titre.toLowerCase() === titre.toLowerCase());
+      let mangaIndex = bibliotheque.findIndex(m => normaliserTitre(m.titre) === normaliserTitre(titre));
       let inclurePrecedents = false;
 
       if (tomeNum > 1) {
