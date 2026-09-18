@@ -273,6 +273,30 @@
       color: white;
     }
 
+    .modal-field-label {
+      font-size: 12px;
+      color: var(--text-sub);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .modal-input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      background: var(--bg-color);
+      color: var(--text-main);
+      font-size: 15px;
+      margin-bottom: 16px;
+    }
+
+    .modal-btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
     .modal-overlay {
       display: none;
       position: fixed;
@@ -500,12 +524,173 @@
     </div>
   </div>
 
+  <!-- Modal générique : confirmation -->
+  <div class="modal-overlay" id="confirm-modal">
+    <div class="modal-content" style="max-width: 340px;">
+      <p id="confirm-message" style="margin-bottom: 20px; white-space: pre-line; line-height: 1.4;"></p>
+      <div class="modal-btn-row">
+        <button class="btn btn-secondary" id="confirm-cancel">Annuler</button>
+        <button class="btn" id="confirm-ok" style="background: #ef4444;">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal générique : saisie série (titre + tome) -->
+  <div class="modal-overlay" id="form-serie-modal">
+    <div class="modal-content" style="max-width: 340px;">
+      <h3 id="form-serie-heading" style="font-size: 16px; margin-bottom: 16px;">Ajouter une série</h3>
+      <label class="modal-field-label" for="form-serie-titre">Titre de la série</label>
+      <input type="text" id="form-serie-titre" class="modal-input" autocomplete="off">
+      <label class="modal-field-label" for="form-serie-tome">Numéro du tome possédé</label>
+      <input type="number" id="form-serie-tome" class="modal-input" min="1">
+      <div class="modal-btn-row">
+        <button class="btn btn-secondary" id="form-serie-cancel">Annuler</button>
+        <button class="btn" id="form-serie-ok">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal générique : saisie texte simple -->
+  <div class="modal-overlay" id="form-text-modal">
+    <div class="modal-content" style="max-width: 340px;">
+      <h3 id="form-text-heading" style="font-size: 16px; margin-bottom: 16px;"></h3>
+      <input type="text" id="form-text-input" class="modal-input" autocomplete="off">
+      <div class="modal-btn-row">
+        <button class="btn btn-secondary" id="form-text-cancel">Annuler</button>
+        <button class="btn" id="form-text-ok">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : choix de la jaquette -->
+  <div class="modal-overlay" id="cover-choice-modal">
+    <div class="modal-content" style="max-width: 340px;">
+      <h3 style="font-size: 16px; margin-bottom: 16px; text-align: center;">Changer la jaquette</h3>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button class="btn btn-secondary" id="cover-choice-file">📁 Depuis mon téléphone</button>
+        <button class="btn btn-secondary" id="cover-choice-url">🔗 Coller un lien</button>
+        <button class="btn btn-secondary" id="cover-choice-cancel" style="background: transparent;">Annuler</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let bibliotheque = [];
     let ongletActif = 'collection';
     let serieIndexActive = null;
     let longPressTimer = null;
     let db = null;
+
+    function confirmerAction(message) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal');
+        document.getElementById('confirm-message').textContent = message;
+        modal.classList.add('active');
+
+        const btnOk = document.getElementById('confirm-ok');
+        const btnCancel = document.getElementById('confirm-cancel');
+
+        function nettoyer(resultat) {
+          modal.classList.remove('active');
+          btnOk.removeEventListener('click', onOk);
+          btnCancel.removeEventListener('click', onCancel);
+          resolve(resultat);
+        }
+        function onOk() { nettoyer(true); }
+        function onCancel() { nettoyer(false); }
+
+        btnOk.addEventListener('click', onOk);
+        btnCancel.addEventListener('click', onCancel);
+      });
+    }
+
+    function demanderSerieEtTome(titreParDefaut, tomeParDefaut, entete) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('form-serie-modal');
+        const champTitre = document.getElementById('form-serie-titre');
+        const champTome = document.getElementById('form-serie-tome');
+        document.getElementById('form-serie-heading').textContent = entete || 'Ajouter une série';
+        champTitre.value = titreParDefaut || '';
+        champTome.value = tomeParDefaut || 1;
+        modal.classList.add('active');
+        setTimeout(() => champTitre.focus(), 50);
+
+        const btnOk = document.getElementById('form-serie-ok');
+        const btnCancel = document.getElementById('form-serie-cancel');
+
+        function nettoyer(resultat) {
+          modal.classList.remove('active');
+          btnOk.removeEventListener('click', onOk);
+          btnCancel.removeEventListener('click', onCancel);
+          resolve(resultat);
+        }
+        function onOk() {
+          const titre = champTitre.value.trim();
+          if (!titre) { champTitre.focus(); return; }
+          const tome = parseInt(champTome.value, 10) || 1;
+          nettoyer({ titre, tome });
+        }
+        function onCancel() { nettoyer(null); }
+
+        btnOk.addEventListener('click', onOk);
+        btnCancel.addEventListener('click', onCancel);
+      });
+    }
+
+    function demanderTexte(entete, valeurParDefaut) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('form-text-modal');
+        const champ = document.getElementById('form-text-input');
+        document.getElementById('form-text-heading').textContent = entete;
+        champ.value = valeurParDefaut || '';
+        modal.classList.add('active');
+        setTimeout(() => champ.focus(), 50);
+
+        const btnOk = document.getElementById('form-text-ok');
+        const btnCancel = document.getElementById('form-text-cancel');
+
+        function nettoyer(resultat) {
+          modal.classList.remove('active');
+          btnOk.removeEventListener('click', onOk);
+          btnCancel.removeEventListener('click', onCancel);
+          resolve(resultat);
+        }
+        function onOk() {
+          const valeur = champ.value.trim();
+          nettoyer(valeur || null);
+        }
+        function onCancel() { nettoyer(null); }
+
+        btnOk.addEventListener('click', onOk);
+        btnCancel.addEventListener('click', onCancel);
+      });
+    }
+
+    function demanderChoixJaquette() {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('cover-choice-modal');
+        modal.classList.add('active');
+
+        const btnFile = document.getElementById('cover-choice-file');
+        const btnUrl = document.getElementById('cover-choice-url');
+        const btnCancel = document.getElementById('cover-choice-cancel');
+
+        function nettoyer(resultat) {
+          modal.classList.remove('active');
+          btnFile.removeEventListener('click', onFile);
+          btnUrl.removeEventListener('click', onUrl);
+          btnCancel.removeEventListener('click', onCancel);
+          resolve(resultat);
+        }
+        function onFile() { nettoyer('fichier'); }
+        function onUrl() { nettoyer('url'); }
+        function onCancel() { nettoyer(null); }
+
+        btnFile.addEventListener('click', onFile);
+        btnUrl.addEventListener('click', onUrl);
+        btnCancel.addEventListener('click', onCancel);
+      });
+    }
 
     function ouvrirDB() {
       return new Promise((resolve, reject) => {
@@ -582,7 +767,7 @@
     }
 
     async function restaurerDepuisCloud() {
-      if (!confirm("Récupérer la dernière sauvegarde en ligne et remplacer la bibliothèque actuelle sur cet appareil ?")) return;
+      if (!(await confirmerAction("Récupérer la dernière sauvegarde en ligne et remplacer la bibliothèque actuelle sur cet appareil ?"))) return;
       try {
         const res = await fetch('https://manga-gemini-proxy.nabil-chilla.workers.dev/backup');
         const data = await res.json();
@@ -679,14 +864,13 @@
         const resultat = JSON.parse(texteJson);
         loader.style.display = 'none';
 
-        const titreFinal = prompt("L'IA a détecté :", resultat.titre || "");
-        if (titreFinal) {
-          let tomeNum = parseInt(prompt("Numéro du tome :", resultat.tome || 1)) || 1;
-          enregistrerSerie(titreFinal.trim(), tomeNum);
+        const saisie = await demanderSerieEtTome(resultat.titre || '', resultat.tome || 1, "L'IA a détecté :");
+        if (saisie) {
+          await enregistrerSerie(saisie.titre, saisie.tome);
 
           try {
             const couvertureRedim = await redimensionnerImage(dataUrl, 300);
-            const idx = bibliotheque.findIndex(m => normaliserTitre(m.titre) === normaliserTitre(titreFinal));
+            const idx = bibliotheque.findIndex(m => normaliserTitre(m.titre) === normaliserTitre(saisie.titre));
             if (idx !== -1) {
               bibliotheque[idx].couverture = couvertureRedim;
               sauvegarder();
@@ -704,12 +888,12 @@
       }
     }
 
-    function ouvrirMenuImage() {
-      const choix = prompt("Option jaquette :\n1 = Importer une image depuis ton téléphone\n2 = Coller un lien URL d'image", "1");
-      if (choix === "1") {
+    async function ouvrirMenuImage() {
+      const choix = await demanderChoixJaquette();
+      if (choix === 'fichier') {
         document.getElementById('cover-file-input').click();
-      } else if (choix === "2") {
-        const url = prompt("Lien de l'image :");
+      } else if (choix === 'url') {
+        const url = await demanderTexte("Lien de l'image :");
         if (url) {
           bibliotheque[serieIndexActive].couverture = url.trim();
           sauvegarder();
@@ -852,11 +1036,11 @@
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = async function(e) {
         try {
           const importedData = JSON.parse(e.target.result);
           if (bibliothequeValide(importedData)) {
-            if (confirm("Remplacer la bibliothèque actuelle par cette sauvegarde ?")) {
+            if (await confirmerAction("Remplacer la bibliothèque actuelle par cette sauvegarde ?")) {
               bibliotheque = importedData;
               sauvegarder();
               fermerParametres();
@@ -1029,9 +1213,9 @@
       sauvegarder();
     }
 
-    function supprimerTomeUnique(sIndex, tIndex) {
+    async function supprimerTomeUnique(sIndex, tIndex) {
       const tome = bibliotheque[sIndex].tomes[tIndex];
-      if (confirm(`Supprimer le tome ${tome.numero} de la liste ?`)) {
+      if (await confirmerAction(`Supprimer le tome ${tome.numero} de la liste ?`)) {
         bibliotheque[sIndex].tomes.splice(tIndex, 1);
         sauvegarder();
       }
@@ -1045,9 +1229,9 @@
       sauvegarder();
     }
 
-    function supprimerSerieActuelle() {
+    async function supprimerSerieActuelle() {
       if (serieIndexActive === null) return;
-      if (confirm(`Supprimer complètement "${bibliotheque[serieIndexActive].titre}" de ta collection ?`)) {
+      if (await confirmerAction(`Supprimer complètement "${bibliotheque[serieIndexActive].titre}" de ta collection ?`)) {
         bibliotheque.splice(serieIndexActive, 1);
         fermerModal();
         sauvegarder();
@@ -1059,12 +1243,12 @@
       serieIndexActive = null;
     }
 
-    function enregistrerSerie(titre, tomeNum) {
+    async function enregistrerSerie(titre, tomeNum) {
       let mangaIndex = bibliotheque.findIndex(m => normaliserTitre(m.titre) === normaliserTitre(titre));
       let inclurePrecedents = false;
 
       if (tomeNum > 1) {
-        inclurePrecedents = confirm(`Tu ajoutes le tome ${tomeNum} de "${titre}".\n\nPossèdes-tu aussi tous les tomes de 1 à ${tomeNum - 1} ?`);
+        inclurePrecedents = await confirmerAction(`Tu ajoutes le tome ${tomeNum} de "${titre}".\n\nPossèdes-tu aussi tous les tomes de 1 à ${tomeNum - 1} ?`);
       }
 
       if (mangaIndex !== -1) {
@@ -1097,11 +1281,10 @@
       sauvegarder();
     }
 
-    function ajouterManuel() {
-      const titre = prompt("Titre de la série :");
-      if (!titre) return;
-      let tomeNum = parseInt(prompt("Numéro du tome possédé :", "1")) || 1;
-      enregistrerSerie(titre.trim(), tomeNum);
+    async function ajouterManuel() {
+      const saisie = await demanderSerieEtTome('', 1, 'Ajouter une série');
+      if (!saisie) return;
+      await enregistrerSerie(saisie.titre, saisie.tome);
     }
 
     initialiserBibliotheque();
