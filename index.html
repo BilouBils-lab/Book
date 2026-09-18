@@ -43,7 +43,7 @@
       background-color: rgba(15, 15, 18, 0.9);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      padding: 12px 16px 0 16px;
+      padding: calc(12px + env(safe-area-inset-top)) 16px 0 16px;
       border-bottom: 1px solid var(--card-border);
       z-index: 100;
     }
