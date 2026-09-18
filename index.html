@@ -460,6 +460,14 @@
 
   <main>
     <div id="view-pal" style="display: none;"></div>
+    <div id="collection-toolbar" style="display: flex; gap: 8px; margin-bottom: 12px;">
+      <input type="text" id="recherche-input" class="modal-input" style="margin-bottom: 0; flex: 1;" placeholder="Rechercher une série..." oninput="onRechercheInput(this.value)">
+      <select id="tri-select" class="modal-input" style="margin-bottom: 0; width: auto; flex-shrink: 0;" onchange="onTriChange(this.value)">
+        <option value="alpha" selected>A → Z</option>
+        <option value="progression">Progression</option>
+        <option value="ajout">Ordre d'ajout</option>
+      </select>
+    </div>
     <div id="view-collection"></div>
   </main>
 
@@ -577,6 +585,8 @@
   <script>
     let bibliotheque = [];
     let ongletActif = 'collection';
+    let rechercheTexte = '';
+    let triActif = 'alpha';
     let serieIndexActive = null;
     let longPressTimer = null;
     let db = null;
@@ -1063,6 +1073,7 @@
       
       document.getElementById('view-pal').style.display = onglet === 'pal' ? 'block' : 'none';
       document.getElementById('view-collection').style.display = onglet === 'collection' ? 'block' : 'none';
+      document.getElementById('collection-toolbar').style.display = onglet === 'collection' ? 'flex' : 'none';
       
       rendreVues();
     }
@@ -1106,10 +1117,32 @@
 
       const containerCol = document.getElementById('view-collection');
       containerCol.innerHTML = '';
+
+      let listeAffichee = bibliotheque.map((serie, i) => ({ serie, indexReel: i }));
+
+      if (rechercheTexte.trim()) {
+        const recherche = normaliserTitre(rechercheTexte);
+        listeAffichee = listeAffichee.filter(item => normaliserTitre(item.serie.titre).includes(recherche));
+      }
+
+      if (triActif === 'alpha') {
+        listeAffichee.sort((a, b) => a.serie.titre.localeCompare(b.serie.titre, 'fr', { sensitivity: 'base' }));
+      } else if (triActif === 'progression') {
+        const pourcentageDe = (serie) => {
+          const total = serie.tomes.length;
+          const lus = serie.tomes.filter(t => t.lu).length;
+          return total > 0 ? lus / total : 0;
+        };
+        listeAffichee.sort((a, b) => pourcentageDe(b.serie) - pourcentageDe(a.serie));
+      }
+      // 'ajout' : on garde l'ordre naturel du tableau (ordre d'ajout), rien à trier
+
       if (bibliotheque.length === 0) {
         containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Clique sur ⚙️ pour importer un CSV ou sur ➕ pour ajouter une série.</div>`;
+      } else if (listeAffichee.length === 0) {
+        containerCol.innerHTML = `<div class="empty-state">Aucune série ne correspond à "${rechercheTexte}".</div>`;
       } else {
-        bibliotheque.forEach((serie, index) => {
+        listeAffichee.forEach(({ serie, indexReel }) => {
           const possedes = serie.tomes.filter(t => t.possede).length;
           const lus = serie.tomes.filter(t => t.lu).length;
           const totalRef = serie.tomes.length;
@@ -1117,7 +1150,7 @@
 
           const card = document.createElement('div');
           card.className = 'series-card';
-          card.onclick = () => ouvrirModalSerie(index);
+          card.onclick = () => ouvrirModalSerie(indexReel);
           card.innerHTML = `
             <img class="cover-thumb" src="${serie.couverture || 'https://via.placeholder.com/65x95?text=Manga'}" alt="Jaquette" onerror="this.src='https://via.placeholder.com/65x95?text=No+Cover'">
             <div class="series-details">
@@ -1136,6 +1169,16 @@
       if (serieIndexActive !== null && bibliotheque[serieIndexActive]) {
         remplirModalSerie(serieIndexActive);
       }
+    }
+
+    function onRechercheInput(valeur) {
+      rechercheTexte = valeur;
+      rendreVues();
+    }
+
+    function onTriChange(valeur) {
+      triActif = valeur;
+      rendreVues();
     }
 
     function marquerCommeLu(sIndex, tIndex) {
