@@ -460,6 +460,7 @@
       <h2 style="font-size: 18px; margin-bottom: 16px;">Paramètres</h2>
       
       <div class="settings-list">
+        <button class="btn btn-secondary" onclick="restaurerDepuisCloud()">☁️ Restaurer depuis le cloud</button>
         <button class="btn btn-secondary" onclick="exporterSauvegarde()">📥 Exporter la sauvegarde (JSON)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📤 Importer la sauvegarde (JSON)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('csv-input').click()">📊 Importer un fichier CSV (Sheets)</button>
@@ -505,9 +506,37 @@
     let serieIndexActive = null;
     let longPressTimer = null;
 
+    let cloudBackupTimer = null;
     function sauvegarder() {
       localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
       rendreVues();
+      clearTimeout(cloudBackupTimer);
+      cloudBackupTimer = setTimeout(() => {
+        fetch('https://manga-gemini-proxy.nabil-chilla.workers.dev/backup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bibliotheque)
+        }).catch(e => console.error('Sauvegarde cloud impossible', e));
+      }, 2000);
+    }
+
+    async function restaurerDepuisCloud() {
+      if (!confirm("Récupérer la dernière sauvegarde en ligne et remplacer la bibliothèque actuelle sur cet appareil ?")) return;
+      try {
+        const res = await fetch('https://manga-gemini-proxy.nabil-chilla.workers.dev/backup');
+        const data = await res.json();
+        if (bibliothequeValide(data)) {
+          bibliotheque = data;
+          localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
+          rendreVues();
+          fermerParametres();
+          alert("Bibliothèque restaurée depuis le cloud !");
+        } else {
+          alert("Aucune sauvegarde en ligne trouvée pour l'instant.");
+        }
+      } catch (e) {
+        alert("Impossible de contacter la sauvegarde en ligne.");
+      }
     }
 
     function ouvrirParametres() {
