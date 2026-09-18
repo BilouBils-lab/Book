@@ -501,14 +501,75 @@
   </div>
 
   <script>
-    let bibliotheque = JSON.parse(localStorage.getItem('mangas_db')) || [];
+    let bibliotheque = [];
     let ongletActif = 'collection';
     let serieIndexActive = null;
     let longPressTimer = null;
+    let db = null;
+
+    function ouvrirDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open('MangaTrackerDB', 1);
+        req.onupgradeneeded = (e) => {
+          const database = e.target.result;
+          if (!database.objectStoreNames.contains('kv')) {
+            database.createObjectStore('kv');
+          }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    function dbGet(cle) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('kv', 'readonly');
+        const req = tx.objectStore('kv').get(cle);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    function dbSet(cle, valeur) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('kv', 'readwrite');
+        const req = tx.objectStore('kv').put(valeur, cle);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function initialiserBibliotheque() {
+      try {
+        db = await ouvrirDB();
+        let data = await dbGet('bibliotheque');
+        if (!data) {
+          const ancien = localStorage.getItem('mangas_db');
+          if (ancien) {
+            try {
+              data = JSON.parse(ancien);
+              await dbSet('bibliotheque', data);
+              localStorage.removeItem('mangas_db');
+            } catch (e) {
+              console.error('Migration depuis localStorage impossible', e);
+            }
+          }
+        }
+        bibliotheque = data || [];
+      } catch (e) {
+        console.error('IndexedDB indisponible, dernier recours localStorage', e);
+        bibliotheque = JSON.parse(localStorage.getItem('mangas_db')) || [];
+      }
+      rendreVues();
+    }
 
     let cloudBackupTimer = null;
     function sauvegarder() {
-      localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
+      if (db) {
+        dbSet('bibliotheque', bibliotheque).catch(e => console.error('Sauvegarde locale impossible', e));
+      } else {
+        localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
+      }
       rendreVues();
       clearTimeout(cloudBackupTimer);
       cloudBackupTimer = setTimeout(() => {
@@ -527,8 +588,7 @@
         const data = await res.json();
         if (bibliothequeValide(data)) {
           bibliotheque = data;
-          localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
-          rendreVues();
+          sauvegarder();
           fermerParametres();
           alert("Bibliothèque restaurée depuis le cloud !");
         } else {
@@ -1044,7 +1104,7 @@
       enregistrerSerie(titre.trim(), tomeNum);
     }
 
-    rendreVues();
+    initialiserBibliotheque();
   </script>
 </body>
 </html>
