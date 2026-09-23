@@ -602,8 +602,6 @@
         <option value="En pause">En pause</option>
         <option value="Abandonnée">Abandonnée</option>
       </select>
-      <label class="modal-field-label">Ma note</label>
-      <div id="infos-note-stars" style="display: flex; gap: 8px; font-size: 26px; margin-bottom: 16px;"></div>
       <button class="btn btn-secondary" id="infos-relancer-recherche" style="font-size: 12px; margin-bottom: 20px;" onclick="rechercherInfosAuto()">🔍 Relancer la recherche automatique</button>
       <div class="modal-btn-row">
         <button class="btn btn-secondary" id="infos-cancel">Annuler</button>
@@ -732,21 +730,29 @@
       });
     }
 
-    let noteSelectionnee = 0;
+    function pause(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
-    function construireEtoiles() {
-      const container = document.getElementById('infos-note-stars');
-      container.innerHTML = '';
-      for (let i = 1; i <= 5; i++) {
-        const span = document.createElement('span');
-        span.textContent = i <= noteSelectionnee ? '★' : '☆';
-        span.style.color = i <= noteSelectionnee ? '#f5b301' : 'var(--text-sub)';
-        span.style.cursor = 'pointer';
-        span.onclick = () => {
-          noteSelectionnee = (noteSelectionnee === i) ? 0 : i;
-          construireEtoiles();
-        };
-        container.appendChild(span);
+    async function fetchAvecReessai(url) {
+      for (let tentative = 0; tentative < 2; tentative++) {
+        try {
+          const r = await fetch(url);
+          if (r.ok) {
+            return { ok: true, status: r.status, body: await r.json().catch(() => null) };
+          }
+          if (tentative === 0 && (r.status === 429 || r.status >= 500)) {
+            await pause(1500);
+            continue;
+          }
+          return { ok: false, status: r.status, body: null };
+        } catch (e) {
+          if (tentative === 0) {
+            await pause(1500);
+            continue;
+          }
+          throw e;
+        }
       }
     }
 
@@ -764,8 +770,8 @@
         const booksUrl = 'https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent('intitle:' + titreSerie) + '&maxResults=1';
 
         const [jikanRes, booksRes] = await Promise.allSettled([
-          fetch(jikanUrl).then(async r => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => null) })),
-          fetch(booksUrl).then(async r => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => null) }))
+          fetchAvecReessai(jikanUrl),
+          fetchAvecReessai(booksUrl)
         ]);
 
         if (jikanRes.status === 'fulfilled' && jikanRes.value.ok) {
@@ -816,8 +822,6 @@
       document.getElementById('infos-editeur').value = serie.editeur || '';
       document.getElementById('infos-statut').value = serie.statut || 'En cours';
       document.getElementById('infos-recherche-status').textContent = '';
-      noteSelectionnee = serie.note || 0;
-      construireEtoiles();
       document.getElementById('form-infos-modal').classList.add('active');
 
       if (!serie.auteur && !serie.genre) {
@@ -836,7 +840,6 @@
       serie.genre = document.getElementById('infos-genre').value.trim();
       serie.editeur = document.getElementById('infos-editeur').value.trim();
       serie.statut = document.getElementById('infos-statut').value;
-      serie.note = noteSelectionnee;
       document.getElementById('form-infos-modal').classList.remove('active');
       sauvegarder();
     });
@@ -1337,11 +1340,9 @@
       document.getElementById('modal-author').innerText = [serie.auteur || 'Auteur inconnu', serie.editeur].filter(Boolean).join(' · ');
       document.getElementById('modal-cover').src = serie.couverture || 'https://via.placeholder.com/90x135?text=Manga';
 
-      const etoiles = '★'.repeat(serie.note || 0) + '☆'.repeat(5 - (serie.note || 0));
       const morceaux = [];
       if (serie.genre) morceaux.push(serie.genre);
       morceaux.push(serie.statut || 'En cours');
-      morceaux.push(etoiles);
       document.getElementById('modal-meta-extra').innerText = morceaux.join(' · ');
 
       const grid = document.getElementById('modal-volumes-grid');
@@ -1465,7 +1466,6 @@
           genre: '',
           editeur: '',
           statut: 'En cours',
-          note: 0,
           couverture: '',
           tomes: initialTomes
         });
