@@ -516,6 +516,8 @@
         <div class="modal-info">
           <h2 id="modal-title" style="font-size: 18px;"></h2>
           <div id="modal-author" style="font-size: 13px; color: var(--text-sub);"></div>
+          <div id="modal-meta-extra" style="font-size: 12px; color: var(--text-sub); margin-top: 4px;"></div>
+          <button class="btn btn-secondary" style="font-size: 11px; width: auto; padding: 4px 10px; margin-top: 8px;" onclick="ouvrirInfosSerie()">✏️ Infos</button>
         </div>
       </div>
 
@@ -578,6 +580,34 @@
         <button class="btn btn-secondary" id="cover-choice-file">📁 Depuis mon téléphone</button>
         <button class="btn btn-secondary" id="cover-choice-url">🔗 Coller un lien</button>
         <button class="btn btn-secondary" id="cover-choice-cancel" style="background: transparent;">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : informations enrichies de la série -->
+  <div class="modal-overlay" id="form-infos-modal">
+    <div class="modal-content" style="max-width: 340px;">
+      <h3 style="font-size: 16px; margin-bottom: 16px;">Informations sur la série</h3>
+      <label class="modal-field-label" for="infos-auteur">Auteur</label>
+      <input type="text" id="infos-auteur" class="modal-input" autocomplete="off">
+      <label class="modal-field-label" for="infos-genre">Genre</label>
+      <input type="text" id="infos-genre" class="modal-input" autocomplete="off">
+      <label class="modal-field-label" for="infos-editeur">Maison d'édition</label>
+      <input type="text" id="infos-editeur" class="modal-input" autocomplete="off">
+      <div id="infos-recherche-status" style="font-size: 11px; color: var(--text-sub); margin-top: -10px; margin-bottom: 14px;"></div>
+      <label class="modal-field-label" for="infos-statut">Statut</label>
+      <select id="infos-statut" class="modal-input">
+        <option value="En cours">En cours</option>
+        <option value="Terminée">Terminée</option>
+        <option value="En pause">En pause</option>
+        <option value="Abandonnée">Abandonnée</option>
+      </select>
+      <label class="modal-field-label">Ma note</label>
+      <div id="infos-note-stars" style="display: flex; gap: 8px; font-size: 26px; margin-bottom: 16px;"></div>
+      <button class="btn btn-secondary" id="infos-relancer-recherche" style="font-size: 12px; margin-bottom: 20px;" onclick="rechercherInfosAuto()">🔍 Relancer la recherche automatique</button>
+      <div class="modal-btn-row">
+        <button class="btn btn-secondary" id="infos-cancel">Annuler</button>
+        <button class="btn" id="infos-ok">Enregistrer</button>
       </div>
     </div>
   </div>
@@ -701,6 +731,99 @@
         btnCancel.addEventListener('click', onCancel);
       });
     }
+
+    let noteSelectionnee = 0;
+
+    function construireEtoiles() {
+      const container = document.getElementById('infos-note-stars');
+      container.innerHTML = '';
+      for (let i = 1; i <= 5; i++) {
+        const span = document.createElement('span');
+        span.textContent = i <= noteSelectionnee ? '★' : '☆';
+        span.style.color = i <= noteSelectionnee ? '#f5b301' : 'var(--text-sub)';
+        span.style.cursor = 'pointer';
+        span.onclick = () => {
+          noteSelectionnee = (noteSelectionnee === i) ? 0 : i;
+          construireEtoiles();
+        };
+        container.appendChild(span);
+      }
+    }
+
+    async function rechercherInfosAuto() {
+      if (serieIndexActive === null) return;
+      const titreSerie = bibliotheque[serieIndexActive].titre;
+      const statusEl = document.getElementById('infos-recherche-status');
+      statusEl.textContent = 'Recherche en cours…';
+
+      let trouve = false;
+      try {
+        const [jikanRes, booksRes] = await Promise.allSettled([
+          fetch('https://api.jikan.moe/v4/manga?q=' + encodeURIComponent(titreSerie) + '&limit=1').then(r => r.json()),
+          fetch('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent('intitle:' + titreSerie) + '&maxResults=1').then(r => r.json())
+        ]);
+
+        if (jikanRes.status === 'fulfilled') {
+          const item = jikanRes.value.data && jikanRes.value.data[0];
+          if (item) {
+            if (item.authors && item.authors.length) {
+              document.getElementById('infos-auteur').value = item.authors.map(a => a.name).join(', ');
+              trouve = true;
+            }
+            if (item.genres && item.genres.length) {
+              document.getElementById('infos-genre').value = item.genres.map(g => g.name).join(', ');
+              trouve = true;
+            }
+          }
+        }
+
+        if (booksRes.status === 'fulfilled') {
+          const item = booksRes.value.items && booksRes.value.items[0];
+          if (item && item.volumeInfo && item.volumeInfo.publisher) {
+            document.getElementById('infos-editeur').value = item.volumeInfo.publisher;
+            trouve = true;
+          }
+        }
+
+        statusEl.textContent = trouve ? '' : 'Aucune information trouvée automatiquement.';
+      } catch (e) {
+        console.error('Recherche auto impossible', e);
+        statusEl.textContent = 'Recherche automatique indisponible pour le moment.';
+      }
+    }
+
+    function ouvrirInfosSerie() {
+      if (serieIndexActive === null) return;
+      const serie = bibliotheque[serieIndexActive];
+      document.getElementById('infos-auteur').value = serie.auteur || '';
+      document.getElementById('infos-genre').value = serie.genre || '';
+      document.getElementById('infos-editeur').value = serie.editeur || '';
+      document.getElementById('infos-statut').value = serie.statut || 'En cours';
+      document.getElementById('infos-recherche-status').textContent = '';
+      noteSelectionnee = serie.note || 0;
+      construireEtoiles();
+      document.getElementById('form-infos-modal').classList.add('active');
+
+      if (!serie.auteur && !serie.genre) {
+        rechercherInfosAuto();
+      }
+    }
+
+    document.getElementById('infos-cancel').addEventListener('click', () => {
+      document.getElementById('form-infos-modal').classList.remove('active');
+    });
+
+    document.getElementById('infos-ok').addEventListener('click', () => {
+      if (serieIndexActive === null) return;
+      const serie = bibliotheque[serieIndexActive];
+      serie.auteur = document.getElementById('infos-auteur').value.trim();
+      serie.genre = document.getElementById('infos-genre').value.trim();
+      serie.editeur = document.getElementById('infos-editeur').value.trim();
+      serie.statut = document.getElementById('infos-statut').value;
+      serie.note = noteSelectionnee;
+      document.getElementById('form-infos-modal').classList.remove('active');
+      sauvegarder();
+    });
 
     function ouvrirDB() {
       return new Promise((resolve, reject) => {
@@ -1195,8 +1318,15 @@
     function remplirModalSerie(index) {
       const serie = bibliotheque[index];
       document.getElementById('modal-title').innerText = serie.titre;
-      document.getElementById('modal-author').innerText = serie.auteur || 'Auteur inconnu';
+      document.getElementById('modal-author').innerText = [serie.auteur || 'Auteur inconnu', serie.editeur].filter(Boolean).join(' · ');
       document.getElementById('modal-cover').src = serie.couverture || 'https://via.placeholder.com/90x135?text=Manga';
+
+      const etoiles = '★'.repeat(serie.note || 0) + '☆'.repeat(5 - (serie.note || 0));
+      const morceaux = [];
+      if (serie.genre) morceaux.push(serie.genre);
+      morceaux.push(serie.statut || 'En cours');
+      morceaux.push(etoiles);
+      document.getElementById('modal-meta-extra').innerText = morceaux.join(' · ');
 
       const grid = document.getElementById('modal-volumes-grid');
       grid.innerHTML = '';
@@ -1316,6 +1446,10 @@
         bibliotheque.push({
           titre: titre,
           auteur: '',
+          genre: '',
+          editeur: '',
+          statut: 'En cours',
+          note: 0,
           couverture: '',
           tomes: initialTomes
         });
