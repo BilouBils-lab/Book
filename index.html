@@ -757,14 +757,19 @@
       statusEl.textContent = 'Recherche en cours…';
 
       let trouve = false;
+      const erreurs = [];
+
       try {
+        const jikanUrl = 'https://api.jikan.moe/v4/manga?q=' + encodeURIComponent(titreSerie) + '&limit=1';
+        const booksUrl = 'https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent('intitle:' + titreSerie) + '&maxResults=1';
+
         const [jikanRes, booksRes] = await Promise.allSettled([
-          fetch('https://api.jikan.moe/v4/manga?q=' + encodeURIComponent(titreSerie) + '&limit=1').then(r => r.json()),
-          fetch('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent('intitle:' + titreSerie) + '&maxResults=1').then(r => r.json())
+          fetch(jikanUrl).then(async r => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => null) })),
+          fetch(booksUrl).then(async r => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => null) }))
         ]);
 
-        if (jikanRes.status === 'fulfilled') {
-          const item = jikanRes.value.data && jikanRes.value.data[0];
+        if (jikanRes.status === 'fulfilled' && jikanRes.value.ok) {
+          const item = jikanRes.value.body && jikanRes.value.body.data && jikanRes.value.body.data[0];
           if (item) {
             if (item.authors && item.authors.length) {
               document.getElementById('infos-auteur').value = item.authors.map(a => a.name).join(', ');
@@ -775,20 +780,31 @@
               trouve = true;
             }
           }
+        } else {
+          erreurs.push('MyAnimeList: ' + (jikanRes.status === 'rejected' ? (jikanRes.reason && jikanRes.reason.message) : 'HTTP ' + jikanRes.value.status));
         }
 
-        if (booksRes.status === 'fulfilled') {
-          const item = booksRes.value.items && booksRes.value.items[0];
+        if (booksRes.status === 'fulfilled' && booksRes.value.ok) {
+          const item = booksRes.value.body && booksRes.value.body.items && booksRes.value.body.items[0];
           if (item && item.volumeInfo && item.volumeInfo.publisher) {
             document.getElementById('infos-editeur').value = item.volumeInfo.publisher;
             trouve = true;
           }
+        } else {
+          erreurs.push('Google Books: ' + (booksRes.status === 'rejected' ? (booksRes.reason && booksRes.reason.message) : 'HTTP ' + booksRes.value.status));
         }
 
-        statusEl.textContent = trouve ? '' : 'Aucune information trouvée automatiquement.';
+        if (trouve) {
+          statusEl.textContent = '';
+        } else if (erreurs.length) {
+          statusEl.textContent = 'Erreur : ' + erreurs.join(' | ');
+          console.error('Recherche auto - détails', erreurs);
+        } else {
+          statusEl.textContent = "Aucune information trouvée pour ce titre.";
+        }
       } catch (e) {
         console.error('Recherche auto impossible', e);
-        statusEl.textContent = 'Recherche automatique indisponible pour le moment.';
+        statusEl.textContent = 'Recherche automatique indisponible (' + e.message + ').';
       }
     }
 
