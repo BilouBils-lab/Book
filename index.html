@@ -776,20 +776,20 @@
       const statusEl = document.getElementById('infos-recherche-status');
       statusEl.textContent = 'Recherche en cours…';
 
-      let trouve = false;
+      let auteurGenreTrouve = false;
+      let editeurTrouve = false;
       const erreurs = [];
+      const manques = [];
 
       try {
         const jikanUrl = 'https://api.jikan.moe/v4/manga?q=' + encodeURIComponent(titreSerie) + '&limit=1';
         const cleBooks = localStorage.getItem('google_books_api_key');
-        let booksUrl = 'https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent('intitle:' + titreSerie) + '&maxResults=1';
-        if (cleBooks) {
-          booksUrl += '&key=' + encodeURIComponent(cleBooks);
-        }
+        const cleParam = cleBooks ? '&key=' + encodeURIComponent(cleBooks) : '';
+        const booksUrlPrecis = 'https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent('intitle:' + titreSerie) + '&maxResults=1' + cleParam;
 
         const [jikanRes, booksRes] = await Promise.allSettled([
           fetchAvecReessai(jikanUrl),
-          fetchAvecReessai(booksUrl)
+          fetchAvecReessai(booksUrlPrecis)
         ]);
 
         if (jikanRes.status === 'fulfilled' && jikanRes.value.ok) {
@@ -797,34 +797,85 @@
           if (item) {
             if (item.authors && item.authors.length) {
               document.getElementById('infos-auteur').value = item.authors.map(a => a.name).join(', ');
-              trouve = true;
+              auteurGenreTrouve = true;
             }
             if (item.genres && item.genres.length) {
               document.getElementById('infos-genre').value = item.genres.map(g => g.name).join(', ');
-              trouve = true;
+              auteurGenreTrouve = true;
             }
           }
+          if (!auteurGenreTrouve) manques.push('auteur/genre');
         } else {
           erreurs.push('MyAnimeList: ' + (jikanRes.status === 'rejected' ? (jikanRes.reason && jikanRes.reason.message) : 'HTTP ' + jikanRes.value.status));
         }
 
+        let editeurItem = null;
         if (booksRes.status === 'fulfilled' && booksRes.value.ok) {
-          const item = booksRes.value.body && booksRes.value.body.items && booksRes.value.body.items[0];
-          if (item && item.volumeInfo && item.volumeInfo.publisher) {
-            document.getElementById('infos-editeur').value = item.volumeInfo.publisher;
-            trouve = true;
-          }
-        } else {
-          erreurs.push('Google Books: ' + (booksRes.status === 'rejected' ? (booksRes.reason && booksRes.reason.message) : 'HTTP ' + booksRes.value.status));
+          editeurItem = booksRes.value.body && booksRes.value.body.items && booksRes.value.body.items[0];
         }
 
-        if (trouve) {
-          statusEl.textContent = '';
-        } else if (erreurs.length) {
+        // Recherche de secours plus large si la recherche précise n'a rien donné
+        if (!editeurItem || !editeurItem.volumeInfo || !editeurItem.volumeInfo.publisher) {
+          const booksUrlLarge = 'https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(titreSerie + ' manga') + '&maxResults=1' + cleParam;
+          const secours = await fetchAvecReessai(booksUrlLarge).catch(() => null);
+          if (secours && secours.ok) {
+            editeurItem = secours.body && secours.body.items && secours.body.items[0];
+          }
+        }
+
+        if (editeurItem && editeurItem.volumeInfo && editeurItem.volumeInfo.publisher) {
+          document.getElementById('infos-editeur').value = editeurItem.volumeInfo.publisher;
+          editeurTrouve = true;
+        } else if (booksRes.status === 'rejected' || (booksRes.status === 'fulfilled' && !booksRes.value.ok)) {
+          erreurs.push('Google Books: ' + (booksRes.status === 'rejected' ? (booksRes.reason && booksRes.reason.message) : 'HTTP ' + booksRes.value.status));
+        } else {
+          manques.push('éditeur');
+        }
+
+        if (erreurs.length) {
           statusEl.textContent = 'Erreur : ' + erreurs.join(' | ');
           console.error('Recherche auto - détails', erreurs);
-        } else {
-          statusEl.textContent = "Aucune information trouvée pour ce titre.";
+        }
+
+        if (manques.length) {
+          statusEl.textContent = 'Complétion par IA en cours pour : ' + manques.join(' et ') + '…';
+          try {
+            const iaRes = await fetch('https://manga-gemini-proxy.nabil-chilla.workers.dev/infos', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ titre: titreSerie })
+            });
+            const iaData = await iaRes.json();
+            const champsCompletesIA = [];
+
+            if (manques.includes('auteur/genre')) {
+              if (!document.getElementById('infos-auteur').value && iaData.auteur) {
+                document.getElementById('infos-auteur').value = iaData.auteur;
+                champsCompletesIA.push('auteur');
+              }
+              if (!document.getElementById('infos-genre').value && iaData.genre) {
+                document.getElementById('infos-genre').value = iaData.genre;
+                champsCompletesIA.push('genre');
+              }
+            }
+            if (manques.includes('éditeur') && !document.getElementById('infos-editeur').value && iaData.editeur) {
+              document.getElementById('infos-editeur').value = iaData.editeur;
+              champsCompletesIA.push('éditeur');
+            }
+
+            if (champsCompletesIA.length) {
+              statusEl.textContent = 'Complété par IA (à vérifier) : ' + champsCompletesIA.join(', ') + '.';
+            } else if (!erreurs.length) {
+              statusEl.textContent = 'Non trouvé, même via IA : ' + manques.join(' et ') + '.';
+            }
+          } catch (e) {
+            console.error('Complétion IA impossible', e);
+            if (!erreurs.length) {
+              statusEl.textContent = 'Non trouvé automatiquement : ' + manques.join(' et ') + '.';
+            }
+          }
+        } else if (!erreurs.length) {
+          statusEl.textContent = '';
         }
       } catch (e) {
         console.error('Recherche auto impossible', e);
