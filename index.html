@@ -807,6 +807,7 @@
           if (!auteurGenreTrouve) manques.push('auteur/genre');
         } else {
           erreurs.push('MyAnimeList: ' + (jikanRes.status === 'rejected' ? (jikanRes.reason && jikanRes.reason.message) : 'HTTP ' + jikanRes.value.status));
+          manques.push('auteur/genre');
         }
 
         let editeurItem = null;
@@ -826,9 +827,10 @@
         if (editeurItem && editeurItem.volumeInfo && editeurItem.volumeInfo.publisher) {
           document.getElementById('infos-editeur').value = editeurItem.volumeInfo.publisher;
           editeurTrouve = true;
-        } else if (booksRes.status === 'rejected' || (booksRes.status === 'fulfilled' && !booksRes.value.ok)) {
-          erreurs.push('Google Books: ' + (booksRes.status === 'rejected' ? (booksRes.reason && booksRes.reason.message) : 'HTTP ' + booksRes.value.status));
         } else {
+          if (booksRes.status === 'rejected' || (booksRes.status === 'fulfilled' && !booksRes.value.ok)) {
+            erreurs.push('Google Books: ' + (booksRes.status === 'rejected' ? (booksRes.reason && booksRes.reason.message) : 'HTTP ' + booksRes.value.status));
+          }
           manques.push('éditeur');
         }
 
