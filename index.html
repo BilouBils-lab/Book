@@ -492,6 +492,7 @@
       <h2 style="font-size: 18px; margin-bottom: 16px;">Paramètres</h2>
       
       <div class="settings-list">
+        <button class="btn btn-secondary" onclick="configurerCleBooks()">📚 Clé Google Books (optionnelle)</button>
         <button class="btn btn-secondary" onclick="restaurerDepuisCloud()">☁️ Restaurer depuis le cloud</button>
         <button class="btn btn-secondary" onclick="exporterSauvegarde()">📥 Exporter la sauvegarde (JSON)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📤 Importer la sauvegarde (JSON)</button>
@@ -695,7 +696,7 @@
         }
         function onOk() {
           const valeur = champ.value.trim();
-          nettoyer(valeur || null);
+          nettoyer(valeur);
         }
         function onCancel() { nettoyer(null); }
 
@@ -730,25 +731,38 @@
       });
     }
 
+    async function configurerCleBooks() {
+      const cleActuelle = localStorage.getItem('google_books_api_key') || '';
+      const nouvelleCle = await demanderTexte("Clé API Google Books (laisse vide pour l'anonyme) :", cleActuelle);
+      if (nouvelleCle !== null) {
+        if (nouvelleCle) {
+          localStorage.setItem('google_books_api_key', nouvelleCle);
+        } else {
+          localStorage.removeItem('google_books_api_key');
+        }
+      }
+    }
+
     function pause(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     async function fetchAvecReessai(url) {
-      for (let tentative = 0; tentative < 2; tentative++) {
+      const delais = [1500, 3000];
+      for (let tentative = 0; tentative <= delais.length; tentative++) {
         try {
           const r = await fetch(url);
           if (r.ok) {
             return { ok: true, status: r.status, body: await r.json().catch(() => null) };
           }
-          if (tentative === 0 && (r.status === 429 || r.status >= 500)) {
-            await pause(1500);
+          if (tentative < delais.length && (r.status === 429 || r.status >= 500)) {
+            await pause(delais[tentative]);
             continue;
           }
           return { ok: false, status: r.status, body: null };
         } catch (e) {
-          if (tentative === 0) {
-            await pause(1500);
+          if (tentative < delais.length) {
+            await pause(delais[tentative]);
             continue;
           }
           throw e;
@@ -767,7 +781,11 @@
 
       try {
         const jikanUrl = 'https://api.jikan.moe/v4/manga?q=' + encodeURIComponent(titreSerie) + '&limit=1';
-        const booksUrl = 'https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent('intitle:' + titreSerie) + '&maxResults=1';
+        const cleBooks = localStorage.getItem('google_books_api_key');
+        let booksUrl = 'https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent('intitle:' + titreSerie) + '&maxResults=1';
+        if (cleBooks) {
+          booksUrl += '&key=' + encodeURIComponent(cleBooks);
+        }
 
         const [jikanRes, booksRes] = await Promise.allSettled([
           fetchAvecReessai(jikanUrl),
