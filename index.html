@@ -801,9 +801,19 @@
       let iaPromise = null;
       const getIA = () => {
         if (!iaPromise) {
-          iaPromise = fetchAvecTimeout(WORKER_URL + '/infos', { method: 'POST', headers: enteteJson, body: corps }, 20000)
-            .then(r => r.json().catch(() => ({ erreur: 'réponse illisible' })))
-            .catch(e => ({ erreur: messageErreur(e) }));
+          iaPromise = (async () => {
+            for (let tentative = 0; tentative <= 1; tentative++) {
+              try {
+                const r = await fetchAvecTimeout(WORKER_URL + '/infos', { method: 'POST', headers: enteteJson, body: corps }, 20000);
+                const data = await r.json().catch(() => ({ erreur: 'réponse illisible' }));
+                if (r.ok || tentative === 1) return data;
+                await pause(3000);
+              } catch (e) {
+                if (tentative === 1) return { erreur: messageErreur(e) };
+                await pause(3000);
+              }
+            }
+          })();
         }
         return iaPromise;
       };
