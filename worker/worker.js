@@ -169,12 +169,34 @@ async function deduireAvecGemini(titre, env) {
   }
 }
 
+// Une sauvegarde qui ferait passer la collection en dessous de cette proportion est refusée
+// (sauf envoi forcé), pour éviter qu'un appareil vide n'écrase la vraie bibliothèque.
+const RATIO_MIN_SAUVEGARDE = 0.5;
+
+async function codeValide(fourni, attendu) {
+  const enc = new TextEncoder();
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(fourni || "")),
+    crypto.subtle.digest("SHA-256", enc.encode(attendu))
+  ]);
+  return crypto.subtle.timingSafeEqual(a, b);
+}
+
+function nombreSeries(texte) {
+  try {
+    const data = JSON.parse(texte);
+    return Array.isArray(data) ? data.length : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export default {
   async fetch(request, env) {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "https://biloubils-lab.github.io",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, X-Backup-Token, X-Backup-Force",
     };
     const json = (corps, status = 200) => new Response(JSON.stringify(corps), {
       status,
@@ -194,8 +216,27 @@ export default {
         if (!env.MANGA_KV) {
           throw new Error("Binding KV 'MANGA_KV' introuvable — vérifie Settings > Bindings sur le Worker.");
         }
+        if (!env.BACKUP_TOKEN) {
+          throw new Error("Secret 'BACKUP_TOKEN' manquant — ajoute-le dans Settings > Variables and Secrets sur le Worker.");
+        }
+        if (!(await codeValide(request.headers.get("X-Backup-Token"), env.BACKUP_TOKEN))) {
+          return json({ error: "Code de sauvegarde incorrect" }, 401);
+        }
         if (request.method === "POST") {
           const body = await request.text();
+          const nouveau = nombreSeries(body);
+          if (nouveau === null) {
+            return json({ error: "Sauvegarde invalide" }, 400);
+          }
+          const ancienTexte = await env.MANGA_KV.get("bibliotheque");
+          const ancien = ancienTexte ? nombreSeries(ancienTexte) : 0;
+          const force = request.headers.get("X-Backup-Force") === "1";
+          if (!force && ancien > 0 && nouveau < ancien * RATIO_MIN_SAUVEGARDE) {
+            return json({ error: "Sauvegarde refusée : elle ferait passer le cloud de " + ancien + " à " + nouveau + " séries.", ancien, nouveau }, 409);
+          }
+          if (ancienTexte) {
+            await env.MANGA_KV.put("bibliotheque_precedente", ancienTexte);
+          }
           await env.MANGA_KV.put("bibliotheque", body);
           return json({ ok: true });
         }

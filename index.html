@@ -483,7 +483,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.3</div>
+  <div class="version-tag">v3.4</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -493,7 +493,9 @@
       
       <div class="settings-list">
         <button class="btn btn-secondary" onclick="configurerCleBooks()">📚 Clé Google Books (optionnelle)</button>
+        <button class="btn btn-secondary" onclick="configurerCodeCloud()">🔑 Code de sauvegarde cloud</button>
         <button class="btn btn-secondary" onclick="restaurerDepuisCloud()">☁️ Restaurer depuis le cloud</button>
+        <button class="btn btn-secondary" onclick="forcerEnvoiCloud()">⬆️ Forcer l'envoi vers le cloud</button>
         <button class="btn btn-secondary" onclick="exporterSauvegarde()">📥 Exporter la sauvegarde (JSON)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📤 Importer la sauvegarde (JSON)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('csv-input').click()">📊 Importer un fichier CSV (Sheets)</button>
@@ -1009,7 +1011,50 @@
       rendreVues();
     }
 
+    const BACKUP_URL = 'https://manga-gemini-proxy.nabil-chilla.workers.dev/backup';
     let cloudBackupTimer = null;
+    let alerteCloudAffichee = false;
+
+    function codeCloud() {
+      return localStorage.getItem('cloud_backup_token') || '';
+    }
+
+    function genererCodeCloud() {
+      const octets = crypto.getRandomValues(new Uint8Array(18));
+      return Array.from(octets, o => o.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function configurerCodeCloud() {
+      const code = await demanderTexte("Code de sauvegarde cloud (le même que BACKUP_TOKEN sur le Worker, et sur tous tes appareils) :", codeCloud() || genererCodeCloud());
+      if (code !== null) {
+        if (code) {
+          localStorage.setItem('cloud_backup_token', code);
+        } else {
+          localStorage.removeItem('cloud_backup_token');
+        }
+      }
+    }
+
+    function signalerProblemeCloud(message) {
+      // Une seule alerte par session, pour ne pas harceler à chaque modification
+      if (alerteCloudAffichee) return;
+      alerteCloudAffichee = true;
+      alert(message);
+    }
+
+    async function envoyerVersCloud(forcer) {
+      const code = codeCloud();
+      if (!code) return { statut: 'sans-code' };
+      const entetes = { 'Content-Type': 'application/json', 'X-Backup-Token': code };
+      if (forcer) entetes['X-Backup-Force'] = '1';
+      const res = await fetch(BACKUP_URL, { method: 'POST', headers: entetes, body: JSON.stringify(bibliotheque) });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) return { statut: 'ok' };
+      if (res.status === 401) return { statut: 'code-incorrect' };
+      if (res.status === 409) return { statut: 'refuse', ancien: data.ancien, nouveau: data.nouveau };
+      return { statut: 'erreur', message: data.error || ('HTTP ' + res.status) };
+    }
+
     function sauvegarder() {
       if (db) {
         dbSet('bibliotheque', bibliotheque).catch(e => console.error('Sauvegarde locale impossible', e));
@@ -1018,19 +1063,41 @@
       }
       rendreVues();
       clearTimeout(cloudBackupTimer);
-      cloudBackupTimer = setTimeout(() => {
-        fetch('https://manga-gemini-proxy.nabil-chilla.workers.dev/backup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bibliotheque)
-        }).catch(e => console.error('Sauvegarde cloud impossible', e));
+      cloudBackupTimer = setTimeout(async () => {
+        try {
+          const r = await envoyerVersCloud(false);
+          if (r.statut === 'code-incorrect') {
+            signalerProblemeCloud("Sauvegarde cloud impossible : le code de sauvegarde est incorrect (Paramètres → 🔑 Code de sauvegarde cloud).");
+          } else if (r.statut === 'refuse') {
+            signalerProblemeCloud(`Sauvegarde cloud bloquée : le cloud contient ${r.ancien} séries et cet appareil seulement ${r.nouveau}.\n\nSi c'est un nouvel appareil, utilise « Restaurer depuis le cloud ». Si tu as vraiment supprimé ces séries, utilise « Forcer l'envoi vers le cloud ».`);
+          } else if (r.statut === 'erreur') {
+            console.error('Sauvegarde cloud impossible', r.message);
+          }
+        } catch (e) {
+          console.error('Sauvegarde cloud impossible', e);
+        }
       }, 2000);
     }
 
+    async function forcerEnvoiCloud() {
+      if (!codeCloud()) { alert("Configure d'abord le code de sauvegarde cloud."); return; }
+      if (!(await confirmerAction(`Remplacer la sauvegarde en ligne par la bibliothèque de cet appareil (${bibliotheque.length} séries) ?`))) return;
+      try {
+        const r = await envoyerVersCloud(true);
+        if (r.statut === 'ok') alert("Sauvegarde en ligne remplacée.");
+        else if (r.statut === 'code-incorrect') alert("Code de sauvegarde incorrect.");
+        else alert("Échec de l'envoi : " + (r.message || r.statut));
+      } catch (e) {
+        alert("Impossible de contacter la sauvegarde en ligne.");
+      }
+    }
+
     async function restaurerDepuisCloud() {
+      if (!codeCloud()) { alert("Configure d'abord le code de sauvegarde cloud."); return; }
       if (!(await confirmerAction("Récupérer la dernière sauvegarde en ligne et remplacer la bibliothèque actuelle sur cet appareil ?"))) return;
       try {
-        const res = await fetch('https://manga-gemini-proxy.nabil-chilla.workers.dev/backup');
+        const res = await fetch(BACKUP_URL, { headers: { 'X-Backup-Token': codeCloud() } });
+        if (res.status === 401) { alert("Code de sauvegarde incorrect."); return; }
         const data = await res.json();
         if (bibliothequeValide(data)) {
           bibliotheque = data;
