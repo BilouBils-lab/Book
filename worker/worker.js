@@ -1,124 +1,10 @@
-const ANILIST_URL = "https://graphql.anilist.co";
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
+// Modèles Gemini essayés dans l'ordre. Pour en changer sans toucher au code, ajoute une variable
+// GEMINI_MODELES sur le Worker (ex. "gemini-flash-latest,gemini-flash-lite-latest").
+// GET /modeles liste les modèles disponibles avec ta clé.
+const MODELES_PAR_DEFAUT = "gemini-flash-latest,gemini-flash-lite-latest";
 
-const STATUTS = {
-  FINISHED: "Terminée",
-  RELEASING: "En cours",
-  HIATUS: "En pause",
-  CANCELLED: "Abandonnée",
-  NOT_YET_RELEASED: "En cours"
-};
-
-const GENRES_FR = {
-  "Action": "Action", "Adventure": "Aventure", "Comedy": "Comédie", "Drama": "Drame",
-  "Ecchi": "Ecchi", "Fantasy": "Fantasy", "Horror": "Horreur", "Mahou Shoujo": "Magical girl",
-  "Mecha": "Mecha", "Music": "Musique", "Mystery": "Mystère", "Psychological": "Psychologique",
-  "Romance": "Romance", "Sci-Fi": "Science-fiction", "Slice of Life": "Tranche de vie",
-  "Sports": "Sport", "Supernatural": "Surnaturel", "Thriller": "Thriller"
-};
-
-function normaliser(t) {
-  return (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function construireResultat(m) {
-  const edges = (m.staff && m.staff.edges) || [];
-  const noms = [];
-  edges.filter(e => /story|art/i.test(e.role || "")).forEach(e => {
-    const nom = e.node && e.node.name && e.node.name.full;
-    if (nom && !noms.includes(nom)) noms.push(nom);
-  });
-  if (!noms.length && edges[0] && edges[0].node && edges[0].node.name) {
-    noms.push(edges[0].node.name.full);
-  }
-  const demo = ((m.tags || []).find(t => t.category === "Demographic") || {}).name;
-  const genres = (m.genres || []).slice(0, 3).map(g => GENRES_FR[g] || g);
-  const genreListe = [demo, ...genres].filter(Boolean);
-  return {
-    trouve: true,
-    anilistId: m.id,
-    titreMatch: (m.title && (m.title.romaji || m.title.english)) || null,
-    auteur: noms.length ? noms.join(", ") : null,
-    genre: genreListe.length ? genreListe.join(", ") : null,
-    statut: STATUTS[m.status] || null,
-    volumes: m.volumes || null,
-    couverture: (m.coverImage && m.coverImage.large) || null,
-    score: m.averageScore || null
-  };
-}
-
-async function appelAniList(query, search) {
-  const res = await fetch(ANILIST_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "MangaTracker/1.0" },
-    body: JSON.stringify({ query, variables: { search } })
-  });
-  const json = await res.json().catch(() => null);
-  return { res, json };
-}
-
-async function chercherAniList(titre) {
-  const requeteRiche = `query ($search: String) {
-    Page(perPage: 8) {
-      media(search: $search, type: MANGA, format_in: [MANGA, ONE_SHOT], sort: [SEARCH_MATCH]) {
-        id
-        title { romaji english native }
-        synonyms
-        genres
-        tags { name category }
-        status
-        volumes
-        popularity
-        averageScore
-        coverImage { large }
-        staff(perPage: 6) { edges { role node { name { full } } } }
-      }
-    }
-  }`;
-
-  const requeteSimple = `query ($search: String) {
-    Media(search: $search, type: MANGA) {
-      id
-      title { romaji english }
-      genres
-      status
-      volumes
-      coverImage { large }
-      staff(perPage: 6) { edges { role node { name { full } } } }
-    }
-  }`;
-
-  let { res, json } = await appelAniList(requeteRiche, titre);
-  let liste = null;
-
-  if (res.ok && json && !json.errors) {
-    liste = (json.data && json.data.Page && json.data.Page.media) || [];
-  } else {
-    // Requête de secours plus simple si la riche est refusée
-    const essai = await appelAniList(requeteSimple, titre);
-    if (essai.res.ok && essai.json && !essai.json.errors) {
-      const m = essai.json.data && essai.json.data.Media;
-      liste = m ? [m] : [];
-    } else {
-      const messages = (essai.json && essai.json.errors ? essai.json.errors : (json && json.errors) || [])
-        .map(e => e.message).join("; ");
-      return { erreur: "AniList HTTP " + essai.res.status + (messages ? " : " + messages : "") };
-    }
-  }
-
-  if (!liste.length) return { trouve: false };
-
-  const cible = normaliser(titre);
-  const exacts = liste.filter(m => {
-    const t = m.title || {};
-    const noms = [t.romaji, t.english, t.native, ...(m.synonyms || [])].map(normaliser);
-    return noms.includes(cible);
-  });
-  const choisi = exacts.length
-    ? exacts.slice().sort((a, b) => (b.popularity || 0) - (a.popularity || 0))[0]
-    : liste[0];
-
-  return construireResultat(choisi);
+function modelesGemini(env) {
+  return (env.GEMINI_MODELES || MODELES_PAR_DEFAUT).split(",").map(m => m.trim()).filter(Boolean);
 }
 
 async function appelGemini(modele, payload, env) {
@@ -132,6 +18,20 @@ async function appelGemini(modele, payload, env) {
   return { res, result };
 }
 
+// Essaie chaque modèle jusqu'à un succès ; en cas d'échec, renvoie l'erreur de chacun
+async function appelGeminiAvecSecours(payload, env) {
+  const erreurs = [];
+  for (const modele of modelesGemini(env)) {
+    const { res, result } = await appelGemini(modele, payload, env);
+    if (res.ok && result) return { result };
+    const msg = result && result.error && result.error.message ? result.error.message : "";
+    erreurs.push(modele + " HTTP " + res.status + (msg ? " : " + msg.slice(0, 120) : ""));
+    // Clé invalide ou refusée : inutile d'essayer les autres modèles
+    if (res.status === 400 || res.status === 401 || res.status === 403) break;
+  }
+  return { erreur: "Gemini — " + erreurs.join(" | ") };
+}
+
 async function deduireAvecGemini(titre, env) {
   const payload = {
     contents: [{
@@ -142,20 +42,8 @@ async function deduireAvecGemini(titre, env) {
     generationConfig: { response_mime_type: "application/json" }
   };
 
-  const modeles = ["gemini-flash-latest", "gemini-2.5-flash"];
-  let res, result, dernierMsg = "";
-
-  for (const modele of modeles) {
-    ({ res, result } = await appelGemini(modele, payload, env));
-    if (res.ok && result) break;
-    const msg = result && result.error && result.error.message ? result.error.message : "";
-    dernierMsg = "Gemini (" + modele + ") HTTP " + res.status + (msg ? " : " + msg.slice(0, 120) : "");
-    if (res.status !== 503 && res.status !== 429) break; // surcharge ou quota : on tente un autre modèle
-  }
-
-  if (!res.ok || !result) {
-    return { erreur: dernierMsg };
-  }
+  const { result, erreur } = await appelGeminiAvecSecours(payload, env);
+  if (erreur) return { erreur };
   const texte = result.candidates && result.candidates[0] && result.candidates[0].content
     && result.candidates[0].content.parts && result.candidates[0].content.parts[0]
     && result.candidates[0].content.parts[0].text;
@@ -252,8 +140,21 @@ export default {
       }
     }
 
-    // --- Infos série via AniList (GET ?titre=... pour tester dans un navigateur, ou POST {titre}) ---
-    if (pathname === "/anilist" || pathname === "/infos") {
+    // --- Modèles Gemini disponibles avec la clé (diagnostic, à ouvrir dans un navigateur) ---
+    if (pathname === "/modeles") {
+      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
+        headers: { "x-goog-api-key": env.GEMINI_API_KEY }
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) return json({ erreur: "HTTP " + res.status }, 502);
+      const modeles = (data.models || [])
+        .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+        .map(m => m.name.replace("models/", ""));
+      return json({ utilises: modelesGemini(env), disponibles: modeles });
+    }
+
+    // --- Infos série via Gemini (GET ?titre=... pour tester dans un navigateur, ou POST {titre}) ---
+    if (pathname === "/infos") {
       try {
         let titre = null;
         if (request.method === "GET") {
@@ -266,9 +167,7 @@ export default {
         }
         if (!titre) return json({ erreur: "Titre manquant" }, 400);
 
-        const resultat = pathname === "/anilist"
-          ? await chercherAniList(titre)
-          : await deduireAvecGemini(titre, env);
+        const resultat = await deduireAvecGemini(titre, env);
         return json(resultat, resultat.erreur ? 502 : 200);
       } catch (e) {
         return json({ erreur: e.message }, 500);
@@ -296,14 +195,9 @@ export default {
         generationConfig: { response_mime_type: "application/json" }
       };
 
-      const geminiRes = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await geminiRes.json();
-      return json(result, geminiRes.status);
+      const { result, erreur } = await appelGeminiAvecSecours(payload, env);
+      if (erreur) return json({ error: erreur }, 502);
+      return json(result);
     } catch (e) {
       return json({ error: e.message }, 500);
     }

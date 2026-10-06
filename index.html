@@ -487,7 +487,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.5</div>
+  <div class="version-tag">v3.6</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -784,6 +784,119 @@
 
     const WORKER_URL = 'https://manga-gemini-proxy.nabil-chilla.workers.dev';
     let jetonRecherche = 0;
+
+    // --- Infos série : AniList puis Jikan (MyAnimeList), appelés directement depuis le navigateur ---
+    // (AniList bloque les requêtes venant des Workers Cloudflare)
+    const GENRES_FR = {
+      'Action': 'Action', 'Adventure': 'Aventure', 'Comedy': 'Comédie', 'Drama': 'Drame',
+      'Ecchi': 'Ecchi', 'Fantasy': 'Fantasy', 'Horror': 'Horreur', 'Mahou Shoujo': 'Magical girl',
+      'Mecha': 'Mecha', 'Music': 'Musique', 'Mystery': 'Mystère', 'Psychological': 'Psychologique',
+      'Romance': 'Romance', 'Sci-Fi': 'Science-fiction', 'Slice of Life': 'Tranche de vie',
+      'Sports': 'Sport', 'Supernatural': 'Surnaturel', 'Thriller': 'Thriller', 'Suspense': 'Suspense',
+      'Gourmet': 'Gastronomie', 'Award Winning': null
+    };
+    const DEMOGRAPHIES = ['Shounen', 'Seinen', 'Shoujo', 'Josei', 'Kids'];
+    const STATUTS_ANILIST = { FINISHED: 'Terminée', RELEASING: 'En cours', HIATUS: 'En pause', CANCELLED: 'Abandonnée', NOT_YET_RELEASED: 'En cours' };
+    const STATUTS_JIKAN = { 'Finished': 'Terminée', 'Publishing': 'En cours', 'On Hiatus': 'En pause', 'Discontinued': 'Abandonnée', 'Not yet published': 'En cours' };
+
+    function normaliserRecherche(t) {
+      return (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    }
+
+    function genresFr(demographie, genres) {
+      const liste = [demographie, ...genres.slice(0, 3).map(g => g in GENRES_FR ? GENRES_FR[g] : g)].filter(Boolean);
+      return liste.length ? liste.join(', ') : null;
+    }
+
+    // Parmi les résultats, préfère un titre identique (le plus populaire), sinon le premier
+    function choisirResultat(liste, titre, nomsDe, popularite) {
+      const cible = normaliserRecherche(titre);
+      const exacts = liste.filter(m => nomsDe(m).map(normaliserRecherche).includes(cible));
+      return exacts.length ? exacts.sort((a, b) => popularite(b) - popularite(a))[0] : liste[0];
+    }
+
+    async function chercherAniList(titre) {
+      const query = `query ($search: String) {
+        Page(perPage: 8) {
+          media(search: $search, type: MANGA, format_in: [MANGA, ONE_SHOT], sort: [SEARCH_MATCH]) {
+            id title { romaji english native } synonyms genres tags { name category }
+            status volumes popularity coverImage { large }
+            staff(perPage: 6) { edges { role node { name { full } } } }
+          }
+        }
+      }`;
+      const r = await fetchAvecTimeout('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ query, variables: { search: titre } })
+      }, 10000);
+      const json = await r.json().catch(() => null);
+      if (!r.ok || !json || json.errors) {
+        const msg = json && json.errors ? json.errors.map(e => e.message).join('; ') : '';
+        throw new Error('HTTP ' + r.status + (msg ? ' : ' + msg : ''));
+      }
+      const liste = (json.data && json.data.Page && json.data.Page.media) || [];
+      if (!liste.length) return { trouve: false };
+
+      const m = choisirResultat(liste, titre,
+        m => [m.title.romaji, m.title.english, m.title.native, ...(m.synonyms || [])], m => m.popularity || 0);
+      const edges = (m.staff && m.staff.edges) || [];
+      const noms = [];
+      edges.filter(e => /story|art/i.test(e.role || '')).forEach(e => {
+        const nom = e.node && e.node.name && e.node.name.full;
+        if (nom && !noms.includes(nom)) noms.push(nom);
+      });
+      const demo = ((m.tags || []).find(t => t.category === 'Demographic') || {}).name;
+      return {
+        trouve: true,
+        source: 'AniList',
+        titreMatch: m.title.romaji || m.title.english,
+        auteur: noms.length ? noms.join(', ') : null,
+        genre: genresFr(demo, m.genres || []),
+        statut: STATUTS_ANILIST[m.status] || null,
+        volumes: m.volumes || null,
+        couverture: (m.coverImage && m.coverImage.large) || null
+      };
+    }
+
+    async function chercherJikan(titre) {
+      const r = await fetchAvecTimeout('https://api.jikan.moe/v4/manga?limit=8&q=' + encodeURIComponent(titre), {}, 10000);
+      const json = await r.json().catch(() => null);
+      if (!r.ok || !json) throw new Error('HTTP ' + r.status);
+      const liste = (json.data || []).filter(m => !/novel/i.test(m.type || ''));
+      if (!liste.length) return { trouve: false };
+
+      const m = choisirResultat(liste, titre,
+        m => [m.title, m.title_english, m.title_japanese, ...(m.titles || []).map(t => t.title)], m => m.members || 0);
+      // MyAnimeList écrit les noms « Nom, Prénom »
+      const auteurs = (m.authors || []).map(a => a.name.split(', ').reverse().join(' '));
+      const demo = ((m.demographics || [])[0] || {}).name;
+      return {
+        trouve: true,
+        source: 'MyAnimeList',
+        titreMatch: m.title,
+        auteur: auteurs.length ? auteurs.join(', ') : null,
+        genre: genresFr(DEMOGRAPHIES.includes(demo) ? demo : null, (m.genres || []).map(g => g.name)),
+        statut: STATUTS_JIKAN[m.status] || null,
+        volumes: m.volumes || null,
+        couverture: (m.images && m.images.jpg && m.images.jpg.large_image_url) || null
+      };
+    }
+
+    // Essaie AniList, puis Jikan si AniList échoue ou ne trouve rien
+    async function chercherInfosSerie(titre) {
+      const erreurs = [];
+      for (const [nom, chercher] of [['AniList', chercherAniList], ['MyAnimeList', chercherJikan]]) {
+        try {
+          const res = await chercher(titre);
+          if (res.trouve) return { ...res, erreurs };
+          erreurs.push(nom + ' : titre introuvable');
+        } catch (e) {
+          erreurs.push(nom + ' : ' + messageErreur(e));
+        }
+      }
+      return { trouve: false, erreurs };
+    }
     let couvertureSuggeree = null;
 
     function messageErreur(e) {
@@ -799,7 +912,7 @@
       const champ = (id) => document.getElementById(id);
       statusEl.textContent = 'Recherche en cours…';
 
-      const resume = { ani: [], books: [], ia: [], erreurs: [] };
+      const resume = { base: null, books: [], ia: [], erreurs: [] };
       const enteteJson = { 'Content-Type': 'application/json' };
       const corps = JSON.stringify({ titre: titreSerie });
 
@@ -825,32 +938,23 @@
       };
 
       const tacheAniList = (async () => {
-        let data = null;
-        try {
-          const r = await fetchAvecTimeout(WORKER_URL + '/anilist', { method: 'POST', headers: enteteJson, body: corps }, 10000);
-          data = await r.json().catch(() => null);
-          if (!r.ok || !data || data.erreur) {
-            resume.erreurs.push('AniList : ' + ((data && data.erreur) || ('HTTP ' + r.status)));
-            data = null;
-          }
-        } catch (e) {
-          resume.erreurs.push('AniList : ' + messageErreur(e));
-        }
+        const data = await chercherInfosSerie(titreSerie);
+        resume.erreurs.push(...data.erreurs);
 
         if (!actif()) return;
-        if (data && data.trouve) {
-          if (data.auteur) { champ('infos-auteur').value = data.auteur; resume.ani.push('auteur'); }
-          if (data.genre) { champ('infos-genre').value = data.genre; resume.ani.push('genre'); }
+        if (data.trouve) {
+          const remplis = [];
+          if (data.auteur) { champ('infos-auteur').value = data.auteur; remplis.push('auteur'); }
+          if (data.genre) { champ('infos-genre').value = data.genre; remplis.push('genre'); }
           if (data.statut && champ('infos-statut').value === 'En cours') {
             champ('infos-statut').value = data.statut;
-            resume.ani.push('statut');
+            remplis.push('statut');
           }
           if (data.couverture && !bibliotheque[serieIndexActive].couverture) {
             couvertureSuggeree = data.couverture;
-            resume.ani.push('jaquette');
+            remplis.push('jaquette');
           }
-        } else if (data && data.trouve === false) {
-          resume.erreurs.push('AniList : titre introuvable');
+          resume.base = { source: data.source, titreMatch: data.titreMatch, remplis };
         }
 
         if (!champ('infos-auteur').value || !champ('infos-genre').value) {
@@ -912,7 +1016,7 @@
       if (!actif()) return;
 
       const parties = [];
-      if (resume.ani.length) parties.push('AniList : ' + resume.ani.join(', '));
+      if (resume.base) parties.push(`${resume.base.source} (« ${resume.base.titreMatch} ») : ${resume.base.remplis.join(', ') || 'rien de nouveau'}`);
       if (resume.books.length) parties.push('Google Books : ' + resume.books.join(', '));
       if (resume.ia.length) parties.push('IA (à vérifier) : ' + resume.ia.join(', '));
       let texte = parties.join(' · ');
@@ -1197,7 +1301,8 @@
         });
 
         if (!response.ok) {
-          throw new Error('Erreur HTTP ' + response.status);
+          const detail = await response.json().catch(() => null);
+          throw new Error((detail && detail.error) || ('Erreur HTTP ' + response.status));
         }
 
         const data = await response.json();
