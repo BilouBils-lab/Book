@@ -487,7 +487,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.6</div>
+  <div class="version-tag">v3.7</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -978,7 +978,8 @@
 
         for (const q of requetes) {
           try {
-            const r = await fetchAvecReessai('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(q) + '&maxResults=5' + cleParam);
+            // langRestrict=fr : uniquement les éditions françaises (sinon on récupère VIZ Media & co)
+            const r = await fetchAvecReessai('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(q) + '&langRestrict=fr&printType=books&maxResults=5' + cleParam);
             if (r.ok) {
               const items = (r.body && r.body.items) || [];
               const trouve = items.find(it => it.volumeInfo && it.volumeInfo.publisher);
@@ -1020,12 +1021,16 @@
       if (resume.books.length) parties.push('Google Books : ' + resume.books.join(', '));
       if (resume.ia.length) parties.push('IA (à vérifier) : ' + resume.ia.join(', '));
       let texte = parties.join(' · ');
+      // Toujours signaler l'échec d'AniList / MyAnimeList, même si l'IA a pris le relais
+      const echecsBase = resume.base ? [] : resume.erreurs.filter(e => /^(AniList|MyAnimeList)/.test(e));
+      if (echecsBase.length) texte += (texte ? ' — ' : '') + echecsBase.join(' | ');
+      const autresErreurs = resume.erreurs.filter(e => !echecsBase.includes(e));
 
       const vides = [['auteur', 'infos-auteur'], ['genre', 'infos-genre'], ['éditeur', 'infos-editeur']]
         .filter(([, id]) => !champ(id).value).map(([nom]) => nom);
       if (vides.length) {
         texte += (texte ? ' — ' : '') + 'Toujours vide : ' + vides.join(', ');
-        if (resume.erreurs.length) texte += ' [' + resume.erreurs.join(' | ') + ']';
+        if (autresErreurs.length) texte += ' [' + autresErreurs.join(' | ') + ']';
       }
       statusEl.textContent = texte;
     }
