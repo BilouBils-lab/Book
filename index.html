@@ -483,7 +483,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.2</div>
+  <div class="version-tag">v3.3</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -1080,6 +1080,14 @@
       });
     }
 
+    const JAQUETTE_DEFAUT = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="135" viewBox="0 0 90 135">' +
+      '<rect width="90" height="135" fill="#2a2a30"/>' +
+      '<text x="45" y="62" font-size="28" text-anchor="middle">📚</text>' +
+      '<text x="45" y="90" font-size="11" fill="#9ca3af" text-anchor="middle" font-family="sans-serif">Manga</text>' +
+      '</svg>'
+    );
+
     function normaliserTitre(t) {
       return (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
     }
@@ -1100,12 +1108,21 @@
           reader.onerror = reject;
           reader.readAsDataURL(file);
         });
-        const base64Data = dataUrl.split(',')[1];
+        // Réduit la photo avant envoi : bien plus rapide en 4G, et suffisant pour lire la jaquette
+        let imageEnvoi = dataUrl;
+        let mimeEnvoi = file.type || "image/jpeg";
+        try {
+          imageEnvoi = await redimensionnerImage(dataUrl, 1024);
+          mimeEnvoi = "image/jpeg";
+        } catch (e) {
+          console.error('Réduction de la photo impossible, envoi en taille originale', e);
+        }
+        const base64Data = imageEnvoi.split(',')[1];
 
         const response = await fetch('https://manga-gemini-proxy.nabil-chilla.workers.dev', {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mimeType: file.type || "image/jpeg", data: base64Data })
+          body: JSON.stringify({ mimeType: mimeEnvoi, data: base64Data })
         });
 
         if (!response.ok) {
@@ -1403,7 +1420,7 @@
           card.className = 'series-card';
           card.onclick = () => ouvrirModalSerie(indexReel);
           card.innerHTML = `
-            <img class="cover-thumb" src="${serie.couverture || 'https://via.placeholder.com/65x95?text=Manga'}" alt="Jaquette" onerror="this.src='https://via.placeholder.com/65x95?text=No+Cover'">
+            <img class="cover-thumb" src="${serie.couverture || JAQUETTE_DEFAUT}" alt="Jaquette" onerror="this.onerror=null; this.src=JAQUETTE_DEFAUT">
             <div class="series-details">
               <div class="series-title">${serie.titre}</div>
               <div class="series-meta">${possedes} possédé(s) · ${lus}/${totalRef} lu(s)</div>
@@ -1447,7 +1464,7 @@
       const serie = bibliotheque[index];
       document.getElementById('modal-title').innerText = serie.titre;
       document.getElementById('modal-author').innerText = [serie.auteur || 'Auteur inconnu', serie.editeur].filter(Boolean).join(' · ');
-      document.getElementById('modal-cover').src = serie.couverture || 'https://via.placeholder.com/90x135?text=Manga';
+      document.getElementById('modal-cover').src = serie.couverture || JAQUETTE_DEFAUT;
 
       const morceaux = [];
       if (serie.genre) morceaux.push(serie.genre);
