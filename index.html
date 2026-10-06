@@ -400,8 +400,9 @@
 
     .version-tag {
       position: fixed;
-      bottom: 6px;
-      right: 10px;
+      /* Zones de sécurité iOS : évite le coin arrondi de l'écran et la barre d'accueil */
+      bottom: calc(6px + env(safe-area-inset-bottom));
+      right: calc(10px + env(safe-area-inset-right));
       font-size: 10px;
       color: var(--text-sub);
       opacity: 0.5;
@@ -483,7 +484,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.4</div>
+  <div class="version-tag">v3.5</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
