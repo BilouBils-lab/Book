@@ -34,7 +34,7 @@
     body {
       background-color: var(--bg-color);
       color: var(--text-main);
-      padding-bottom: 90px;
+      padding-bottom: calc(90px + env(safe-area-inset-bottom));
     }
 
     header {
@@ -222,12 +222,15 @@
 
     .actions-bar {
       position: fixed;
-      bottom: 20px;
+      /* Au-dessus de la barre d'accueil de l'iPhone, 20px ailleurs */
+      bottom: max(20px, calc(8px + env(safe-area-inset-bottom)));
       left: 50%;
       transform: translateX(-50%);
       display: flex;
       gap: 10px;
       z-index: 99;
+      /* Centrée avec left: 50%, la barre n'a que la moitié de l'écran : sans ça, les textes passent à la ligne */
+      white-space: nowrap;
     }
 
     .btn-fab {
