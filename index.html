@@ -324,29 +324,6 @@
       position: relative;
     }
 
-    .modal-header {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-
-    .modal-cover {
-      width: 90px;
-      height: 135px;
-      border-radius: 8px;
-      object-fit: cover;
-      background: #2a2a30;
-      cursor: pointer;
-    }
-
-    .modal-info {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 6px;
-    }
-
     .close-modal {
       position: absolute;
       top: 12px;
@@ -358,41 +335,140 @@
       cursor: pointer;
     }
 
+    /* --- Fiche d'une série --- */
+    .fiche { padding: 16px; }
+
+    .fiche-entete {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+
+    .fiche-jaquette {
+      width: 76px;
+      height: 114px;
+      flex-shrink: 0;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #2a2a30;
+      cursor: pointer;
+    }
+
+    .fiche-infos { flex: 1; min-width: 0; }
+
+    .fiche-titre {
+      font-size: 19px;
+      line-height: 1.2;
+      cursor: pointer;
+      margin-bottom: 4px;
+    }
+
+    .fiche-auteur {
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-bottom: 8px;
+    }
+
+    .fiche-pastilles { display: flex; flex-wrap: wrap; gap: 5px; }
+
+    .pastille {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #2a2a30;
+      color: var(--text-sub);
+      white-space: nowrap;
+    }
+
+    .pastille.statut::before { content: '● '; }
+    .pastille.en-cours { color: #60a5fa; background: rgba(37, 99, 235, 0.15); }
+    .pastille.terminee { color: #34d399; background: rgba(16, 185, 129, 0.15); }
+    .pastille.en-pause { color: #fbbf24; background: rgba(245, 158, 11, 0.15); }
+    .pastille.abandonnee { color: #9ca3af; }
+
+    .fiche-boutons-haut { display: flex; gap: 2px; margin: -6px -6px 0 0; }
+
+    .icone-btn {
+      width: 34px;
+      height: 34px;
+      border: none;
+      border-radius: 50%;
+      background: none;
+      color: var(--text-sub);
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .fiche-progression {
+      background: #141418;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .fiche-compteur { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+    .fiche-compteur span { color: var(--text-sub); font-weight: 400; }
+
+    /* Frise : un segment par tome, les trous montrent les tomes manquants */
+    .fiche-frise { display: flex; gap: 2px; height: 8px; }
+    .fiche-frise i { flex: 1; border-radius: 2px; background: #2a2a30; }
+    .fiche-frise i.possede { background: rgba(37, 99, 235, 0.55); }
+    .fiche-frise i.lu { background: var(--accent); }
+
+    .fiche-prochain { font-size: 12px; color: var(--text-sub); margin-top: 8px; }
+    .fiche-prochain b { color: var(--text-main); }
+
+    .fiche-legende {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--text-sub);
+      margin-bottom: 10px;
+    }
+    .fiche-legende span { display: flex; align-items: center; gap: 5px; }
+    .fiche-astuce { margin-left: auto; opacity: 0.7; }
+    .pt { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+    .pt.lu { background: var(--accent); }
+    .pt.possede { border: 1.5px solid var(--accent); }
+    .pt.manquant { border: 1.5px dashed #4b4b55; }
+
     .volumes-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
-      gap: 8px;
-      margin-top: 16px;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
     }
 
     .tome-box {
-      height: 42px;
+      height: 36px;
       border-radius: 8px;
-      background: #2a2a30;
-      color: var(--text-sub);
+      border: 1.5px dashed #3a3a42;
+      color: #6b6b75;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       user-select: none;
-      border: 1px solid transparent;
-      transition: all 0.15s ease;
-      position: relative;
+      -webkit-user-select: none;
+      transition: background 0.15s ease;
     }
 
     .tome-box.owned {
-      background: rgba(37, 99, 235, 0.15);
-      color: var(--accent);
-      border-color: var(--accent);
+      border: 1.5px solid var(--accent);
+      background: rgba(37, 99, 235, 0.12);
+      color: #93b4f5;
     }
 
     .tome-box.read {
+      border: 1.5px solid var(--accent);
       background: var(--accent);
       color: #ffffff;
-      border-color: var(--accent);
     }
+
+    .fiche-ajouter { margin-top: 16px; }
 
     .empty-state {
       text-align: center;
@@ -438,13 +514,6 @@
       border: 2px solid var(--success);
       border-radius: 8px;
       box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35);
-    }
-
-    /* Crayon après le titre de la fiche : il se renomme d'un appui */
-    #modal-title::after {
-      content: ' ✏️';
-      font-size: 13px;
-      opacity: 0.6;
     }
 
     .settings-list {
@@ -521,7 +590,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.18</div>
+  <div class="version-tag">v3.19</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -550,73 +619,48 @@
 
   <!-- Modal Détail Série -->
   <div id="detail-modal" class="modal-overlay">
-    <div class="modal-content">
-      <button class="close-modal" onclick="fermerModal()">×</button>
-      <div class="modal-header">
-        <div style="position: relative;">
-          <img id="modal-cover" class="modal-cover" src="" alt="Jaquette" onclick="ouvrirMenuImage()">
-          <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); color: white; padding: 2px 4px; border-radius: 4px; font-size: 10px;">✏️</div>
+    <div class="modal-content fiche">
+      <div class="fiche-entete">
+        <img id="modal-cover" class="fiche-jaquette" src="" alt="Jaquette" onclick="ouvrirMenuImage()">
+        <div class="fiche-infos">
+          <h2 id="modal-title" class="fiche-titre" onclick="renommerSerieActuelle()" title="Renommer la série"></h2>
+          <div id="modal-author" class="fiche-auteur"></div>
+          <div id="modal-pastilles" class="fiche-pastilles"></div>
         </div>
-        <div class="modal-info">
-          <h2 id="modal-title" style="font-size: 18px; cursor: pointer;" onclick="renommerSerieActuelle()" title="Renommer la série"></h2>
-          <div id="modal-author" style="font-size: 13px; color: var(--text-sub);"></div>
-          <div id="modal-meta-extra" style="font-size: 12px; color: var(--text-sub); margin-top: 4px;"></div>
-          <button class="btn btn-secondary" style="font-size: 11px; width: auto; padding: 4px 10px; margin-top: 8px;" onclick="ouvrirInfosSerie()">✏️ Infos</button>
+        <div class="fiche-boutons-haut">
+          <button class="icone-btn" onclick="ouvrirMenuSerie()" aria-label="Plus d'actions">⋯</button>
+          <button class="icone-btn" onclick="fermerModal()" aria-label="Fermer">✕</button>
         </div>
       </div>
 
-      <div style="font-size: 12px; margin-bottom: 8px; color: var(--text-sub); display: flex; justify-content: space-between; align-items: center;">
-        <span>Clic: Statut | Appui long: Supprimer tome</span>
+      <div class="fiche-progression">
+        <div id="fiche-compteur" class="fiche-compteur"></div>
+        <div id="fiche-frise" class="fiche-frise"></div>
+        <div id="fiche-prochain" class="fiche-prochain"></div>
       </div>
-      
+
+      <div class="fiche-legende">
+        <span><i class="pt lu"></i>lu</span>
+        <span><i class="pt possede"></i>possédé</span>
+        <span><i class="pt manquant"></i>manquant</span>
+        <span class="fiche-astuce">appui long : retirer</span>
+      </div>
       <div id="modal-volumes-grid" class="volumes-grid"></div>
-      
-      <div style="margin-top: 16px; display: flex; justify-content: space-between;">
-        <button class="btn btn-secondary" style="font-size: 12px; width: auto;" onclick="ajouterNouveauTomeModal()">+ Ajouter tome</button>
-        <button class="btn btn-secondary" style="font-size: 12px; width: auto; background: rgba(239,68,68,0.2); color: #ef4444;" onclick="supprimerSerieActuelle()">Supprimer la série</button>
-      </div>
+
+      <button class="btn btn-secondary fiche-ajouter" onclick="ajouterNouveauTomeModal()">+ Ajouter un tome</button>
     </div>
   </div>
 
-  <!-- Écran de scan du code-barres -->
-  <div class="modal-overlay" id="scanner-modal">
-    <div class="modal-content" style="max-width: 380px;">
-      <h3 style="font-size: 16px; margin-bottom: 10px;">📷 Scanner le code-barres</h3>
-      <div class="scanner-zone">
-        <video id="scanner-video" autoplay muted playsinline></video>
-        <div class="scanner-cadre"></div>
-      </div>
-      <div id="scanner-statut" style="font-size: 12px; color: var(--text-sub); margin: 10px 0; text-align: center;">Vise le code-barres au dos du livre</div>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <button class="btn btn-secondary" onclick="scannerDepuisPhoto()">📸 Prendre une photo du code-barres</button>
-        <button class="btn btn-secondary" onclick="scannerSaisieManuelle()">⌨️ Saisir l'ISBN</button>
-        <button class="btn btn-secondary" onclick="scannerJaquetteIA()">🖼️ Pas de code-barres ? Scanner la jaquette (IA)</button>
-        <button class="btn btn-secondary" style="background: transparent;" onclick="fermerScanner()">Annuler</button>
-      </div>
-      <input type="file" id="scanner-photo-input" style="display: none;" accept="image/*" capture="environment" onchange="decoderPhotoCodeBarres(event)">
-    </div>
-  </div>
-
-  <!-- Modal : résultat d'une recherche par ISBN -->
-  <div class="modal-overlay" id="isbn-modal">
-    <div class="modal-content" style="max-width: 360px;">
-      <h3 style="font-size: 16px; margin-bottom: 12px;">🔎 Recherche par ISBN</h3>
-      <div id="isbn-resultat"></div>
-      <div class="modal-btn-row" style="margin-top: 16px;">
-        <button class="btn btn-secondary" id="isbn-fermer">Fermer</button>
-        <button class="btn" id="isbn-ajouter">Ajouter ce tome</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal : complétion de la collection -->
-  <div class="modal-overlay" id="completion-modal">
+  <!-- Menu « ⋯ » de la fiche : actions rares -->
+  <div class="modal-overlay" id="menu-serie-modal">
     <div class="modal-content" style="max-width: 340px;">
-      <h3 id="completion-titre" style="font-size: 16px; margin-bottom: 12px;">✨ Compléter ma collection</h3>
-      <div id="completion-etape" style="font-size: 13px; color: var(--text-sub); margin-bottom: 8px;"></div>
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="completion-barre" style="width: 0%;"></div></div>
-      <div id="completion-bilan" style="font-size: 13px; margin-top: 14px; white-space: pre-line; line-height: 1.4;"></div>
-      <button class="btn btn-secondary" id="completion-bouton" style="margin-top: 16px;">Arrêter</button>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button class="btn btn-secondary" onclick="actionMenuSerie(renommerSerieActuelle)">✏️ Renommer la série</button>
+        <button class="btn btn-secondary" onclick="actionMenuSerie(ouvrirInfosSerie)">ℹ️ Modifier les infos</button>
+        <button class="btn btn-secondary" onclick="actionMenuSerie(ouvrirMenuImage)">🖼️ Changer la jaquette</button>
+        <button class="btn btn-secondary" style="color: #ef4444;" onclick="actionMenuSerie(supprimerSerieActuelle)">🗑️ Supprimer la série</button>
+        <button class="btn btn-secondary" style="background: transparent;" onclick="fermerMenuSerie()">Annuler</button>
+      </div>
     </div>
   </div>
 
@@ -2200,17 +2244,27 @@
       document.getElementById('detail-modal').classList.add('active');
     }
 
+    const CLASSES_STATUT = { 'En cours': 'en-cours', 'Terminée': 'terminee', 'En pause': 'en-pause', 'Abandonnée': 'abandonnee' };
+
+    function creerPastille(texte, classe) {
+      const el = document.createElement('span');
+      el.className = 'pastille' + (classe ? ' ' + classe : '');
+      el.textContent = texte;
+      return el;
+    }
+
     function remplirModalSerie(index) {
       const serie = bibliotheque[index];
       document.getElementById('modal-title').innerText = serie.titre;
       document.getElementById('modal-author').innerText = [serie.auteur || 'Auteur inconnu', serie.editeur].filter(Boolean).join(' · ');
       document.getElementById('modal-cover').src = serie.couverture || JAQUETTE_DEFAUT;
 
-      const morceaux = [];
-      if (serie.genre) morceaux.push(serie.genre);
-      morceaux.push(serie.statut || 'En cours');
-      if (serie.tomesParus) morceaux.push(`${serie.tomesParus} tome${serie.tomesParus > 1 ? 's' : ''} parus en France`);
-      document.getElementById('modal-meta-extra').innerText = morceaux.join(' · ');
+      // Pastilles : statut coloré puis genres
+      const pastilles = document.getElementById('modal-pastilles');
+      pastilles.innerHTML = '';
+      const statut = serie.statut || 'En cours';
+      pastilles.appendChild(creerPastille(statut, 'statut ' + (CLASSES_STATUT[statut] || '')));
+      (serie.genre || '').split(/\s*,\s*/).filter(Boolean).slice(0, 3).forEach(g => pastilles.appendChild(creerPastille(g)));
 
       // Vérification discrète à la BnF si l'info manque ou date de plus d'une semaine
       if (!serie.tomesParusMaj || Date.now() - serie.tomesParusMaj > DELAI_MAJ_TOMES_PARUS) {
@@ -2221,20 +2275,59 @@
         }).catch(e => console.error('Tomes parus indisponibles', e));
       }
 
+      // Progression : jusqu'au dernier tome paru (BnF), ou au dernier tome de la liste
+      const dernierListe = serie.tomes.reduce((max, t) => Math.max(max, t.numero), 0);
+      const total = Math.max(serie.tomesParus || 0, dernierListe);
+      const parNumero = new Map(serie.tomes.map((t, i) => [t.numero, i]));
+      const possedes = serie.tomes.filter(t => t.possede).length;
+      const lus = serie.tomes.filter(t => t.lu).length;
+
+      document.getElementById('fiche-compteur').innerHTML = serie.tomesParus
+        ? `${possedes} / ${total} possédés <span>· ${lus} lu${lus > 1 ? 's' : ''}</span>`
+        : `${possedes} possédé${possedes > 1 ? 's' : ''} <span>· ${lus} lu${lus > 1 ? 's' : ''}</span>`;
+
+      const frise = document.getElementById('fiche-frise');
+      frise.innerHTML = '';
+      for (let n = 1; n <= total; n++) {
+        const tome = parNumero.has(n) ? serie.tomes[parNumero.get(n)] : null;
+        const seg = document.createElement('i');
+        if (tome && tome.lu) seg.className = 'lu';
+        else if (tome && tome.possede) seg.className = 'possede';
+        frise.appendChild(seg);
+      }
+
+      const manquants = [];
+      for (let n = 1; n <= total; n++) {
+        const tome = parNumero.has(n) ? serie.tomes[parNumero.get(n)] : null;
+        if (!tome || !tome.possede) manquants.push(n);
+      }
+      const prochain = document.getElementById('fiche-prochain');
+      if (manquants.length) {
+        prochain.innerHTML = `Prochain à acheter : <b>tome ${manquants[0]}</b>` +
+          (manquants.length > 1 ? ` · ${manquants.length} manquants` : '');
+      } else if (serie.tomesParus) {
+        prochain.textContent = statut === 'Terminée' ? 'Série complète 🎉' : 'À jour : tu as tous les tomes parus ✓';
+      } else {
+        prochain.textContent = 'Nombre de tomes parus inconnu';
+      }
+
+      // Grille : chaque tome jusqu'au dernier paru ; les absents de la liste s'ajoutent d'un appui
       const grid = document.getElementById('modal-volumes-grid');
       grid.innerHTML = '';
-
-      serie.tomes.forEach((tome, tIndex) => {
-        let classe = 'tome-box';
-        if (tome.lu) classe += ' read';
-        else if (tome.possede) classe += ' owned';
-
+      for (let n = 1; n <= total; n++) {
+        const tIndex = parNumero.has(n) ? parNumero.get(n) : -1;
+        const tome = tIndex >= 0 ? serie.tomes[tIndex] : null;
         const box = document.createElement('div');
-        box.className = classe;
-        box.innerText = tome.numero;
-        
-        let suppressionDeclenchee = false;
+        box.className = 'tome-box' + (tome && tome.lu ? ' read' : tome && tome.possede ? ' owned' : '');
+        box.innerText = n;
 
+        if (!tome) {
+          box.onclick = () => ajouterTomeNumero(index, n);
+          grid.appendChild(box);
+          continue;
+        }
+
+        let suppressionDeclenchee = false;
         box.onclick = () => {
           if (suppressionDeclenchee) {
             suppressionDeclenchee = false;
@@ -2242,12 +2335,10 @@
           }
           toggleTomeState(index, tIndex);
         };
-
         box.oncontextmenu = (e) => {
           e.preventDefault();
           supprimerTomeUnique(index, tIndex);
         };
-
         box.ontouchstart = () => {
           suppressionDeclenchee = false;
           longPressTimer = setTimeout(() => {
@@ -2260,9 +2351,29 @@
           if (suppressionDeclenchee) e.preventDefault();
         };
         box.ontouchmove = () => clearTimeout(longPressTimer);
-
         grid.appendChild(box);
-      });
+      }
+    }
+
+    // Tome affiché comme manquant (pas encore dans la liste) : un appui l'ajoute comme possédé
+    function ajouterTomeNumero(sIndex, numero) {
+      const serie = bibliotheque[sIndex];
+      serie.tomes.push({ numero, possede: true, lu: false });
+      serie.tomes.sort((a, b) => a.numero - b.numero);
+      sauvegarder();
+    }
+
+    function ouvrirMenuSerie() {
+      document.getElementById('menu-serie-modal').classList.add('active');
+    }
+
+    function fermerMenuSerie() {
+      document.getElementById('menu-serie-modal').classList.remove('active');
+    }
+
+    function actionMenuSerie(action) {
+      fermerMenuSerie();
+      action();
     }
 
     function toggleTomeState(sIndex, tIndex) {
