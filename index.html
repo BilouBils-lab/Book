@@ -521,7 +521,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.16</div>
+  <div class="version-tag">v3.17</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -1500,33 +1500,55 @@
       return { base: titreRecherche(titre), edition: m ? m[1].trim() : null };
     }
 
-    // Plus grand numéro de tome parmi les notices BnF de cette série et de cette édition
-    async function chercherTomesParus(serie) {
-      const { base, edition } = decomposerTitreSerie(serie.titre);
+    // Notices BnF de cette série et de cette édition → numéros de tome, regroupés par éditeur
+    async function noticesEdition(base, edition, editeur) {
       const mots = (base + ' ' + (edition || '')).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
       let url = WORKER_URL + '/edition?mots=' + encodeURIComponent(mots);
-      if (serie.editeur) url += '&editeur=' + encodeURIComponent(serie.editeur);
+      if (editeur) url += '&editeur=' + encodeURIComponent(editeur);
       const r = await fetchAvecTimeout(url, {}, 20000);
       const d = await r.json().catch(() => null);
       if (!r.ok || !d || d.erreur) throw new Error((d && d.erreur) || 'HTTP ' + r.status);
 
-      const editeurSerie = editeurFrancais(serie.editeur);
-      const numeros = new Set();
+      const parEditeur = new Map();
       for (const notice of d.notices || []) {
         const a = analyserTitreLivre(notice.titre);
         if (!a.tome || normaliserRecherche(a.serie) !== normaliserRecherche(base)) continue;
         // Même édition : le mot de l'édition doit figurer dans le titre ; édition standard : aucune édition détectée
         if (edition ? !normaliserRecherche(notice.titre).includes(normaliserRecherche(edition)) : a.edition) continue;
-        const editeurNotice = editeurFrancais(notice.editeur);
-        if (editeurSerie && editeurNotice && editeurNotice !== editeurSerie) continue;
-        numeros.add(a.tome);
+        const nom = editeurFrancais(notice.editeur) || (notice.editeur || '').replace(/\s*\([^)]*\)/, '') || '?';
+        if (!parEditeur.has(nom)) parEditeur.set(nom, new Set());
+        parEditeur.get(nom).add(a.tome);
       }
-      return numeros.size ? Math.max(...numeros) : null;
+      return { parEditeur, nbNotices: (d.notices || []).length, exemple: (d.notices || [])[0] && d.notices[0].titre };
+    }
+
+    // Nombre de tomes parus : plus grand numéro trouvé chez l'éditeur de la série.
+    // Si rien chez cet éditeur (éditeur vide, faux ou écrit autrement), nouvel essai sans éditeur :
+    // on retient alors l'éditeur qui a le plus de tomes.
+    async function chercherTomesParus(serie) {
+      const { base, edition } = decomposerTitreSerie(serie.titre);
+      const editeurSerie = editeurFrancais(serie.editeur);
+      const essais = serie.editeur ? [serie.editeur, null] : [null];
+      let diagnostic = null;
+      for (const editeur of essais) {
+        const res = await noticesEdition(base, edition, editeur);
+        let numeros = null;
+        if (editeur && editeurSerie) numeros = res.parEditeur.get(editeurSerie);
+        if (!numeros) {
+          for (const [, tomes] of res.parEditeur) if (!numeros || tomes.size > numeros.size) numeros = tomes;
+        }
+        if (numeros && numeros.size) return { parus: Math.max(...numeros) };
+        if (!diagnostic || res.nbNotices) diagnostic = res.nbNotices
+          ? `${res.nbNotices} notice(s) BnF, aucune retenue (ex. « ${res.exemple} »)`
+          : 'aucune notice à la BnF';
+      }
+      return { parus: null, diagnostic };
     }
 
     async function majTomesParus(serie) {
-      const parus = await chercherTomesParus(serie);
+      const { parus, diagnostic } = await chercherTomesParus(serie);
       serie.tomesParusMaj = Date.now();
+      serie.tomesParusDiagnostic = diagnostic || null;
       if (parus && parus !== serie.tomesParus) { serie.tomesParus = parus; return true; }
       return false;
     }
@@ -1539,11 +1561,12 @@
       const introuvables = [];
       await traiterEnLot('📚 Tomes parus en France', bibliotheque.slice(), async (serie) => {
         const modifie = await majTomesParus(serie);
-        if (serie.tomesParus) trouvees++; else introuvables.push(serie.titre);
+        if (serie.tomesParus) trouvees++;
+        else introuvables.push(`• ${serie.titre} (${serie.editeur || 'éditeur inconnu'}) : ${serie.tomesParusDiagnostic || 'erreur de recherche'}`);
         return true;
       }, 1000);
       let bilan = `Nombre de tomes parus connu pour ${trouvees} série(s).`;
-      if (introuvables.length) bilan += `\n\nPas trouvé à la BnF (${introuvables.length}) : ${introuvables.join(', ')}.\nVérifie le titre et l'éditeur de ces séries (ex. « Berserk (Prestige) », éditeur Glénat).`;
+      if (introuvables.length) bilan += `\n\nPas trouvé à la BnF (${introuvables.length}) :\n${introuvables.join('\n')}\n\nVérifie le titre de ces séries : une édition spéciale se note entre parenthèses, ex. « Berserk (Prestige) ».`;
       document.getElementById('completion-bilan').textContent = bilan;
     }
 
