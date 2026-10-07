@@ -634,7 +634,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.23</div>
+  <div class="version-tag">v3.24</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -1591,6 +1591,7 @@
         if (traitees < cibles.length && !completionArretee) await pause(pauseMs);
       }
       sauvegarder();
+      if (!cibles.length) barre.style.width = '100%';
       etape.textContent = completionArretee ? `Arrêté après ${traitees} série(s) sur ${cibles.length}` : 'Terminé ✅';
       bouton.textContent = 'Fermer';
       bouton.onclick = () => modal.classList.remove('active');
