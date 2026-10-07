@@ -487,7 +487,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.8</div>
+  <div class="version-tag">v3.9</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -496,6 +496,7 @@
       <h2 style="font-size: 18px; margin-bottom: 16px;">Paramètres</h2>
       
       <div class="settings-list">
+        <button class="btn btn-secondary" onclick="completerCollection()">✨ Compléter ma collection</button>
         <button class="btn btn-secondary" onclick="configurerCleBooks()">📚 Clé Google Books (optionnelle)</button>
         <button class="btn btn-secondary" onclick="configurerCodeCloud()">🔑 Code de sauvegarde cloud</button>
         <button class="btn btn-secondary" onclick="restaurerDepuisCloud()">☁️ Restaurer depuis le cloud</button>
@@ -538,6 +539,17 @@
         <button class="btn btn-secondary" style="font-size: 12px; width: auto;" onclick="ajouterNouveauTomeModal()">+ Ajouter tome</button>
         <button class="btn btn-secondary" style="font-size: 12px; width: auto; background: rgba(239,68,68,0.2); color: #ef4444;" onclick="supprimerSerieActuelle()">Supprimer la série</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal : complétion de la collection -->
+  <div class="modal-overlay" id="completion-modal">
+    <div class="modal-content" style="max-width: 340px;">
+      <h3 style="font-size: 16px; margin-bottom: 12px;">✨ Compléter ma collection</h3>
+      <div id="completion-etape" style="font-size: 13px; color: var(--text-sub); margin-bottom: 8px;"></div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="completion-barre" style="width: 0%;"></div></div>
+      <div id="completion-bilan" style="font-size: 13px; margin-top: 14px; white-space: pre-line; line-height: 1.4;"></div>
+      <button class="btn btn-secondary" id="completion-bouton" style="margin-top: 16px;">Arrêter</button>
     </div>
   </div>
 
@@ -917,145 +929,194 @@
       }
       return { trouve: false, erreurs };
     }
-    let couvertureSuggeree = null;
+    let infosSuggerees = {};
 
     function messageErreur(e) {
       return e && e.name === 'AbortError' ? 'délai dépassé' : (e && e.message) || 'erreur inconnue';
     }
 
+    // Gemini via le Worker, avec une nouvelle tentative
+    async function demanderIA(titre) {
+      for (let tentative = 0; tentative <= 1; tentative++) {
+        try {
+          const r = await fetchAvecTimeout(WORKER_URL + '/infos', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titre })
+          }, 20000);
+          const data = await r.json().catch(() => ({ erreur: 'réponse illisible' }));
+          if (r.ok || tentative === 1) return data;
+        } catch (e) {
+          if (tentative === 1) return { erreur: messageErreur(e) };
+        }
+        await pause(3000);
+      }
+    }
+
+    async function chercherEditeurGoogleBooks(titre) {
+      const cleBooks = localStorage.getItem('google_books_api_key');
+      const cleParam = cleBooks ? '&key=' + encodeURIComponent(cleBooks) : '';
+      let erreur = null;
+      for (const q of ['intitle:' + titre, titre + ' manga']) {
+        try {
+          // langRestrict=fr : uniquement les éditions françaises
+          const r = await fetchAvecReessai('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(q) + '&langRestrict=fr&printType=books&maxResults=5' + cleParam);
+          if (!r.ok) { erreur = 'HTTP ' + r.status; continue; }
+          for (const it of (r.body && r.body.items) || []) {
+            const editeur = editeurFrancais(it.volumeInfo && it.volumeInfo.publisher);
+            if (editeur) return { editeur };
+          }
+        } catch (e) {
+          erreur = messageErreur(e);
+        }
+      }
+      return { erreur };
+    }
+
+    // Cherche les infos d'une série sans rien modifier. `deja` indique les champs déjà renseignés :
+    // ils ne sont jamais remplacés. Ordre : AniList / MyAnimeList, Google Books (éditeur), puis l'IA
+    // seulement pour ce qui manque encore (quota limité).
+    async function collecterInfosSerie(titre, deja) {
+      const res = { valeurs: {}, sources: {}, base: null, erreurs: [] };
+      const poser = (champ, valeur, source) => {
+        if (valeur && !deja[champ] && !res.valeurs[champ]) { res.valeurs[champ] = valeur; res.sources[champ] = source; }
+      };
+
+      const [base, livres] = await Promise.all([
+        chercherInfosSerie(titre),
+        deja.editeur ? null : chercherEditeurGoogleBooks(titre)
+      ]);
+      res.erreurs.push(...base.erreurs);
+      if (base.trouve) {
+        res.base = { source: base.source, titreMatch: base.titreMatch };
+        poser('auteur', base.auteur, base.source);
+        poser('genre', base.genre, base.source);
+        poser('statut', base.statut, base.source);
+        poser('couverture', base.couverture, base.source);
+        poser('tomesTotal', base.volumes, base.source);
+      }
+      if (livres && livres.editeur) poser('editeur', livres.editeur, 'Google Books');
+      else if (livres && livres.erreur) res.erreurs.push('Google Books : ' + livres.erreur);
+
+      const manque = ['auteur', 'genre', 'editeur'].filter(c => !deja[c] && !res.valeurs[c]);
+      if (manque.length) {
+        const ia = await demanderIA(titre);
+        if (ia.erreur) res.erreurs.push('IA : ' + ia.erreur);
+        else manque.forEach(c => poser(c, ia[c], 'IA'));
+      }
+      return res;
+    }
+
+    // Champs « déjà renseignés » d'une série (le statut par défaut « En cours » peut être corrigé)
+    function champsRenseignes(serie, valeurs) {
+      const v = valeurs || serie;
+      return {
+        auteur: !!v.auteur, genre: !!v.genre, editeur: !!v.editeur,
+        statut: !!v.statut && v.statut !== 'En cours',
+        couverture: !!serie.couverture, tomesTotal: !!serie.tomesTotal
+      };
+    }
+
+    const NOMS_CHAMPS = { auteur: 'auteur', genre: 'genre', editeur: 'éditeur', statut: 'statut', couverture: 'jaquette', tomesTotal: 'nombre de tomes' };
+
+    // Ligne de résumé : qui a rempli quoi, et pourquoi des champs restent vides
+    function resumerRecherche(res, vides) {
+      const parSource = {};
+      for (const [champ, source] of Object.entries(res.sources)) (parSource[source] = parSource[source] || []).push(NOMS_CHAMPS[champ]);
+      const parties = [];
+      if (res.base) parties.push(`${res.base.source} (« ${res.base.titreMatch} ») : ${(parSource[res.base.source] || []).join(', ') || 'rien de nouveau'}`);
+      if (parSource['Google Books']) parties.push('Google Books : ' + parSource['Google Books'].join(', '));
+      if (parSource['IA']) parties.push('IA (à vérifier) : ' + parSource['IA'].join(', '));
+      let texte = parties.join(' · ');
+      // Toujours signaler l'échec d'AniList / MyAnimeList, même si l'IA a pris le relais
+      const echecsBase = res.base ? [] : res.erreurs.filter(e => /^(AniList|MyAnimeList)/.test(e));
+      if (echecsBase.length) texte += (texte ? ' — ' : '') + echecsBase.join(' | ');
+      if (vides.length) {
+        texte += (texte ? ' — ' : '') + 'Toujours vide : ' + vides.map(c => NOMS_CHAMPS[c]).join(', ');
+        const autres = res.erreurs.filter(e => !echecsBase.includes(e));
+        if (autres.length) texte += ' [' + autres.join(' | ') + ']';
+      }
+      return texte;
+    }
+
     async function rechercherInfosAuto() {
       if (serieIndexActive === null) return;
       const jeton = ++jetonRecherche;
-      const actif = () => jeton === jetonRecherche;
-      const titreSerie = bibliotheque[serieIndexActive].titre;
-      const statusEl = document.getElementById('infos-recherche-status');
+      const serie = bibliotheque[serieIndexActive];
       const champ = (id) => document.getElementById(id);
+      const statusEl = champ('infos-recherche-status');
       statusEl.textContent = 'Recherche en cours…';
 
-      const resume = { base: null, books: [], ia: [], erreurs: [] };
-      const enteteJson = { 'Content-Type': 'application/json' };
-      const corps = JSON.stringify({ titre: titreSerie });
-
-      // IA : appelée seulement si un champ manque, et une seule fois (quota limité)
-      let iaPromise = null;
-      const getIA = () => {
-        if (!iaPromise) {
-          iaPromise = (async () => {
-            for (let tentative = 0; tentative <= 1; tentative++) {
-              try {
-                const r = await fetchAvecTimeout(WORKER_URL + '/infos', { method: 'POST', headers: enteteJson, body: corps }, 20000);
-                const data = await r.json().catch(() => ({ erreur: 'réponse illisible' }));
-                if (r.ok || tentative === 1) return data;
-                await pause(3000);
-              } catch (e) {
-                if (tentative === 1) return { erreur: messageErreur(e) };
-                await pause(3000);
-              }
-            }
-          })();
-        }
-        return iaPromise;
+      const saisie = {
+        auteur: champ('infos-auteur').value.trim(), genre: champ('infos-genre').value.trim(),
+        editeur: champ('infos-editeur').value.trim(), statut: champ('infos-statut').value
       };
+      const res = await collecterInfosSerie(serie.titre, champsRenseignes(serie, saisie));
+      if (jeton !== jetonRecherche) return;
 
-      const tacheAniList = (async () => {
-        const data = await chercherInfosSerie(titreSerie);
-        resume.erreurs.push(...data.erreurs);
+      const v = res.valeurs;
+      if (v.auteur) champ('infos-auteur').value = v.auteur;
+      if (v.genre) champ('infos-genre').value = v.genre;
+      if (v.editeur) champ('infos-editeur').value = v.editeur;
+      if (v.statut) champ('infos-statut').value = v.statut;
+      infosSuggerees = { couverture: v.couverture, tomesTotal: v.tomesTotal };
 
-        if (!actif()) return;
-        if (data.trouve) {
-          const remplis = [];
-          if (data.auteur) { champ('infos-auteur').value = data.auteur; remplis.push('auteur'); }
-          if (data.genre) { champ('infos-genre').value = data.genre; remplis.push('genre'); }
-          if (data.statut && champ('infos-statut').value === 'En cours') {
-            champ('infos-statut').value = data.statut;
-            remplis.push('statut');
-          }
-          if (data.couverture && !bibliotheque[serieIndexActive].couverture) {
-            couvertureSuggeree = data.couverture;
-            remplis.push('jaquette');
-          }
-          resume.base = { source: data.source, titreMatch: data.titreMatch, remplis };
+      const vides = ['auteur', 'genre', 'editeur'].filter(c => !champ('infos-' + c).value);
+      statusEl.textContent = resumerRecherche(res, vides);
+    }
+
+    // --- Compléter toute la collection ---
+    const PAUSE_ENTRE_SERIES_MS = 2500; // respecte les limites d'AniList et de Gemini
+    let completionArretee = false;
+
+    function serieIncomplete(s) {
+      return !s.auteur || !s.genre || !s.editeur || !s.couverture;
+    }
+
+    async function completerCollection() {
+      const cibles = bibliotheque.filter(serieIncomplete);
+      if (!cibles.length) { alert('Toutes tes séries sont déjà complètes 🎉'); return; }
+      const minutes = Math.max(1, Math.round(cibles.length * 4 / 60));
+      if (!(await confirmerAction(`Compléter ${cibles.length} série(s) incomplète(s) ?\n\nSeuls les champs vides sont remplis, rien n'est écrasé. Compte environ ${minutes} min : garde l'app ouverte.`))) return;
+
+      fermerParametres();
+      const modal = document.getElementById('completion-modal');
+      const etape = document.getElementById('completion-etape');
+      const barre = document.getElementById('completion-barre');
+      const bilanEl = document.getElementById('completion-bilan');
+      const bouton = document.getElementById('completion-bouton');
+      bilanEl.textContent = '';
+      barre.style.width = '0%';
+      bouton.textContent = 'Arrêter';
+      bouton.onclick = () => { completionArretee = true; bouton.textContent = 'Arrêt après cette série…'; };
+      completionArretee = false;
+      modal.classList.add('active');
+
+      let completees = 0;
+      const incompletes = [];
+      let traitees = 0;
+      for (const serie of cibles) {
+        if (completionArretee) break;
+        etape.textContent = `${traitees + 1} / ${cibles.length} — ${serie.titre}`;
+        try {
+          const res = await collecterInfosSerie(serie.titre, champsRenseignes(serie));
+          const champs = Object.keys(res.valeurs);
+          champs.forEach(c => { serie[c] = res.valeurs[c]; });
+          if (champs.length) { completees++; sauvegarderLocal(); }
+        } catch (e) {
+          console.error('Complétion impossible pour ' + serie.titre, e);
         }
-
-        if (!champ('infos-auteur').value || !champ('infos-genre').value) {
-          const ia = await getIA();
-          if (!actif()) return;
-          if (ia && !ia.erreur) {
-            if (!champ('infos-auteur').value && ia.auteur) { champ('infos-auteur').value = ia.auteur; resume.ia.push('auteur'); }
-            if (!champ('infos-genre').value && ia.genre) { champ('infos-genre').value = ia.genre; resume.ia.push('genre'); }
-          } else if (ia && ia.erreur) {
-            resume.erreurs.push('IA : ' + ia.erreur);
-          }
-        }
-      })();
-
-      const tacheBooks = (async () => {
-        const cleBooks = localStorage.getItem('google_books_api_key');
-        const cleParam = cleBooks ? '&key=' + encodeURIComponent(cleBooks) : '';
-        const requetes = ['intitle:' + titreSerie, titreSerie + ' manga'];
-        let editeur = null;
-        let erreurBooks = null;
-
-        for (const q of requetes) {
-          try {
-            // langRestrict=fr : uniquement les éditions françaises (sinon on récupère VIZ Media & co)
-            const r = await fetchAvecReessai('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(q) + '&langRestrict=fr&printType=books&maxResults=5' + cleParam);
-            if (r.ok) {
-              const items = (r.body && r.body.items) || [];
-              for (const it of items) {
-                editeur = editeurFrancais(it.volumeInfo && it.volumeInfo.publisher);
-                if (editeur) break;
-              }
-              if (editeur) break;
-            } else {
-              erreurBooks = 'HTTP ' + r.status;
-            }
-          } catch (e) {
-            erreurBooks = messageErreur(e);
-          }
-        }
-
-        if (!actif()) return;
-        if (editeur) {
-          champ('infos-editeur').value = editeur;
-          resume.books.push('éditeur');
-          return;
-        }
-        if (erreurBooks) resume.erreurs.push('Google Books : ' + erreurBooks);
-
-        const ia = await getIA();
-        if (!actif()) return;
-        if (ia && !ia.erreur) {
-          if (!champ('infos-editeur').value && ia.editeur) { champ('infos-editeur').value = ia.editeur; resume.ia.push('éditeur'); }
-        } else if (ia && ia.erreur && !resume.erreurs.some(x => x.startsWith('IA'))) {
-          resume.erreurs.push('IA : ' + ia.erreur);
-        }
-      })();
-
-      try {
-        await Promise.all([tacheAniList, tacheBooks]);
-      } catch (e) {
-        resume.erreurs.push(messageErreur(e));
+        if (serieIncomplete(serie)) incompletes.push(serie.titre);
+        traitees++;
+        barre.style.width = Math.round(traitees / cibles.length * 100) + '%';
+        if (traitees < cibles.length && !completionArretee) await pause(PAUSE_ENTRE_SERIES_MS);
       }
-      if (!actif()) return;
 
-      const parties = [];
-      if (resume.base) parties.push(`${resume.base.source} (« ${resume.base.titreMatch} ») : ${resume.base.remplis.join(', ') || 'rien de nouveau'}`);
-      if (resume.books.length) parties.push('Google Books : ' + resume.books.join(', '));
-      if (resume.ia.length) parties.push('IA (à vérifier) : ' + resume.ia.join(', '));
-      let texte = parties.join(' · ');
-      // Toujours signaler l'échec d'AniList / MyAnimeList, même si l'IA a pris le relais
-      const echecsBase = resume.base ? [] : resume.erreurs.filter(e => /^(AniList|MyAnimeList)/.test(e));
-      if (echecsBase.length) texte += (texte ? ' — ' : '') + echecsBase.join(' | ');
-      const autresErreurs = resume.erreurs.filter(e => !echecsBase.includes(e));
-
-      const vides = [['auteur', 'infos-auteur'], ['genre', 'infos-genre'], ['éditeur', 'infos-editeur']]
-        .filter(([, id]) => !champ(id).value).map(([nom]) => nom);
-      if (vides.length) {
-        texte += (texte ? ' — ' : '') + 'Toujours vide : ' + vides.join(', ');
-        if (autresErreurs.length) texte += ' [' + autresErreurs.join(' | ') + ']';
-      }
-      statusEl.textContent = texte;
+      sauvegarder();
+      etape.textContent = completionArretee ? `Arrêté après ${traitees} série(s) sur ${cibles.length}` : 'Terminé ✅';
+      let bilan = `${completees} série(s) enrichie(s).`;
+      if (incompletes.length) bilan += `\n\nEncore incomplètes (${incompletes.length}) : ${incompletes.join(', ')}.\nOuvre leur fiche (✏️ Infos) pour compléter à la main ou vérifier le titre.`;
+      bilanEl.textContent = bilan;
+      bouton.textContent = 'Fermer';
+      bouton.onclick = () => modal.classList.remove('active');
     }
 
     function ouvrirInfosSerie() {
@@ -1066,7 +1127,7 @@
       document.getElementById('infos-editeur').value = serie.editeur || '';
       document.getElementById('infos-statut').value = serie.statut || 'En cours';
       document.getElementById('infos-recherche-status').textContent = '';
-      couvertureSuggeree = null;
+      infosSuggerees = {};
       document.getElementById('form-infos-modal').classList.add('active');
 
       if (!serie.auteur && !serie.genre) {
@@ -1085,8 +1146,9 @@
       serie.genre = document.getElementById('infos-genre').value.trim();
       serie.editeur = document.getElementById('infos-editeur').value.trim();
       serie.statut = document.getElementById('infos-statut').value;
-      if (couvertureSuggeree && !serie.couverture) serie.couverture = couvertureSuggeree;
-      couvertureSuggeree = null;
+      if (infosSuggerees.couverture && !serie.couverture) serie.couverture = infosSuggerees.couverture;
+      if (infosSuggerees.tomesTotal && !serie.tomesTotal) serie.tomesTotal = infosSuggerees.tomesTotal;
+      infosSuggerees = {};
       document.getElementById('form-infos-modal').classList.remove('active');
       sauvegarder();
     });
@@ -1191,13 +1253,17 @@
       return { statut: 'erreur', message: data.error || ('HTTP ' + res.status) };
     }
 
-    function sauvegarder() {
+    function sauvegarderLocal() {
       if (db) {
         dbSet('bibliotheque', bibliotheque).catch(e => console.error('Sauvegarde locale impossible', e));
       } else {
         localStorage.setItem('mangas_db', JSON.stringify(bibliotheque));
       }
       rendreVues();
+    }
+
+    function sauvegarder() {
+      sauvegarderLocal();
       clearTimeout(cloudBackupTimer);
       cloudBackupTimer = setTimeout(async () => {
         try {
