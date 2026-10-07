@@ -168,6 +168,14 @@
       margin-top: 4px;
     }
 
+    /* Barre à deux niveaux : possédés (clair) puis lus (plein) par-dessus */
+    .barre-double { position: relative; }
+    .barre-double .progress-bar-fill { position: absolute; left: 0; top: 0; }
+    .barre-double .progress-bar-fill.possedes { background-color: rgba(37, 99, 235, 0.45); }
+
+    .series-meta .a-acheter { color: #fbbf24; }
+    .series-meta .complete { color: var(--success); }
+
     .progress-bar-fill {
       height: 100%;
       background-color: var(--accent);
@@ -607,6 +615,7 @@
       <select id="tri-select" class="modal-input" style="margin-bottom: 0; width: auto; flex-shrink: 0;" onchange="onTriChange(this.value)">
         <option value="alpha" selected>A → Z</option>
         <option value="progression">Progression</option>
+        <option value="completer">À compléter</option>
         <option value="ajout">Ordre d'ajout</option>
       </select>
     </div>
@@ -625,7 +634,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.20</div>
+  <div class="version-tag">v3.21</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -2216,11 +2225,18 @@
         listeAffichee.sort((a, b) => a.serie.titre.localeCompare(b.serie.titre, 'fr', { sensitivity: 'base' }));
       } else if (triActif === 'progression') {
         const pourcentageDe = (serie) => {
-          const total = serie.tomes.length;
-          const lus = serie.tomes.filter(t => t.lu).length;
+          const { total, lus } = statsSerie(serie);
           return total > 0 ? lus / total : 0;
         };
         listeAffichee.sort((a, b) => pourcentageDe(b.serie) - pourcentageDe(a.serie));
+      } else if (triActif === 'completer') {
+        // D'abord les séries où il manque le moins de tomes, puis les complètes, puis les inconnues
+        const rang = (serie) => {
+          const { manquants } = statsSerie(serie);
+          if (manquants.length) return manquants.length;
+          return serie.tomesParus ? 100000 : 200000;
+        };
+        listeAffichee.sort((a, b) => rang(a.serie) - rang(b.serie) || a.serie.titre.localeCompare(b.serie.titre, 'fr', { sensitivity: 'base' }));
       }
       // 'ajout' : on garde l'ordre naturel du tableau (ordre d'ajout), rien à trier
 
@@ -2230,10 +2246,15 @@
         containerCol.innerHTML = `<div class="empty-state">Aucune série ne correspond à "${rechercheTexte}".</div>`;
       } else {
         listeAffichee.forEach(({ serie, indexReel }) => {
-          const possedes = serie.tomes.filter(t => t.possede).length;
-          const lus = serie.tomes.filter(t => t.lu).length;
-          const totalRef = serie.tomes.length;
-          const pourcentage = totalRef > 0 ? Math.min(100, Math.round((lus / totalRef) * 100)) : 0;
+          const { total, possedes, lus, manquants } = statsSerie(serie);
+          const pctPossedes = total ? Math.round(possedes / total * 100) : 0;
+          const pctLus = total ? Math.round(lus / total * 100) : 0;
+          let etat;
+          if (manquants.length) etat = `<span class="a-acheter">${manquants.length} à acheter</span>`;
+          else if (serie.tomesParus) etat = `<span class="complete">${serie.statut === 'Terminée' ? 'Complète' : 'À jour'} ✓</span>`;
+          else etat = '';
+          const compte = serie.tomesParus ? `${possedes} / ${total}` : `${possedes} possédé${possedes > 1 ? 's' : ''}`;
+          const meta = [compte, etat, `${lus} lu${lus > 1 ? 's' : ''}`].filter(Boolean).join(' · ');
 
           const card = document.createElement('div');
           card.className = 'series-card';
@@ -2241,14 +2262,16 @@
           card.innerHTML = `
             <img class="cover-thumb" src="${serie.couverture || JAQUETTE_DEFAUT}" alt="Jaquette" onerror="this.onerror=null; this.src=JAQUETTE_DEFAUT">
             <div class="series-details">
-              <div class="series-title">${serie.titre}</div>
-              <div class="series-meta">${possedes} possédé(s) · ${lus}/${totalRef} lu(s)</div>
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill" style="width: ${pourcentage}%;"></div>
+              <div class="series-title"></div>
+              <div class="series-meta">${meta}</div>
+              <div class="progress-bar-bg barre-double">
+                <div class="progress-bar-fill possedes" style="width: ${pctPossedes}%;"></div>
+                <div class="progress-bar-fill" style="width: ${pctLus}%;"></div>
               </div>
             </div>
             <div class="chevron">›</div>
           `;
+          card.querySelector('.series-title').textContent = serie.titre;
           containerCol.appendChild(card);
         });
       }
@@ -2277,6 +2300,26 @@
       serieIndexActive = index;
       remplirModalSerie(index);
       document.getElementById('detail-modal').classList.add('active');
+    }
+
+    // Chiffres d'une série, partagés par la fiche et la liste : jusqu'au dernier tome paru (BnF)
+    // ou, à défaut, jusqu'au dernier tome de la liste
+    function statsSerie(serie) {
+      const dernierListe = serie.tomes.reduce((max, t) => Math.max(max, t.numero), 0);
+      const total = Math.max(serie.tomesParus || 0, dernierListe);
+      const parNumero = new Map(serie.tomes.map((t, i) => [t.numero, i]));
+      const manquants = [];
+      for (let n = 1; n <= total; n++) {
+        const tome = parNumero.has(n) ? serie.tomes[parNumero.get(n)] : null;
+        if (!tome || !tome.possede) manquants.push(n);
+      }
+      return {
+        total,
+        parNumero,
+        possedes: serie.tomes.filter(t => t.possede).length,
+        lus: serie.tomes.filter(t => t.lu).length,
+        manquants
+      };
     }
 
     const CLASSES_STATUT = { 'En cours': 'en-cours', 'Terminée': 'terminee', 'En pause': 'en-pause', 'Abandonnée': 'abandonnee' };
@@ -2310,12 +2353,8 @@
         }).catch(e => console.error('Tomes parus indisponibles', e));
       }
 
-      // Progression : jusqu'au dernier tome paru (BnF), ou au dernier tome de la liste
-      const dernierListe = serie.tomes.reduce((max, t) => Math.max(max, t.numero), 0);
-      const total = Math.max(serie.tomesParus || 0, dernierListe);
-      const parNumero = new Map(serie.tomes.map((t, i) => [t.numero, i]));
-      const possedes = serie.tomes.filter(t => t.possede).length;
-      const lus = serie.tomes.filter(t => t.lu).length;
+      // Progression
+      const { total, parNumero, possedes, lus, manquants } = statsSerie(serie);
 
       document.getElementById('fiche-compteur').innerHTML = serie.tomesParus
         ? `${possedes} / ${total} possédés <span>· ${lus} lu${lus > 1 ? 's' : ''}</span>`
@@ -2332,11 +2371,6 @@
         frise.appendChild(seg);
       }
 
-      const manquants = [];
-      for (let n = 1; n <= total; n++) {
-        const tome = parNumero.has(n) ? serie.tomes[parNumero.get(n)] : null;
-        if (!tome || !tome.possede) manquants.push(n);
-      }
       const prochain = document.getElementById('fiche-prochain');
       if (manquants.length) {
         prochain.innerHTML = `Prochain à acheter : <b>tome ${manquants[0]}</b>` +
