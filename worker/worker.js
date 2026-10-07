@@ -236,6 +236,17 @@ export default {
       }
     }
 
+    // --- Données de parution Manga Insight (CC BY 4.0), relayées telles quelles avec CORS ---
+    // L'app les garde en mémoire une semaine ; Cloudflare en garde une copie 24 h.
+    if (pathname === "/mangainsight/core" || pathname === "/mangainsight/rows") {
+      const fichier = pathname.endsWith("core") ? "core" : "rows";
+      const res = await fetch(`https://mangainsight.fr/data/dashboard/${fichier}.json`, { cf: { cacheTtl: 86400, cacheEverything: true } });
+      if (!res.ok) return json({ erreur: "Manga Insight HTTP " + res.status }, 502);
+      return new Response(res.body, {
+        headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=86400" }
+      });
+    }
+
     // --- Notices BnF d'une édition (GET /edition?mots=Berserk prestige&editeur=Glénat) ---
     if (pathname === "/edition") {
       const mots = (url.searchParams.get("mots") || "").trim();
