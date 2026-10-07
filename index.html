@@ -487,7 +487,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.10</div>
+  <div class="version-tag">v3.11</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -497,6 +497,7 @@
       
       <div class="settings-list">
         <button class="btn btn-secondary" onclick="completerCollection()">✨ Compléter ma collection</button>
+        <button class="btn btn-secondary" onclick="rechercherIsbn()">🔎 Rechercher par ISBN</button>
         <button class="btn btn-secondary" onclick="configurerCleBooks()">📚 Clé Google Books (optionnelle)</button>
         <button class="btn btn-secondary" onclick="configurerCodeCloud()">🔑 Code de sauvegarde cloud</button>
         <button class="btn btn-secondary" onclick="restaurerDepuisCloud()">☁️ Restaurer depuis le cloud</button>
@@ -538,6 +539,18 @@
       <div style="margin-top: 16px; display: flex; justify-content: space-between;">
         <button class="btn btn-secondary" style="font-size: 12px; width: auto;" onclick="ajouterNouveauTomeModal()">+ Ajouter tome</button>
         <button class="btn btn-secondary" style="font-size: 12px; width: auto; background: rgba(239,68,68,0.2); color: #ef4444;" onclick="supprimerSerieActuelle()">Supprimer la série</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : résultat d'une recherche par ISBN -->
+  <div class="modal-overlay" id="isbn-modal">
+    <div class="modal-content" style="max-width: 360px;">
+      <h3 style="font-size: 16px; margin-bottom: 12px;">🔎 Recherche par ISBN</h3>
+      <div id="isbn-resultat"></div>
+      <div class="modal-btn-row" style="margin-top: 16px;">
+        <button class="btn btn-secondary" id="isbn-fermer">Fermer</button>
+        <button class="btn" id="isbn-ajouter">Ajouter ce tome</button>
       </div>
     </div>
   </div>
@@ -1082,6 +1095,145 @@
 
       const vides = ['auteur', 'genre', 'editeur'].filter(c => !champ('infos-' + c).value);
       statusEl.textContent = resumerRecherche(res, vides);
+    }
+
+    // --- Recherche par ISBN (Google Books, avec la clé enregistrée dans les réglages) ---
+    function nettoyerIsbn(saisie) {
+      return (saisie || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+    }
+
+    // Le dernier chiffre d'un ISBN est une clé de contrôle : détecte les fautes de frappe
+    function isbnValide(isbn) {
+      if (/^\d{13}$/.test(isbn)) {
+        const somme = [...isbn].reduce((acc, c, i) => acc + Number(c) * (i % 2 ? 3 : 1), 0);
+        return somme % 10 === 0;
+      }
+      if (/^\d{9}[\dX]$/.test(isbn)) {
+        const somme = [...isbn].reduce((acc, c, i) => acc + (c === 'X' ? 10 : Number(c)) * (10 - i), 0);
+        return somme % 11 === 0;
+      }
+      return false;
+    }
+
+    const EDITIONS = [
+      ['Prestige', /prestige/], ['Deluxe', /deluxe/], ['Perfect', /perfect/], ['Ultimate', /ultimate/],
+      ['Double', /\bdouble\b|2 en 1|2-en-1/], ['Intégrale', /int[eé]grale/], ['Collector', /collector/],
+      ['Star', /\bstar\b/], ['Smash', /\bsmash\b/], ['Kanzenban', /kanzenban/], ['Originale', /[eé]dition originale/]
+    ];
+
+    // « Berserk Prestige - Tome 5 » → { serie: 'Berserk', tome: 5, edition: 'Prestige' }
+    function analyserTitreLivre(titre, sousTitre) {
+      const texte = (titre || '') + ' ' + (sousTitre || '');
+      const motifTome = /(?:\btome|\bt\.?|\bvol\.?|\bvolume|n°)\s*0*(\d{1,3})\b/i;
+      const m = texte.match(motifTome) || (titre || '').match(/\b0*(\d{1,3})\s*$/);
+      const edition = (EDITIONS.find(([, motif]) => motif.test(texte.toLowerCase())) || [])[0] || null;
+      let serie = (titre || '').replace(motifTome, '').replace(/\b0*\d{1,3}\s*$/, '');
+      if (edition) serie = serie.replace(new RegExp('[(\\-–:,]*\\s*([ée]dition\\s+)?' + edition + '(\\s+[ée]dition)?\\s*[)]?', 'i'), ' ');
+      serie = serie.replace(/\s+/g, ' ').replace(/[\s\-–:,.()]+$/, '').replace(/^[\s\-–:,.]+/, '').trim();
+      return { serie: serie || titre, tome: m ? Number(m[1]) : null, edition };
+    }
+
+    function ligneInfo(parent, libelle, valeur) {
+      if (!valeur) return;
+      const div = document.createElement('div');
+      div.style.cssText = 'font-size: 13px; margin-bottom: 6px; line-height: 1.35;';
+      const b = document.createElement('span');
+      b.style.color = 'var(--text-sub)';
+      b.textContent = libelle + ' : ';
+      div.append(b, String(valeur));
+      parent.appendChild(div);
+    }
+
+    async function rechercherIsbn() {
+      const saisie = await demanderTexte("ISBN (les 13 chiffres sous le code-barres) :", '');
+      if (saisie === null) return;
+      const isbn = nettoyerIsbn(saisie);
+      if (!isbnValide(isbn)) {
+        alert("Cet ISBN n'est pas valide (" + (isbn.length || 0) + " caractères). Vérifie les chiffres : il en faut 13 (ou 10 pour un livre ancien).");
+        return;
+      }
+      const cle = localStorage.getItem('google_books_api_key');
+      if (!cle) {
+        alert("Configure d'abord ta clé Google Books (Paramètres → 📚 Clé Google Books).");
+        return;
+      }
+
+      fermerParametres();
+      const loader = document.getElementById('loader-ia');
+      document.getElementById('loader-status').textContent = 'Recherche du livre…';
+      loader.style.display = 'flex';
+      let data = null, statut = 0;
+      try {
+        const r = await fetchAvecTimeout('https://www.googleapis.com/books/v1/volumes?q=isbn:' + isbn + '&key=' + encodeURIComponent(cle), {}, 10000);
+        statut = r.status;
+        data = await r.json().catch(() => null);
+      } catch (e) {
+        loader.style.display = 'none';
+        alert('Google Books injoignable : ' + messageErreur(e));
+        return;
+      }
+      loader.style.display = 'none';
+
+      if (statut !== 200) {
+        const msg = (data && data.error && data.error.message) || ('HTTP ' + statut);
+        let conseil = '';
+        if (/referer/i.test(msg)) conseil = "\n\nTa clé n'autorise pas ce site : ajoute https://biloubils-lab.github.io/* dans ses restrictions (Google Cloud → Identifiants).";
+        else if (/key not valid/i.test(msg)) conseil = '\n\nLa clé enregistrée est invalide : vérifie-la dans les Paramètres.';
+        else if (statut === 429) conseil = '\n\nQuota du jour dépassé : réessaie demain.';
+        alert('Google Books a refusé la recherche : ' + msg + conseil);
+        return;
+      }
+      if (!data || !data.totalItems || !data.items) {
+        alert("Google Books ne connaît pas l'ISBN " + isbn + '.');
+        return;
+      }
+
+      const vi = data.items[0].volumeInfo || {};
+      const analyse = analyserTitreLivre(vi.title, vi.subtitle);
+      const numeroSerie = vi.seriesInfo && Number(vi.seriesInfo.bookDisplayNumber);
+      if (!analyse.tome && numeroSerie) analyse.tome = numeroSerie;
+      const couverture = vi.imageLinks && (vi.imageLinks.thumbnail || vi.imageLinks.smallThumbnail);
+      const couvertureHttps = couverture ? couverture.replace(/^http:/, 'https:') : null;
+
+      const zone = document.getElementById('isbn-resultat');
+      zone.innerHTML = '';
+      if (couvertureHttps) {
+        const img = document.createElement('img');
+        img.src = couvertureHttps;
+        img.alt = 'Couverture';
+        img.style.cssText = 'width: 90px; border-radius: 6px; float: right; margin: 0 0 8px 10px;';
+        zone.appendChild(img);
+      }
+      ligneInfo(zone, 'Titre', vi.title);
+      ligneInfo(zone, 'Sous-titre', vi.subtitle);
+      ligneInfo(zone, 'Auteur(s)', (vi.authors || []).join(', '));
+      ligneInfo(zone, 'Éditeur', vi.publisher);
+      ligneInfo(zone, 'Parution', vi.publishedDate);
+      ligneInfo(zone, 'Langue', vi.language);
+      ligneInfo(zone, 'Pages', vi.pageCount);
+      ligneInfo(zone, 'ISBN', isbn);
+      const detecte = document.createElement('div');
+      detecte.style.cssText = 'clear: both; font-size: 13px; margin-top: 10px; padding: 8px; border-radius: 8px; background: #2a2a30;';
+      detecte.textContent = `Détecté → série : ${analyse.serie} · tome : ${analyse.tome || '?'} · édition : ${analyse.edition || 'standard'}`;
+      zone.appendChild(detecte);
+
+      const modal = document.getElementById('isbn-modal');
+      modal.classList.add('active');
+      document.getElementById('isbn-fermer').onclick = () => modal.classList.remove('active');
+      document.getElementById('isbn-ajouter').onclick = async () => {
+        modal.classList.remove('active');
+        const titrePropose = analyse.edition ? `${analyse.serie} (${analyse.edition})` : analyse.serie;
+        const choix = await demanderSerieEtTome(titrePropose, analyse.tome || 1, 'Ajouter ce tome');
+        if (!choix) return;
+        await enregistrerSerie(choix.titre, choix.tome);
+        const serie = bibliotheque.find(m => normaliserTitre(m.titre) === normaliserTitre(choix.titre));
+        if (!serie) return;
+        const tome = serie.tomes.find(t => t.numero === choix.tome);
+        if (tome) tome.isbn = isbn;
+        if (!serie.editeur) serie.editeur = editeurFrancais(vi.publisher) || vi.publisher || '';
+        if (!serie.couverture && couvertureHttps) serie.couverture = couvertureHttps;
+        sauvegarder();
+      };
     }
 
     // --- Compléter toute la collection ---
