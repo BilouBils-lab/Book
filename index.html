@@ -416,6 +416,10 @@
     .fiche-frise i.possede { background: rgba(37, 99, 235, 0.55); }
     .fiche-frise i.lu { background: var(--accent); }
 
+    /* Longue série : segments collés en une barre continue */
+    .fiche-frise.dense { gap: 0; border-radius: 3px; overflow: hidden; }
+    .fiche-frise.dense i { border-radius: 0; }
+
     .fiche-prochain { font-size: 12px; color: var(--text-sub); margin-top: 8px; }
     .fiche-prochain b { color: var(--text-main); }
 
@@ -467,6 +471,37 @@
       background: var(--accent);
       color: #ffffff;
     }
+
+    /* Tranches de 10 tomes pour les longues séries */
+    .tranche { border-top: 1px solid var(--card-border); }
+    .tranche:last-child { border-bottom: 1px solid var(--card-border); }
+
+    .tranche-entete {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 2px;
+      background: none;
+      border: none;
+      color: var(--text-main);
+      font-size: 13px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .tranche-fleche { width: 12px; color: var(--text-sub); transition: transform 0.15s ease; }
+    .tranche.ouverte .tranche-fleche { transform: rotate(90deg); }
+    .tranche-nom { width: 92px; }
+    .tranche-barre { flex: 1; height: 6px; display: flex; border-radius: 3px; overflow: hidden; background: #2a2a30; }
+    .tranche-barre i { flex: 1; }
+    .tranche-barre i.possede { background: rgba(37, 99, 235, 0.55); }
+    .tranche-barre i.lu { background: var(--accent); }
+    .tranche-compte { width: 52px; text-align: right; color: var(--text-sub); font-size: 12px; }
+    .tranche-compte.complete { color: var(--success); }
+
+    .tranche .volumes-grid { grid-template-columns: repeat(5, 1fr); padding: 0 0 12px; display: none; }
+    .tranche.ouverte .volumes-grid { display: grid; }
 
     .fiche-ajouter { margin-top: 16px; }
 
@@ -590,7 +625,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.19</div>
+  <div class="version-tag">v3.20</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -2288,6 +2323,7 @@
 
       const frise = document.getElementById('fiche-frise');
       frise.innerHTML = '';
+      frise.classList.toggle('dense', total > 40);
       for (let n = 1; n <= total; n++) {
         const tome = parNumero.has(n) ? serie.tomes[parNumero.get(n)] : null;
         const seg = document.createElement('i');
@@ -2311,48 +2347,102 @@
         prochain.textContent = 'Nombre de tomes parus inconnu';
       }
 
-      // Grille : chaque tome jusqu'au dernier paru ; les absents de la liste s'ajoutent d'un appui
+      // Grille : chaque tome jusqu'au dernier paru ; au-delà de 30 tomes, regroupée par tranches de 10
       const grid = document.getElementById('modal-volumes-grid');
       grid.innerHTML = '';
-      for (let n = 1; n <= total; n++) {
-        const tIndex = parNumero.has(n) ? parNumero.get(n) : -1;
-        const tome = tIndex >= 0 ? serie.tomes[tIndex] : null;
-        const box = document.createElement('div');
-        box.className = 'tome-box' + (tome && tome.lu ? ' read' : tome && tome.possede ? ' owned' : '');
-        box.innerText = n;
-
-        if (!tome) {
-          box.onclick = () => ajouterTomeNumero(index, n);
-          grid.appendChild(box);
-          continue;
-        }
-
-        let suppressionDeclenchee = false;
-        box.onclick = () => {
-          if (suppressionDeclenchee) {
-            suppressionDeclenchee = false;
-            return;
-          }
-          toggleTomeState(index, tIndex);
-        };
-        box.oncontextmenu = (e) => {
-          e.preventDefault();
-          supprimerTomeUnique(index, tIndex);
-        };
-        box.ontouchstart = () => {
-          suppressionDeclenchee = false;
-          longPressTimer = setTimeout(() => {
-            suppressionDeclenchee = true;
-            supprimerTomeUnique(index, tIndex);
-          }, 600);
-        };
-        box.ontouchend = (e) => {
-          clearTimeout(longPressTimer);
-          if (suppressionDeclenchee) e.preventDefault();
-        };
-        box.ontouchmove = () => clearTimeout(longPressTimer);
-        grid.appendChild(box);
+      const etatTome = (n) => parNumero.has(n) ? serie.tomes[parNumero.get(n)] : null;
+      if (total <= SEUIL_TRANCHES) {
+        grid.className = 'volumes-grid';
+        for (let n = 1; n <= total; n++) grid.appendChild(creerCaseTome(index, n, parNumero));
+        return;
       }
+
+      grid.className = '';
+      if (!tranchesOuvertes.has(serie)) {
+        // Par défaut : la tranche du prochain tome à acheter (ou la dernière si tout est possédé)
+        const cible = manquants.length ? manquants[0] : total;
+        tranchesOuvertes.set(serie, new Set([Math.floor((cible - 1) / 10) * 10 + 1]));
+      }
+      const ouvertes = tranchesOuvertes.get(serie);
+      for (let debut = 1; debut <= total; debut += 10) {
+        const fin = Math.min(debut + 9, total);
+        const tranche = document.createElement('div');
+        tranche.className = 'tranche' + (ouvertes.has(debut) ? ' ouverte' : '');
+
+        const entete = document.createElement('button');
+        entete.className = 'tranche-entete';
+        const barre = document.createElement('span');
+        barre.className = 'tranche-barre';
+        let possedesTranche = 0;
+        for (let n = debut; n <= fin; n++) {
+          const tome = etatTome(n);
+          const seg = document.createElement('i');
+          if (tome && tome.possede) { possedesTranche++; seg.className = tome.lu ? 'lu' : 'possede'; }
+          barre.appendChild(seg);
+        }
+        const taille = fin - debut + 1;
+        const complete = possedesTranche === taille;
+        entete.innerHTML = `<span class="tranche-fleche">›</span><span class="tranche-nom">Tomes ${debut}–${fin}</span>`;
+        entete.appendChild(barre);
+        const compte = document.createElement('span');
+        compte.className = 'tranche-compte' + (complete ? ' complete' : '');
+        compte.textContent = `${possedesTranche}/${taille}${complete ? ' ✓' : ''}`;
+        entete.appendChild(compte);
+        entete.onclick = () => {
+          if (ouvertes.has(debut)) ouvertes.delete(debut); else ouvertes.add(debut);
+          tranche.classList.toggle('ouverte');
+        };
+
+        const cases = document.createElement('div');
+        cases.className = 'volumes-grid';
+        for (let n = debut; n <= fin; n++) cases.appendChild(creerCaseTome(index, n, parNumero));
+        tranche.append(entete, cases);
+        grid.appendChild(tranche);
+      }
+    }
+
+    const SEUIL_TRANCHES = 30;
+    // Tranches dépliées par série, gardées tant que l'app est ouverte
+    const tranchesOuvertes = new WeakMap();
+
+    function creerCaseTome(index, n, parNumero) {
+      const serie = bibliotheque[index];
+      const tIndex = parNumero.has(n) ? parNumero.get(n) : -1;
+      const tome = tIndex >= 0 ? serie.tomes[tIndex] : null;
+      const box = document.createElement('div');
+      box.className = 'tome-box' + (tome && tome.lu ? ' read' : tome && tome.possede ? ' owned' : '');
+      box.innerText = n;
+
+      if (!tome) {
+        box.onclick = () => ajouterTomeNumero(index, n);
+        return box;
+      }
+
+      let suppressionDeclenchee = false;
+      box.onclick = () => {
+        if (suppressionDeclenchee) {
+          suppressionDeclenchee = false;
+          return;
+        }
+        toggleTomeState(index, tIndex);
+      };
+      box.oncontextmenu = (e) => {
+        e.preventDefault();
+        supprimerTomeUnique(index, tIndex);
+      };
+      box.ontouchstart = () => {
+        suppressionDeclenchee = false;
+        longPressTimer = setTimeout(() => {
+          suppressionDeclenchee = true;
+          supprimerTomeUnique(index, tIndex);
+        }, 600);
+      };
+      box.ontouchend = (e) => {
+        clearTimeout(longPressTimer);
+        if (suppressionDeclenchee) e.preventDefault();
+      };
+      box.ontouchmove = () => clearTimeout(longPressTimer);
+      return box;
     }
 
     // Tome affiché comme manquant (pas encore dans la liste) : un appui l'ajoute comme possédé
