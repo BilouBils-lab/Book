@@ -634,7 +634,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.21</div>
+  <div class="version-tag">v3.22</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -644,7 +644,7 @@
       
       <div class="settings-list">
         <button class="btn btn-secondary" onclick="completerCollection()">✨ Compléter ma collection</button>
-        <button class="btn btn-secondary" onclick="majTomesParusCollection()">📚 Tomes parus en France (BnF)</button>
+        <button class="btn btn-secondary" onclick="majTomesParusCollection()">🔄 Mettre à jour mes séries</button>
         <button class="btn btn-secondary" onclick="rechercherIsbn()">🔎 Rechercher par ISBN</button>
         <button class="btn btn-secondary" onclick="configurerCleBooks()">📚 Clé Google Books (optionnelle)</button>
         <button class="btn btn-secondary" onclick="configurerCodeCloud()">🔑 Code de sauvegarde cloud</button>
@@ -655,6 +655,7 @@
         <button class="btn btn-secondary" onclick="document.getElementById('csv-input').click()">📊 Importer un fichier CSV (Sheets)</button>
       </div>
 
+      <div style="font-size: 11px; color: var(--text-sub); margin-top: 14px; line-height: 1.4;">Données de parution : <a href="https://mangainsight.fr/" style="color: inherit;">Manga Insight</a> (CC BY 4.0) et catalogue de la BnF.</div>
       <input type="file" id="file-input" style="display: none;" accept=".json" onchange="importerSauvegarde(event)">
       <input type="file" id="csv-input" style="display: none;" accept=".csv" onchange="importerCSV(event)">
       <input type="file" id="cover-file-input" style="display: none;" accept="image/*" onchange="chargerJaquetteFichier(event)">
@@ -681,6 +682,7 @@
         <div id="fiche-compteur" class="fiche-compteur"></div>
         <div id="fiche-frise" class="fiche-frise"></div>
         <div id="fiche-prochain" class="fiche-prochain"></div>
+        <div id="fiche-sortie" class="fiche-prochain"></div>
       </div>
 
       <div class="fiche-legende">
@@ -1657,23 +1659,193 @@
       return null;
     }
 
+    // --- Données de parution Manga Insight (CC BY 4.0) : sorties en France, au mois près ---
+    // Deux fichiers alignés ligne à ligne : rows (titre « Série - Édition Vol.N », EAN) et core (année, mois, éditeur)
+    const DELAI_MANGA_INSIGHT = 7 * 24 * 3600 * 1000;
+    // Suffixes qui ne sont pas l'édition standard d'une série
+    const VARIANTES_MI = /collector|coffret|coffre|prestige|deluxe|perfect|ultimate|double|int[ée]grale|light novel|roman|novel|artbook|art ?book|guide|fanbook|anime ?comics|vivre card|[ée]dition|kanzenban|anthologie|spin|best of/i;
+    const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+    let indexMI = null;
+    let dateMI = null;
+
+    function compacterMangaInsight(core, rows) {
+      const col = core.col, editeurs = core.dict.editor, sorties = [];
+      for (let i = 0; i < rows.title.length; i++) {
+        const m = (rows.title[i] || '').match(/^(.*?)\s+Vol\.\s*(\d+)\s*$/);
+        if (!m || !col.year[i]) continue;
+        sorties.push([m[1], Number(m[2]), col.year[i], col.month[i], col.editor[i] >= 0 ? editeurs[col.editor[i]] : '', rows.ean[i] || '']);
+      }
+      return sorties;
+    }
+
+    function indexerMangaInsight(sorties) {
+      const index = new Map();
+      for (const [nom, vol, annee, mois, editeur, ean] of sorties) {
+        const morceaux = nom.split(' - ');
+        const entree = { nom, base: morceaux[0], suffixe: morceaux.slice(1).join(' - '), vol, k: annee * 12 + mois - 1, editeur, ean };
+        const cle = normaliserRecherche(entree.base);
+        if (!index.has(cle)) index.set(cle, []);
+        index.get(cle).push(entree);
+      }
+      return index;
+    }
+
+    // Charge les données (cache de 7 jours sur l'appareil, sinon téléchargement via le Worker)
+    async function chargerMangaInsight(forcer) {
+      let cache = null;
+      if (db) cache = await dbGet('mangainsight').catch(() => null);
+      if (!cache || forcer || Date.now() - cache.recupere > DELAI_MANGA_INSIGHT) {
+        try {
+          const [core, rows] = await Promise.all(['core', 'rows'].map(f =>
+            fetchAvecTimeout(WORKER_URL + '/mangainsight/' + f, {}, 30000).then(r => {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            })));
+          if (core.n !== rows.n) throw new Error('fichiers désalignés');
+          cache = { genere: core.generated_at, recupere: Date.now(), sorties: compacterMangaInsight(core, rows) };
+          if (db) await dbSet('mangainsight', cache);
+        } catch (e) {
+          console.error('Manga Insight indisponible', e);
+          if (!cache) return false;
+        }
+      }
+      indexMI = indexerMangaInsight(cache.sorties);
+      dateMI = cache.genere;
+      return true;
+    }
+
+    // Retrouve la série et son édition dans les sorties françaises, puis calcule rythme et estimation
+    function infosMangaInsight(serie) {
+      if (!indexMI) return null;
+      const { base, edition } = decomposerTitreSerie(serie.titre);
+      const cible = normaliserRecherche(base);
+      const editionN = edition ? normaliserRecherche(edition) : null;
+      const groupes = new Map();
+      for (const cle of new Set([cible, normaliserRecherche(base.split(' - ')[0])])) {
+        for (const s of indexMI.get(cle) || []) {
+          const nomN = normaliserRecherche(s.nom);
+          const baseOk = normaliserRecherche(s.base) === cible || nomN.startsWith(cible);
+          const ok = editionN
+            ? baseOk && nomN.includes(editionN)
+            : nomN === cible || (normaliserRecherche(s.base) === cible && !VARIANTES_MI.test(s.suffixe));
+          if (!ok) continue;
+          const cleGroupe = s.nom + '|' + s.editeur;
+          if (!groupes.has(cleGroupe)) groupes.set(cleGroupe, []);
+          groupes.get(cleGroupe).push(s);
+        }
+      }
+      let liste = [...groupes.values()];
+      // Préférences : nom exact (« Ao Ashi - Playmaker » pour « Ao Ashi » sinon), puis même éditeur, puis le plus de tomes
+      const exacts = liste.filter(g => normaliserRecherche(g[0].nom) === cible);
+      if (exacts.length) liste = exacts;
+      const editeurSerie = editeurFrancais(serie.editeur);
+      const memeEditeur = liste.filter(g => editeurSerie && editeurFrancais(g[0].editeur) === editeurSerie);
+      if (memeEditeur.length) liste = memeEditeur;
+      if (!liste.length) return null;
+      const nbTomes = (g) => new Set(g.map(s => s.vol)).size;
+      liste.sort((a, b) => nbTomes(b) - nbTomes(a));
+
+      // Une sortie par numéro (la plus ancienne en cas de réédition)
+      const parVol = new Map();
+      for (const s of liste[0]) if (!parVol.has(s.vol) || s.k < parVol.get(s.vol).k) parVol.set(s.vol, s);
+      const volumes = [...parVol.values()].sort((a, b) => a.vol - b.vol);
+      const dernier = volumes.reduce((a, b) => (b.k > a.k || (b.k === a.k && b.vol > a.vol) ? b : a));
+
+      // Rythme : médiane des écarts (en mois) entre les derniers tomes parus
+      const recents = volumes.filter(v => v.vol <= dernier.vol).slice(-7);
+      const ecarts = [];
+      for (let i = 1; i < recents.length; i++) ecarts.push(recents[i].k - recents[i - 1].k);
+      ecarts.sort((a, b) => a - b);
+      const rythme = ecarts.length >= 2 ? Math.max(1, ecarts[Math.floor(ecarts.length / 2)]) : null;
+
+      return {
+        nom: liste[0][0].nom,
+        editeur: liste[0][0].editeur,
+        tomesParus: volumes[volumes.length - 1].vol,
+        isbnParTome: Object.fromEntries(volumes.filter(v => v.ean).map(v => [v.vol, v.ean])),
+        dernier: { vol: dernier.vol, k: dernier.k },
+        rythme
+      };
+    }
+
+    // Met à jour une série avec Manga Insight. Renvoie true si quelque chose a changé.
+    function appliquerMangaInsight(serie) {
+      const mi = infosMangaInsight(serie);
+      if (!mi) return false;
+      const avant = JSON.stringify([serie.tomesParus, serie.editeur, serie.parution, serie.tomes]);
+      serie.tomesParus = mi.tomesParus;
+      serie.tomesParusSource = 'Manga Insight';
+      serie.tomesParusMaj = Date.now();
+      serie.parution = { nom: mi.nom, dernier: mi.dernier, rythme: mi.rythme };
+      if (!serie.editeur && mi.editeur) serie.editeur = editeurFrancais(mi.editeur) || mi.editeur;
+      for (const tome of serie.tomes) if (tome.possede && !tome.isbn && mi.isbnParTome[tome.numero]) tome.isbn = mi.isbnParTome[tome.numero];
+      return JSON.stringify([serie.tomesParus, serie.editeur, serie.parution, serie.tomes]) !== avant;
+    }
+
+    const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+    // k = année × 12 + mois (0 à 11) → « novembre 2026 » ou, en court, « nov. 26 »
+    function moisTexte(k, court) {
+      const annee = Math.floor(k / 12);
+      return court ? `${MOIS_COURTS[k % 12]} ${String(annee).slice(2)}` : `${MOIS[k % 12]} ${annee}`;
+    }
+
+    // Prochaine sortie estimée d'après le rythme : { vol, k, retard } ou null (série terminée ou en pause)
+    function prochaineSortie(serie) {
+      const p = serie.parution;
+      if (!p || !p.rythme || serie.statut === 'Terminée' || serie.statut === 'Abandonnée') return null;
+      const maintenant = new Date().getFullYear() * 12 + new Date().getMonth();
+      // Rien depuis bien plus longtemps que d'habitude : on ne devine pas
+      if (maintenant - p.dernier.k > Math.max(3 * p.rythme, 12)) return null;
+      const k = p.dernier.k + p.rythme;
+      return { vol: p.dernier.vol + 1, k: Math.max(k, maintenant), retard: k < maintenant };
+    }
+
+    // Au démarrage : met à jour discrètement toutes les séries si les données sont disponibles
+    async function majMangaInsightAuDemarrage() {
+      if (!(await chargerMangaInsight(false))) return;
+      let modifie = false;
+      for (const serie of bibliotheque) if (appliquerMangaInsight(serie)) modifie = true;
+      if (modifie) sauvegarderLocal();
+    }
+
     async function majTomesParusCollection() {
       if (!bibliotheque.length) return;
-      if (!(await confirmerAction(`Chercher à la BnF le nombre de tomes parus en France pour tes ${bibliotheque.length} séries ?\n\nCompte environ ${Math.max(1, Math.round(bibliotheque.length * 2 / 60))} min.`))) return;
+      if (!(await confirmerAction(`Mettre à jour tes ${bibliotheque.length} séries ?\n\nTomes parus en France, dernière sortie et prochaine sortie estimée (Manga Insight), puis la BnF pour les séries introuvables.`))) return;
       fermerParametres();
-      let trouvees = 0;
+      document.getElementById('loader-status').textContent = 'Téléchargement des sorties (Manga Insight)…';
+      document.getElementById('loader-ia').style.display = 'flex';
+      const miOk = await chargerMangaInsight(true);
+      document.getElementById('loader-ia').style.display = 'none';
+
+      const viaMI = [];
+      const restantes = [];
+      for (const serie of bibliotheque) {
+        if (miOk && infosMangaInsight(serie)) { appliquerMangaInsight(serie); viaMI.push(serie); }
+        else restantes.push(serie);
+      }
+      sauvegarderLocal();
+
+      let viaBnf = 0;
       const introuvables = [];
       const corrections = [];
-      await traiterEnLot('📚 Tomes parus en France', bibliotheque.slice(), async (serie) => {
-        const correction = await majTomesParus(serie);
-        if (correction) corrections.push(`• ${serie.titre} : ${correction}`);
-        if (serie.tomesParus) trouvees++;
-        else introuvables.push(`• ${serie.titre} (${serie.editeur || 'éditeur inconnu'}) : ${serie.tomesParusDiagnostic || 'erreur de recherche'}`);
-        return true;
-      }, 1000);
-      let bilan = `Nombre de tomes parus connu pour ${trouvees} série(s).`;
+      if (restantes.length) {
+        await traiterEnLot('🔄 Mise à jour des séries', restantes, async (serie) => {
+          const correction = await majTomesParus(serie);
+          if (correction) corrections.push(`• ${serie.titre} : ${correction}`);
+          if (serie.tomesParus) viaBnf++;
+          else introuvables.push(`• ${serie.titre} (${serie.editeur || 'éditeur inconnu'}) : ${serie.tomesParusDiagnostic || 'erreur de recherche'}`);
+          return true;
+        }, 1000);
+      } else {
+        await traiterEnLot('🔄 Mise à jour des séries', [], async () => false, 0);
+      }
+
+      let bilan = miOk
+        ? `${viaMI.length} série(s) mises à jour avec Manga Insight (données du ${new Date(dateMI).toLocaleDateString('fr-FR')}).`
+        : `Manga Insight injoignable : recherche à la BnF uniquement.`;
+      if (restantes.length) bilan += `\n${viaBnf} série(s) trouvée(s) à la BnF.`;
       if (corrections.length) bilan += `\n\nÉditeur corrigé d'après la BnF (${corrections.length}) :\n${corrections.join('\n')}`;
-      if (introuvables.length) bilan += `\n\nPas trouvé à la BnF (${introuvables.length}) :\n${introuvables.join('\n')}\n\nVérifie le titre de ces séries : une édition spéciale se note entre parenthèses, ex. « Berserk (Prestige) ».`;
+      if (introuvables.length) bilan += `\n\nIntrouvables (${introuvables.length}) :\n${introuvables.join('\n')}\n\nVérifie le titre de ces séries : une édition spéciale se note entre parenthèses, ex. « Berserk (Prestige) ».`;
       document.getElementById('completion-bilan').textContent = bilan;
     }
 
@@ -1765,6 +1937,7 @@
         bibliotheque = JSON.parse(localStorage.getItem('mangas_db')) || [];
       }
       rendreVues();
+      majMangaInsightAuDemarrage();
     }
 
     const BACKUP_URL = 'https://manga-gemini-proxy.nabil-chilla.workers.dev/backup';
@@ -2251,7 +2424,11 @@
           const pctLus = total ? Math.round(lus / total * 100) : 0;
           let etat;
           if (manquants.length) etat = `<span class="a-acheter">${manquants.length} à acheter</span>`;
-          else if (serie.tomesParus) etat = `<span class="complete">${serie.statut === 'Terminée' ? 'Complète' : 'À jour'} ✓</span>`;
+          else if (serie.tomesParus) {
+            const prochaine = prochaineSortie(serie);
+            etat = `<span class="complete">${serie.statut === 'Terminée' ? 'Complète' : 'À jour'} ✓</span>` +
+              (prochaine ? ` · 📅 ${prochaine.retard ? 'bientôt' : moisTexte(prochaine.k, true)}` : '');
+          }
           else etat = '';
           const compte = serie.tomesParus ? `${possedes} / ${total}` : `${possedes} possédé${possedes > 1 ? 's' : ''}`;
           const meta = [compte, etat, `${lus} lu${lus > 1 ? 's' : ''}`].filter(Boolean).join(' · ');
@@ -2345,7 +2522,7 @@
       (serie.genre || '').split(/\s*,\s*/).filter(Boolean).slice(0, 3).forEach(g => pastilles.appendChild(creerPastille(g)));
 
       // Vérification discrète à la BnF si l'info manque ou date de plus d'une semaine
-      if (!serie.tomesParusMaj || Date.now() - serie.tomesParusMaj > DELAI_MAJ_TOMES_PARUS) {
+      if (serie.tomesParusSource !== 'Manga Insight' && (!serie.tomesParusMaj || Date.now() - serie.tomesParusMaj > DELAI_MAJ_TOMES_PARUS)) {
         const avant = serie.tomesParus;
         majTomesParus(serie).then((correction) => {
           sauvegarderLocal();
@@ -2379,6 +2556,17 @@
         prochain.textContent = statut === 'Terminée' ? 'Série complète 🎉' : 'À jour : tu as tous les tomes parus ✓';
       } else {
         prochain.textContent = 'Nombre de tomes parus inconnu';
+      }
+
+      // Parution (Manga Insight) : prochaine sortie estimée, sinon dernière sortie connue
+      const sortie = document.getElementById('fiche-sortie');
+      const prochaine = prochaineSortie(serie);
+      if (prochaine) {
+        sortie.innerHTML = `📅 Tome ${prochaine.vol} ${prochaine.retard ? 'attendu prochainement' : 'attendu vers <b>' + moisTexte(prochaine.k) + '</b>'} <span>· environ tous les ${serie.parution.rythme > 1 ? serie.parution.rythme + ' mois' : 'mois'}</span>`;
+      } else if (serie.parution) {
+        sortie.textContent = `📅 Dernier tome paru : n° ${serie.parution.dernier.vol} en ${moisTexte(serie.parution.dernier.k)}`;
+      } else {
+        sortie.textContent = '';
       }
 
       // Grille : chaque tome jusqu'au dernier paru ; au-delà de 30 tomes, regroupée par tranches de 10
