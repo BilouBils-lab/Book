@@ -487,7 +487,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.12</div>
+  <div class="version-tag">v3.13</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -1127,7 +1127,9 @@
       const edition = (EDITIONS.find(([, motif]) => motif.test(texte.toLowerCase())) || [])[0] || null;
       // Les parenthèses contiennent l'édition ou des précisions : jamais le nom de la série
       let serie = (titre || '').replace(/\s*\([^)]*\)/g, '');
-      const motifs = [/(?:\btome|\bt\.?|\bvol\.?|\bvolume|n°)\s*0*(\d{1,3})\b/i, /\.\s*0*(\d{1,3})\s*$/, /\b0*(\d{1,3})\s*$/];
+      // Dans l'ordre : « Tome 5 » / « Vol. 5 », puis le format BnF « Série. 5 … » (série avant le point),
+      // puis un numéro en fin de titre
+      const motifs = [/(?:\btome|\bt\.?|\bvol\.?|\bvolume|n°)\s*0*(\d{1,3})\b/i, /\.\s*0*(\d{1,3})\b.*$/, /\b0*(\d{1,3})\s*$/];
       let tome = null;
       for (const motif of motifs) {
         const m = serie.match(motif) || (sousTitre || '').match(motif);
@@ -1157,9 +1159,7 @@
         const r = await fetchAvecTimeout(WORKER_URL + '/isbn?isbn=' + isbn, {}, 15000);
         const d = await r.json().catch(() => null);
         if (d && d.trouve) {
-          // La BnF liste aussi « Nom, Prénom (dates). Auteur du texte » : on garde la forme simple
-          const auteurs = (d.auteurs || []).filter(a => !/[(,]/.test(a));
-          return { trouve: true, source: 'BnF', titre: d.titre, auteurs: auteurs.length ? auteurs : (d.auteurs || []),
+          return { trouve: true, source: 'BnF', titre: d.titre, auteurs: d.auteurs || [],
             editeur: (d.editeur || '').replace(/\s*\([^)]*\)/, ''), date: d.date, description: d.description, erreurs };
         }
         erreurs.push('BnF : ' + ((d && d.erreur) || (d && d.trouve === false ? 'inconnu' : 'HTTP ' + r.status)));

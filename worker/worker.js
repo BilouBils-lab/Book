@@ -92,6 +92,13 @@ function champsDublinCore(xml, nom) {
   return [...xml.matchAll(motif)].map(m => decoderXml(m[1]));
 }
 
+// « Miura, Kentarō (1966-2021). Auteur du texte » → « Kentarō Miura »
+function nettoyerAuteurBnf(nom) {
+  const sansRole = nom.replace(/\s*\([^)]*\)/g, "").replace(/\.\s*[^.]*$/, "").trim();
+  const [famille, prenom] = sansRole.split(/,\s*/);
+  return prenom ? `${prenom} ${famille}` : famille;
+}
+
 async function chercherIsbnBnf(isbn) {
   const requete = `bib.isbn adj "${isbn}"`;
   const url = "https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&recordSchema=dublincore&maximumRecords=1&query=" + encodeURIComponent(requete);
@@ -100,11 +107,22 @@ async function chercherIsbnBnf(isbn) {
   const xml = await res.text();
   const nombre = Number((xml.match(/numberOfRecords>(\d+)</) || [])[1] || 0);
   if (!nombre) return { trouve: false };
+  // Sans doublon, accents ignorés (« Kentaro Miura » et « Kentarō Miura »)
+  const auteurs = [];
+  const sansAccents = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  for (const a of champsDublinCore(xml, "creator").map(nettoyerAuteurBnf).filter(Boolean)) {
+    if (!auteurs.some(x => sansAccents(x) === sansAccents(a))) auteurs.push(a);
+  }
+  // Le titre BnF se termine par la mention de responsabilité : « Berserk. 1 (Éd. prestige) / Kentaro Miura »
+  let titre = (champsDublinCore(xml, "title")[0] || "").split(" / ")[0];
+  for (const a of auteurs) {
+    if (sansAccents(titre).endsWith(" " + sansAccents(a))) titre = titre.slice(0, titre.length - a.length).trim();
+  }
   return {
     trouve: true,
     source: "BnF",
-    titre: champsDublinCore(xml, "title")[0] || null,
-    auteurs: champsDublinCore(xml, "creator"),
+    titre: titre || null,
+    auteurs,
     editeur: champsDublinCore(xml, "publisher")[0] || null,
     date: champsDublinCore(xml, "date")[0] || null,
     description: champsDublinCore(xml, "description")[0] || champsDublinCore(xml, "format")[0] || null,
@@ -121,7 +139,7 @@ export default {
     };
     const json = (corps, status = 200) => new Response(JSON.stringify(corps), {
       status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+      headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" }
     });
 
     if (request.method === "OPTIONS") {
