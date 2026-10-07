@@ -521,7 +521,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.17</div>
+  <div class="version-tag">v3.18</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -1512,14 +1512,19 @@
       const parEditeur = new Map();
       for (const notice of d.notices || []) {
         const a = analyserTitreLivre(notice.titre);
-        if (!a.tome || normaliserRecherche(a.serie) !== normaliserRecherche(base)) continue;
+        // « Ao Ashi : brother foot. 1 » : le sous-titre français après « : » est ignoré
+        const nomsPossibles = [a.serie, a.serie.split(/\s+:\s+/)[0]].map(normaliserRecherche);
+        if (!a.tome || !nomsPossibles.includes(normaliserRecherche(base))) continue;
         // Même édition : le mot de l'édition doit figurer dans le titre ; édition standard : aucune édition détectée
         if (edition ? !normaliserRecherche(notice.titre).includes(normaliserRecherche(edition)) : a.edition) continue;
         const nom = editeurFrancais(notice.editeur) || (notice.editeur || '').replace(/\s*\([^)]*\)/, '') || '?';
         if (!parEditeur.has(nom)) parEditeur.set(nom, new Set());
         parEditeur.get(nom).add(a.tome);
       }
-      return { parEditeur, nbNotices: (d.notices || []).length, exemple: (d.notices || [])[0] && d.notices[0].titre };
+      // Pour le diagnostic : des titres qui contiennent vraiment le nom de la série
+      const cle = normaliserRecherche(base);
+      const exemples = (d.notices || []).map(n => n.titre).filter(t => normaliserRecherche(t).includes(cle));
+      return { parEditeur, nbNotices: (d.notices || []).length, exemples: (exemples.length ? exemples : (d.notices || []).map(n => n.titre)).slice(0, 3) };
     }
 
     // Nombre de tomes parus : plus grand numéro trouvé chez l'éditeur de la série.
@@ -1537,20 +1542,31 @@
         if (!numeros) {
           for (const [, tomes] of res.parEditeur) if (!numeros || tomes.size > numeros.size) numeros = tomes;
         }
-        if (numeros && numeros.size) return { parus: Math.max(...numeros) };
+        if (numeros && numeros.size) {
+          // Trouvé seulement sans éditeur : l'éditeur de la série était faux ou absent, on prend celui de la BnF
+          let editeurBnf = null;
+          for (const [nom, tomes] of res.parEditeur) if (tomes === numeros) editeurBnf = nom;
+          return { parus: Math.max(...numeros), editeurBnf: !editeur && editeurBnf !== '?' ? editeurBnf : null };
+        }
         if (!diagnostic || res.nbNotices) diagnostic = res.nbNotices
-          ? `${res.nbNotices} notice(s) BnF, aucune retenue (ex. « ${res.exemple} »)`
+          ? `${res.nbNotices} notice(s) BnF, aucune retenue (ex. ${res.exemples.map(t => '« ' + t + ' »').join(', ')})`
           : 'aucune notice à la BnF';
       }
       return { parus: null, diagnostic };
     }
 
+    // Renvoie la correction d'éditeur faite (« PUQ → Mangetsu »), sinon null
     async function majTomesParus(serie) {
-      const { parus, diagnostic } = await chercherTomesParus(serie);
+      const { parus, diagnostic, editeurBnf } = await chercherTomesParus(serie);
       serie.tomesParusMaj = Date.now();
       serie.tomesParusDiagnostic = diagnostic || null;
-      if (parus && parus !== serie.tomesParus) { serie.tomesParus = parus; return true; }
-      return false;
+      if (parus) serie.tomesParus = parus;
+      if (editeurBnf && editeurFrancais(serie.editeur) !== editeurBnf) {
+        const correction = `${serie.editeur || 'vide'} → ${editeurBnf}`;
+        serie.editeur = editeurBnf;
+        return correction;
+      }
+      return null;
     }
 
     async function majTomesParusCollection() {
@@ -1559,13 +1575,16 @@
       fermerParametres();
       let trouvees = 0;
       const introuvables = [];
+      const corrections = [];
       await traiterEnLot('📚 Tomes parus en France', bibliotheque.slice(), async (serie) => {
-        const modifie = await majTomesParus(serie);
+        const correction = await majTomesParus(serie);
+        if (correction) corrections.push(`• ${serie.titre} : ${correction}`);
         if (serie.tomesParus) trouvees++;
         else introuvables.push(`• ${serie.titre} (${serie.editeur || 'éditeur inconnu'}) : ${serie.tomesParusDiagnostic || 'erreur de recherche'}`);
         return true;
       }, 1000);
       let bilan = `Nombre de tomes parus connu pour ${trouvees} série(s).`;
+      if (corrections.length) bilan += `\n\nÉditeur corrigé d'après la BnF (${corrections.length}) :\n${corrections.join('\n')}`;
       if (introuvables.length) bilan += `\n\nPas trouvé à la BnF (${introuvables.length}) :\n${introuvables.join('\n')}\n\nVérifie le titre de ces séries : une édition spéciale se note entre parenthèses, ex. « Berserk (Prestige) ».`;
       document.getElementById('completion-bilan').textContent = bilan;
     }
@@ -2195,9 +2214,10 @@
 
       // Vérification discrète à la BnF si l'info manque ou date de plus d'une semaine
       if (!serie.tomesParusMaj || Date.now() - serie.tomesParusMaj > DELAI_MAJ_TOMES_PARUS) {
-        majTomesParus(serie).then((modifie) => {
+        const avant = serie.tomesParus;
+        majTomesParus(serie).then((correction) => {
           sauvegarderLocal();
-          if (modifie && serieIndexActive === index && bibliotheque[index] === serie) remplirModalSerie(index);
+          if ((correction || serie.tomesParus !== avant) && serieIndexActive === index && bibliotheque[index] === serie) remplirModalSerie(index);
         }).catch(e => console.error('Tomes parus indisponibles', e));
       }
 
