@@ -413,6 +413,33 @@
       pointer-events: none;
     }
 
+    .scanner-zone {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .scanner-zone video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Cadre de visée : un code-barres est large et peu haut */
+    .scanner-cadre {
+      position: absolute;
+      left: 12%;
+      right: 12%;
+      top: 32%;
+      bottom: 32%;
+      border: 2px solid var(--success);
+      border-radius: 8px;
+      box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35);
+    }
+
     .settings-list {
       display: flex;
       flex-direction: column;
@@ -476,7 +503,7 @@
   </main>
 
   <div class="actions-bar">
-    <button class="btn-fab btn-fab-secondary" onclick="declencherScanIA()">📷 Scan IA</button>
+    <button class="btn-fab btn-fab-secondary" onclick="ouvrirScanner()">📷 Scanner</button>
     <button class="btn-fab" onclick="ajouterManuel()">➕ Saisie</button>
   </div>
 
@@ -487,7 +514,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.13</div>
+  <div class="version-tag">v3.14</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -540,6 +567,25 @@
         <button class="btn btn-secondary" style="font-size: 12px; width: auto;" onclick="ajouterNouveauTomeModal()">+ Ajouter tome</button>
         <button class="btn btn-secondary" style="font-size: 12px; width: auto; background: rgba(239,68,68,0.2); color: #ef4444;" onclick="supprimerSerieActuelle()">Supprimer la série</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Écran de scan du code-barres -->
+  <div class="modal-overlay" id="scanner-modal">
+    <div class="modal-content" style="max-width: 380px;">
+      <h3 style="font-size: 16px; margin-bottom: 10px;">📷 Scanner le code-barres</h3>
+      <div class="scanner-zone">
+        <video id="scanner-video" autoplay muted playsinline></video>
+        <div class="scanner-cadre"></div>
+      </div>
+      <div id="scanner-statut" style="font-size: 12px; color: var(--text-sub); margin: 10px 0; text-align: center;">Vise le code-barres au dos du livre</div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="btn btn-secondary" onclick="scannerDepuisPhoto()">📸 Prendre une photo du code-barres</button>
+        <button class="btn btn-secondary" onclick="scannerSaisieManuelle()">⌨️ Saisir l'ISBN</button>
+        <button class="btn btn-secondary" onclick="scannerJaquetteIA()">🖼️ Pas de code-barres ? Scanner la jaquette (IA)</button>
+        <button class="btn btn-secondary" style="background: transparent;" onclick="fermerScanner()">Annuler</button>
+      </div>
+      <input type="file" id="scanner-photo-input" style="display: none;" accept="image/*" capture="environment" onchange="decoderPhotoCodeBarres(event)">
     </div>
   </div>
 
@@ -1197,13 +1243,20 @@
         return;
       }
       fermerParametres();
+      await afficherLivreIsbn(isbn);
+    }
+
+    // Cherche le livre puis affiche sa fiche ; propose le scan de jaquette s'il est introuvable
+    async function afficherLivreIsbn(isbn) {
       const loader = document.getElementById('loader-ia');
       document.getElementById('loader-status').textContent = 'Recherche du livre…';
       loader.style.display = 'flex';
       const livre = await chercherLivreParIsbn(isbn);
       loader.style.display = 'none';
       if (!livre.trouve) {
-        alert("Livre introuvable pour l'ISBN " + isbn + '.\n\n' + livre.erreurs.join('\n'));
+        if (await confirmerAction("Livre introuvable pour l'ISBN " + isbn + '.\n\n' + livre.erreurs.join('\n') + "\n\nScanner plutôt la jaquette avec l'IA ?")) {
+          declencherScanIA();
+        }
         return;
       }
       const analyse = analyserTitreLivre(livre.titre, livre.sousTitre);
@@ -1250,6 +1303,115 @@
         if (!serie.couverture && couvertureHttps) serie.couverture = couvertureHttps;
         sauvegarder();
       };
+    }
+
+    // --- Scan du code-barres (bibliothèque ZXing, chargée seulement à la première utilisation) ---
+    const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.23.0/umd/index.min.js';
+    let zxingPromesse = null;
+    let lecteurCodeBarres = null;
+    let scanTermine = false;
+
+    function chargerZxing() {
+      if (!zxingPromesse) {
+        zxingPromesse = new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = ZXING_URL;
+          script.onload = () => resolve(window.ZXing);
+          script.onerror = () => { zxingPromesse = null; reject(new Error('bibliothèque de scan injoignable')); };
+          document.head.appendChild(script);
+        });
+      }
+      return zxingPromesse;
+    }
+
+    function creerLecteur(ZXing) {
+      const indices = new Map();
+      // Les livres utilisent des codes EAN-13 (ISBN 978/979…)
+      indices.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]);
+      indices.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      return new ZXing.BrowserMultiFormatReader(indices);
+    }
+
+    function statutScanner(texte) {
+      document.getElementById('scanner-statut').textContent = texte;
+    }
+
+    async function ouvrirScanner() {
+      scanTermine = false;
+      document.getElementById('scanner-modal').classList.add('active');
+      statutScanner('Ouverture de la caméra…');
+      try {
+        const ZXing = await chargerZxing();
+        if (scanTermine) return;
+        lecteurCodeBarres = creerLecteur(ZXing);
+        await lecteurCodeBarres.decodeFromConstraints(
+          { video: { facingMode: 'environment' } },
+          document.getElementById('scanner-video'),
+          (resultat) => { if (resultat) codeBarresLu(resultat.getText()); }
+        );
+        if (!scanTermine) statutScanner('Vise le code-barres au dos du livre');
+      } catch (e) {
+        const refus = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+        statutScanner(refus
+          ? "Accès à la caméra refusé : autorise-le dans les réglages de l'iPhone, ou prends une photo du code-barres."
+          : 'Caméra indisponible (' + messageErreur(e) + ') : prends une photo du code-barres.');
+      }
+    }
+
+    function arreterCamera() {
+      if (lecteurCodeBarres) { lecteurCodeBarres.reset(); lecteurCodeBarres = null; }
+    }
+
+    function fermerScanner() {
+      scanTermine = true;
+      arreterCamera();
+      document.getElementById('scanner-modal').classList.remove('active');
+    }
+
+    async function codeBarresLu(texte) {
+      if (scanTermine) return;
+      const isbn = nettoyerIsbn(texte);
+      // Un EAN-13 qui n'est pas un ISBN (ex. code-barres de prix) est ignoré : on continue de viser
+      if (!/^97[89]/.test(isbn) || !isbnValide(isbn)) {
+        statutScanner('Code ' + texte + " lu, mais ce n'est pas un ISBN : vise le code-barres du livre.");
+        return;
+      }
+      if (navigator.vibrate) navigator.vibrate(80);
+      fermerScanner();
+      await afficherLivreIsbn(isbn);
+    }
+
+    function scannerDepuisPhoto() {
+      document.getElementById('scanner-photo-input').click();
+    }
+
+    async function decoderPhotoCodeBarres(event) {
+      const fichier = event.target.files[0];
+      event.target.value = '';
+      if (!fichier) return;
+      statutScanner('Lecture de la photo…');
+      const url = URL.createObjectURL(fichier);
+      try {
+        const ZXing = await chargerZxing();
+        arreterCamera();
+        const resultat = await creerLecteur(ZXing).decodeFromImageUrl(url);
+        scanTermine = false;
+        await codeBarresLu(resultat.getText());
+      } catch (e) {
+        statutScanner("Aucun code-barres lisible sur la photo : rapproche-toi, évite les reflets, ou saisis l'ISBN.");
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    function scannerSaisieManuelle() {
+      fermerScanner();
+      rechercherIsbn();
+    }
+
+    function scannerJaquetteIA() {
+      fermerScanner();
+      declencherScanIA();
     }
 
     // --- Compléter toute la collection ---
