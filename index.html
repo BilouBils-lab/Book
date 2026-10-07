@@ -487,7 +487,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.9</div>
+  <div class="version-tag">v3.10</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -839,12 +839,18 @@
       ['Black Box', /black box/], ['IMHO', /\bimho\b/], ['Le Lézard Noir', /l[eé]zard noir/],
       ['Komikku', /komikku/], ['Naban', /naban/], ['Ankama', /ankama/], ['Kotoji', /kotoji/],
       ['Omaké Books', /omak[eé]/], ['Hachette', /hachette/], ['Bamboo', /bamboo/], ['Dargaud', /dargaud/],
-      ['Shiba', /\bshiba\b/], ['H2T', /\bh2t\b/]
+      ['Shiba', /\bshiba\b/], ['H2T', /\bh2t\b/],
+      ['KBooks', /\bk ?books\b/], ['Webtoon Factory', /webtoon factory/], ['Delitoon', /delitoon/], ['Verytoon', /verytoon/]
     ];
     function editeurFrancais(nom) {
       const n = (nom || '').toLowerCase();
       const trouve = EDITEURS_FR.find(([, motif]) => motif.test(n));
       return trouve ? trouve[0] : null;
+    }
+
+    // « Haikyu!! (Smash) » → « Haikyu!! » : l'édition entre parenthèses fait échouer les recherches
+    function titreRecherche(titre) {
+      return (titre || '').replace(/\s*\([^)]*\)/g, '').trim() || titre;
     }
 
     async function chercherAniList(titre) {
@@ -944,6 +950,8 @@
           }, 20000);
           const data = await r.json().catch(() => ({ erreur: 'réponse illisible' }));
           if (r.ok || tentative === 1) return data;
+          // Limite de requêtes par minute atteinte : on laisse le quota se recharger
+          if (/429/.test(data.erreur || '')) { await pause(15000); continue; }
         } catch (e) {
           if (tentative === 1) return { erreur: messageErreur(e) };
         }
@@ -980,27 +988,40 @@
         if (valeur && !deja[champ] && !res.valeurs[champ]) { res.valeurs[champ] = valeur; res.sources[champ] = source; }
       };
 
-      const [base, livres] = await Promise.all([
-        chercherInfosSerie(titre),
-        deja.editeur ? null : chercherEditeurGoogleBooks(titre)
-      ]);
-      res.erreurs.push(...base.erreurs);
-      if (base.trouve) {
+      const titreR = titreRecherche(titre);
+      const appliquerBase = (base) => {
         res.base = { source: base.source, titreMatch: base.titreMatch };
         poser('auteur', base.auteur, base.source);
         poser('genre', base.genre, base.source);
         poser('statut', base.statut, base.source);
         poser('couverture', base.couverture, base.source);
-        poser('tomesTotal', base.volumes, base.source);
-      }
+        // Le nombre de tomes d'AniList est celui de l'édition standard : inutilisable pour une édition spéciale
+        if (titreR === titre) poser('tomesTotal', base.volumes, base.source);
+      };
+
+      const [base, livres] = await Promise.all([
+        chercherInfosSerie(titreR),
+        deja.editeur ? null : chercherEditeurGoogleBooks(titreR)
+      ]);
+      res.erreurs.push(...base.erreurs);
+      if (base.trouve) appliquerBase(base);
       if (livres && livres.editeur) poser('editeur', livres.editeur, 'Google Books');
       else if (livres && livres.erreur) res.erreurs.push('Google Books : ' + livres.erreur);
 
       const manque = ['auteur', 'genre', 'editeur'].filter(c => !deja[c] && !res.valeurs[c]);
       if (manque.length) {
-        const ia = await demanderIA(titre);
-        if (ia.erreur) res.erreurs.push('IA : ' + ia.erreur);
-        else manque.forEach(c => poser(c, ia[c], 'IA'));
+        const ia = await demanderIA(titreR);
+        if (ia.erreur) {
+          res.erreurs.push('IA : ' + ia.erreur);
+        } else {
+          // Titre français inconnu d'AniList : on réessaie avec le titre original donné par l'IA
+          if (!base.trouve && ia.titre_original && normaliserRecherche(ia.titre_original) !== normaliserRecherche(titreR)) {
+            const base2 = await chercherInfosSerie(ia.titre_original);
+            if (base2.trouve) appliquerBase(base2);
+            else res.erreurs.push(...base2.erreurs.map(e => e + ' (« ' + ia.titre_original + ' »)'));
+          }
+          manque.forEach(c => poser(c, ia[c], 'IA'));
+        }
       }
       return res;
     }
@@ -1104,7 +1125,10 @@
         } catch (e) {
           console.error('Complétion impossible pour ' + serie.titre, e);
         }
-        if (serieIncomplete(serie)) incompletes.push(serie.titre);
+        if (serieIncomplete(serie)) {
+          const manquants = ['auteur', 'genre', 'editeur', 'couverture'].filter(c => !serie[c]).map(c => NOMS_CHAMPS[c]);
+          incompletes.push(`• ${serie.titre} : ${manquants.join(', ')}`);
+        }
         traitees++;
         barre.style.width = Math.round(traitees / cibles.length * 100) + '%';
         if (traitees < cibles.length && !completionArretee) await pause(PAUSE_ENTRE_SERIES_MS);
@@ -1113,7 +1137,7 @@
       sauvegarder();
       etape.textContent = completionArretee ? `Arrêté après ${traitees} série(s) sur ${cibles.length}` : 'Terminé ✅';
       let bilan = `${completees} série(s) enrichie(s).`;
-      if (incompletes.length) bilan += `\n\nEncore incomplètes (${incompletes.length}) : ${incompletes.join(', ')}.\nOuvre leur fiche (✏️ Infos) pour compléter à la main ou vérifier le titre.`;
+      if (incompletes.length) bilan += `\n\nEncore incomplètes (${incompletes.length}) — il manque :\n${incompletes.join('\n')}\n\nOuvre leur fiche (✏️ Infos) pour compléter à la main ou vérifier le titre.`;
       bilanEl.textContent = bilan;
       bouton.textContent = 'Fermer';
       bouton.onclick = () => modal.classList.remove('active');

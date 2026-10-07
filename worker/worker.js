@@ -36,7 +36,7 @@ async function deduireAvecGemini(titre, env) {
   const payload = {
     contents: [{
       parts: [{
-        text: `Pour le manga "${titre}", donne l'auteur (mangaka), le genre principal, et la maison d'édition de l'édition française si elle existe. Réponds UNIQUEMENT en JSON strict avec les clés "auteur", "genre", "editeur" (chaînes de caractères en français, ou null pour un champ si tu n'es pas raisonnablement sûr — ne devine pas au hasard).`
+        text: `Pour le manga "${titre}", donne l'auteur (mangaka), le genre principal, et la maison d'édition de l'édition française si elle existe. Donne aussi "titre_original" : le titre sous lequel la série est connue internationalement, en romaji ou en anglais (par exemple "Shingeki no Kyojin" pour "L'Attaque des Titans"). Réponds UNIQUEMENT en JSON strict avec les clés "auteur", "genre", "editeur", "titre_original" (chaînes de caractères, en français pour les trois premières, ou null pour un champ si tu n'es pas raisonnablement sûr — ne devine pas au hasard).`
       }]
     }],
     generationConfig: { response_mime_type: "application/json" }
@@ -51,7 +51,7 @@ async function deduireAvecGemini(titre, env) {
   try {
     const propre = texte.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
     const o = JSON.parse(propre);
-    return { auteur: o.auteur || null, genre: o.genre || null, editeur: o.editeur || null };
+    return { auteur: o.auteur || null, genre: o.genre || null, editeur: o.editeur || null, titre_original: o.titre_original || null };
   } catch (e) {
     return { erreur: "Réponse IA illisible" };
   }
