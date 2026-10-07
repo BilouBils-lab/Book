@@ -79,6 +79,39 @@ function nombreSeries(texte) {
   }
 }
 
+// --- Recherche d'un livre par ISBN dans le catalogue de la BnF (dépôt légal : tout livre publié en France) ---
+function decoderXml(t) {
+  return t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&amp;/g, "&").trim();
+}
+
+function champsDublinCore(xml, nom) {
+  const motif = new RegExp("<dc:" + nom + "[^>]*>([\\s\\S]*?)</dc:" + nom + ">", "g");
+  return [...xml.matchAll(motif)].map(m => decoderXml(m[1]));
+}
+
+async function chercherIsbnBnf(isbn) {
+  const requete = `bib.isbn adj "${isbn}"`;
+  const url = "https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&recordSchema=dublincore&maximumRecords=1&query=" + encodeURIComponent(requete);
+  const res = await fetch(url, { headers: { "Accept": "application/xml" } });
+  if (!res.ok) return { erreur: "BnF HTTP " + res.status };
+  const xml = await res.text();
+  const nombre = Number((xml.match(/numberOfRecords>(\d+)</) || [])[1] || 0);
+  if (!nombre) return { trouve: false };
+  return {
+    trouve: true,
+    source: "BnF",
+    titre: champsDublinCore(xml, "title")[0] || null,
+    auteurs: champsDublinCore(xml, "creator"),
+    editeur: champsDublinCore(xml, "publisher")[0] || null,
+    date: champsDublinCore(xml, "date")[0] || null,
+    description: champsDublinCore(xml, "description")[0] || champsDublinCore(xml, "format")[0] || null,
+    langue: champsDublinCore(xml, "language")[0] || null
+  };
+}
+
 export default {
   async fetch(request, env) {
     const corsHeaders = {
@@ -137,6 +170,18 @@ export default {
         return new Response("Method not allowed", { status: 405, headers: corsHeaders });
       } catch (e) {
         return json({ error: e.message }, 500);
+      }
+    }
+
+    // --- Livre par ISBN (GET /isbn?isbn=978...) ---
+    if (pathname === "/isbn") {
+      const isbn = (url.searchParams.get("isbn") || "").replace(/[^0-9Xx]/g, "").toUpperCase();
+      if (!/^(\d{13}|\d{9}[\dX])$/.test(isbn)) return json({ erreur: "ISBN invalide" }, 400);
+      try {
+        const resultat = await chercherIsbnBnf(isbn);
+        return json(resultat, resultat.erreur ? 502 : 200);
+      } catch (e) {
+        return json({ erreur: "BnF : " + e.message }, 502);
       }
     }
 
