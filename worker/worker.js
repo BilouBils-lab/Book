@@ -99,35 +99,68 @@ function nettoyerAuteurBnf(nom) {
   return prenom ? `${prenom} ${famille}` : famille;
 }
 
-async function chercherIsbnBnf(isbn) {
-  const requete = `bib.isbn adj "${isbn}"`;
-  const url = "https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&recordSchema=dublincore&maximumRecords=1&query=" + encodeURIComponent(requete);
-  const res = await fetch(url, { headers: { "Accept": "application/xml" } });
-  if (!res.ok) return { erreur: "BnF HTTP " + res.status };
-  const xml = await res.text();
-  const nombre = Number((xml.match(/numberOfRecords>(\d+)</) || [])[1] || 0);
-  if (!nombre) return { trouve: false };
-  // Sans doublon, accents ignorés (« Kentaro Miura » et « Kentarō Miura »)
-  const auteurs = [];
+// Titre BnF sans la mention de responsabilité ni le nom des auteurs
+function nettoyerTitreBnf(titreBrut, auteurs) {
+  let titre = (titreBrut || "").split(" / ")[0];
   const sansAccents = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  for (const a of champsDublinCore(xml, "creator").map(nettoyerAuteurBnf).filter(Boolean)) {
-    if (!auteurs.some(x => sansAccents(x) === sansAccents(a))) auteurs.push(a);
-  }
-  // Le titre BnF se termine par la mention de responsabilité : « Berserk. 1 (Éd. prestige) / Kentaro Miura »
-  let titre = (champsDublinCore(xml, "title")[0] || "").split(" / ")[0];
   for (const a of auteurs) {
     if (sansAccents(titre).endsWith(" " + sansAccents(a))) titre = titre.slice(0, titre.length - a.length).trim();
   }
+  return titre;
+}
+
+function auteursBnf(xml) {
+  // Sans doublon, accents ignorés (« Kentaro Miura » et « Kentarō Miura »)
+  const auteurs = [];
+  const sansAccents = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  for (const a of champsDublinCore(xml, "creator").map(nettoyerAuteurBnf).filter(Boolean)) {
+    if (!auteurs.some(x => sansAccents(x) === sansAccents(a))) auteurs.push(a);
+  }
+  return auteurs;
+}
+
+async function interrogerBnf(requete, maximum) {
+  const url = "https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&recordSchema=dublincore&maximumRecords=" + maximum + "&query=" + encodeURIComponent(requete);
+  const res = await fetch(url, { headers: { "Accept": "application/xml" } });
+  if (!res.ok) return { erreur: "BnF HTTP " + res.status };
+  const xml = await res.text();
+  return { xml, total: Number((xml.match(/numberOfRecords>(\d+)</) || [])[1] || 0) };
+}
+
+async function chercherIsbnBnf(isbn) {
+  const { xml, total, erreur } = await interrogerBnf(`bib.isbn adj "${isbn}"`, 1);
+  if (erreur) return { erreur };
+  if (!total) return { trouve: false };
+  const auteurs = auteursBnf(xml);
   return {
     trouve: true,
     source: "BnF",
-    titre: titre || null,
+    titre: nettoyerTitreBnf(champsDublinCore(xml, "title")[0], auteurs) || null,
     auteurs,
     editeur: champsDublinCore(xml, "publisher")[0] || null,
     date: champsDublinCore(xml, "date")[0] || null,
     description: champsDublinCore(xml, "description")[0] || champsDublinCore(xml, "format")[0] || null,
     langue: champsDublinCore(xml, "language")[0] || null
   };
+}
+
+// Toutes les notices dont le titre contient ces mots (ex. « Berserk prestige »), chez cet éditeur si connu
+async function chercherEditionBnf(mots, editeur) {
+  let requete = `bib.title all "${mots.replace(/"/g, "")}"`;
+  if (editeur) requete += ` and bib.publisher all "${editeur.replace(/"/g, "")}"`;
+  const { xml, total, erreur } = await interrogerBnf(requete, 1000);
+  if (erreur) return { erreur };
+  const notices = xml.split(/<srw:record>/).slice(1).map(bloc => {
+    const auteurs = auteursBnf(bloc);
+    const isbn = (champsDublinCore(bloc, "identifier").join(" ").match(/97[89]\d{10}/) || [])[0] || null;
+    return {
+      titre: nettoyerTitreBnf(champsDublinCore(bloc, "title")[0], auteurs),
+      editeur: champsDublinCore(bloc, "publisher")[0] || null,
+      date: champsDublinCore(bloc, "date")[0] || null,
+      isbn
+    };
+  });
+  return { total, notices };
 }
 
 export default {
@@ -197,6 +230,18 @@ export default {
       if (!/^(\d{13}|\d{9}[\dX])$/.test(isbn)) return json({ erreur: "ISBN invalide" }, 400);
       try {
         const resultat = await chercherIsbnBnf(isbn);
+        return json(resultat, resultat.erreur ? 502 : 200);
+      } catch (e) {
+        return json({ erreur: "BnF : " + e.message }, 502);
+      }
+    }
+
+    // --- Notices BnF d'une édition (GET /edition?mots=Berserk prestige&editeur=Glénat) ---
+    if (pathname === "/edition") {
+      const mots = (url.searchParams.get("mots") || "").trim();
+      if (!mots) return json({ erreur: "Mots manquants" }, 400);
+      try {
+        const resultat = await chercherEditionBnf(mots, (url.searchParams.get("editeur") || "").trim());
         return json(resultat, resultat.erreur ? 502 : 200);
       } catch (e) {
         return json({ erreur: "BnF : " + e.message }, 502);
