@@ -487,7 +487,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.7</div>
+  <div class="version-tag">v3.8</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -815,6 +815,26 @@
       return exacts.length ? exacts.sort((a, b) => popularite(b) - popularite(a))[0] : liste[0];
     }
 
+    // Google Books renvoie souvent l'éditeur américain (VIZ Media…) même pour une édition française :
+    // on n'accepte que les éditeurs de manga présents en France, sous leur nom usuel.
+    const EDITEURS_FR = [
+      ['Glénat', /gl[eé]nat/], ['Kana', /\bkana\b/], ['Pika', /\bpika\b/], ['Ki-oon', /ki-?oon/],
+      ['Kurokawa', /kurokawa/], ['Tonkam', /tonkam/], ['Delcourt', /delcourt/], ['Kazé', /kaz[eé]/],
+      ['Crunchyroll', /crunchyroll/], ['Panini Manga', /panini/], ['Soleil Manga', /soleil/], ['Akata', /akata/],
+      ['Doki-Doki', /doki/], ['Casterman', /casterman/], ['Sakka', /sakka/], ['Ototo', /ototo/],
+      ['Vega-Dupuis', /\bvega\b/], ['Dupuis', /dupuis/], ['Mangetsu', /mangetsu/], ['Meian', /meian/],
+      ['Noeve Grafx', /noeve/], ['Michel Lafon', /michel lafon/], ['Nobi Nobi', /nobi/], ['Taifu', /taifu/],
+      ['Black Box', /black box/], ['IMHO', /\bimho\b/], ['Le Lézard Noir', /l[eé]zard noir/],
+      ['Komikku', /komikku/], ['Naban', /naban/], ['Ankama', /ankama/], ['Kotoji', /kotoji/],
+      ['Omaké Books', /omak[eé]/], ['Hachette', /hachette/], ['Bamboo', /bamboo/], ['Dargaud', /dargaud/],
+      ['Shiba', /\bshiba\b/], ['H2T', /\bh2t\b/]
+    ];
+    function editeurFrancais(nom) {
+      const n = (nom || '').toLowerCase();
+      const trouve = EDITEURS_FR.find(([, motif]) => motif.test(n));
+      return trouve ? trouve[0] : null;
+    }
+
     async function chercherAniList(titre) {
       const query = `query ($search: String) {
         Page(perPage: 8) {
@@ -982,8 +1002,11 @@
             const r = await fetchAvecReessai('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(q) + '&langRestrict=fr&printType=books&maxResults=5' + cleParam);
             if (r.ok) {
               const items = (r.body && r.body.items) || [];
-              const trouve = items.find(it => it.volumeInfo && it.volumeInfo.publisher);
-              if (trouve) { editeur = trouve.volumeInfo.publisher; break; }
+              for (const it of items) {
+                editeur = editeurFrancais(it.volumeInfo && it.volumeInfo.publisher);
+                if (editeur) break;
+              }
+              if (editeur) break;
             } else {
               erreurBooks = 'HTTP ' + r.status;
             }
