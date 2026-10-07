@@ -634,7 +634,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.22</div>
+  <div class="version-tag">v3.23</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -707,6 +707,48 @@
         <button class="btn btn-secondary" style="color: #ef4444;" onclick="actionMenuSerie(supprimerSerieActuelle)">🗑️ Supprimer la série</button>
         <button class="btn btn-secondary" style="background: transparent;" onclick="fermerMenuSerie()">Annuler</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Écran de scan du code-barres -->
+  <div class="modal-overlay" id="scanner-modal">
+    <div class="modal-content" style="max-width: 380px;">
+      <h3 style="font-size: 16px; margin-bottom: 10px;">📷 Scanner le code-barres</h3>
+      <div class="scanner-zone">
+        <video id="scanner-video" autoplay muted playsinline></video>
+        <div class="scanner-cadre"></div>
+      </div>
+      <div id="scanner-statut" style="font-size: 12px; color: var(--text-sub); margin: 10px 0; text-align: center;">Vise le code-barres au dos du livre</div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="btn btn-secondary" onclick="scannerDepuisPhoto()">📸 Prendre une photo du code-barres</button>
+        <button class="btn btn-secondary" onclick="scannerSaisieManuelle()">⌨️ Saisir l'ISBN</button>
+        <button class="btn btn-secondary" onclick="scannerJaquetteIA()">🖼️ Pas de code-barres ? Scanner la jaquette (IA)</button>
+        <button class="btn btn-secondary" style="background: transparent;" onclick="fermerScanner()">Annuler</button>
+      </div>
+      <input type="file" id="scanner-photo-input" style="display: none;" accept="image/*" capture="environment" onchange="decoderPhotoCodeBarres(event)">
+    </div>
+  </div>
+
+  <!-- Modal : résultat d'une recherche par ISBN -->
+  <div class="modal-overlay" id="isbn-modal">
+    <div class="modal-content" style="max-width: 360px;">
+      <h3 style="font-size: 16px; margin-bottom: 12px;">🔎 Recherche par ISBN</h3>
+      <div id="isbn-resultat"></div>
+      <div class="modal-btn-row" style="margin-top: 16px;">
+        <button class="btn btn-secondary" id="isbn-fermer">Fermer</button>
+        <button class="btn" id="isbn-ajouter">Ajouter ce tome</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal : complétion de la collection -->
+  <div class="modal-overlay" id="completion-modal">
+    <div class="modal-content" style="max-width: 340px;">
+      <h3 id="completion-titre" style="font-size: 16px; margin-bottom: 12px;">✨ Compléter ma collection</h3>
+      <div id="completion-etape" style="font-size: 13px; color: var(--text-sub); margin-bottom: 8px;"></div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="completion-barre" style="width: 0%;"></div></div>
+      <div id="completion-bilan" style="font-size: 13px; margin-top: 14px; white-space: pre-line; line-height: 1.4;"></div>
+      <button class="btn btn-secondary" id="completion-bouton" style="margin-top: 16px;">Arrêter</button>
     </div>
   </div>
 
