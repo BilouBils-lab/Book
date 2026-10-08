@@ -683,3 +683,13 @@ main {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Paramètres : état de la sauvegarde et liste des versions */
+.settings-titre { font-size: 12px; font-weight: 600; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 8px; }
+.etat-sauvegarde { font-size: 13px; line-height: 1.4; padding: 10px 12px; border-radius: 10px; background: var(--card-bg); border: 1px solid var(--card-border); }
+.etat-sauvegarde.alerte { border-color: #b45309; }
+.etat-sauvegarde small { display: block; color: var(--text-sub); font-size: 12px; margin-top: 2px; }
+.versions-liste { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.version-item { text-align: left; padding: 10px 12px; border-radius: 10px; background: var(--card-bg); border: 1px solid var(--card-border); color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.version-item small { display: block; color: var(--text-sub); font-size: 12px; margin-top: 2px; }
+.version-item.actuelle { border-color: var(--accent, #6366f1); }
