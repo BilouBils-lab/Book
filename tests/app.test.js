@@ -282,6 +282,9 @@ test('Sauvegarde : état dans les Paramètres et restauration d\u2019une ancienn
   verifier((await etat()).includes('Code de sauvegarde incorrect'), 'code incorrect signalé');
   await page.evaluate(() => localStorage.setItem('cloud_backup_token', 'code'));
   egal(await etat(), "✅ Sauvegardée en ligne aujourd'hui à 10:15" + '2 séries, 5 tomes · 2 versions précédentes', 'sauvegarde à jour');
+  versions.actuelle.date = null;
+  egal(await etat(), '✅ Sauvegardée en ligne' + '2 séries, 5 tomes · la date s\u2019affichera après ta prochaine modification · 2 versions précédentes', 'sauvegarde sans date (ancien Worker)');
+  versions.actuelle.date = '2026-10-08T08:15:00.000Z';
   await page.evaluate(() => { bibliotheque[1].tomes.push({ numero: 3, possede: true, lu: false }); });
   verifier((await etat()).includes('sur cet appareil : 2 séries, 6 tomes'), 'différence entre l\u2019appareil et le cloud signalée');
 
