@@ -30,3 +30,9 @@ Pour utiliser un Chromium déjà installé : `CHROMIUM_PATH=/chemin/vers/chromiu
 
 - `app.test.js` : les tests.
 - `donnees/` : un extrait des données Manga Insight (licence CC BY 4.0) et une photo de code-barres.
+
+## Tests automatiques sur GitHub
+
+Le fichier `.github/workflows/tests.yml` demande à GitHub (GitHub Actions) de lancer ces tests
+à chaque pull request et à chaque envoi sur `main`. Le résultat apparaît dans la PR
+(✅ / ❌) et dans l'onglet **Actions** du dépôt, où l'on peut lire le détail d'un échec.

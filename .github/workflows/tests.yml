@@ -1,0 +1,35 @@
+# Lance les tests automatiques (dossier tests/) à chaque pull request et à chaque envoi sur main.
+# Le résultat s'affiche dans la page de la PR : ✅ si tout passe, ❌ sinon.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Installer les outils de test
+        run: npm ci
+
+      - name: Installer le navigateur Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Lancer les tests
+        run: npm test
