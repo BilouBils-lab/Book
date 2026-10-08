@@ -310,6 +310,41 @@ function fusionnerSeries(cible, source) {
   if ((!cible.statut || cible.statut === 'En cours') && source.statut) cible.statut = source.statut;
 }
 
+// Renomme la série d'index `index` (fusion avec une série déjà nommée ainsi). Si l'édition change,
+// les infos de parution (propres à une édition) sont effacées : elles seront retrouvées à la
+// prochaine mise à jour. Renvoie l'index de la série obtenue.
+function changerTitreSerie(index, nouveau) {
+  const serie = bibliotheque[index];
+  const ancienneEdition = editionDuTitre(serie.titre);
+  let cible = serie;
+  const autreIndex = bibliotheque.findIndex((m, i) => i !== index && normaliserTitre(m.titre) === normaliserTitre(nouveau));
+  if (autreIndex !== -1) {
+    cible = bibliotheque[autreIndex];
+    fusionnerSeries(cible, serie);
+    bibliotheque.splice(index, 1);
+  }
+  cible.titre = nouveau;
+  // Édition spéciale : le nombre de tomes trouvé automatiquement est celui de l'édition standard
+  if (titreRecherche(nouveau) !== nouveau) delete cible.tomesTotal;
+  if (editionDuTitre(nouveau) !== ancienneEdition) {
+    for (const champ of ['tomesTotal', 'tomesParus', 'tomesParusSource', 'tomesParusMaj', 'tomesParusDiagnostic', 'parution']) delete cible[champ];
+  }
+  return bibliotheque.indexOf(cible);
+}
+
+// Marque un tome scanné comme possédé avec son ISBN ; renvoie true s'il était déjà possédé
+function ajouterTomeScanne(serie, numero, isbn) {
+  const existant = serie.tomes.find(t => t.numero === numero);
+  const etaitPossede = !!(existant && existant.possede);
+  if (existant) existant.possede = true;
+  else {
+    serie.tomes.push({ numero, possede: true, lu: false });
+    serie.tomes.sort((a, b) => a.numero - b.numero);
+  }
+  serie.tomes.find(t => t.numero === numero).isbn = isbn;
+  return etaitPossede;
+}
+
 async function renommerSerieActuelle() {
   if (serieIndexActive === null) return;
   const serie = bibliotheque[serieIndexActive];
@@ -317,20 +352,9 @@ async function renommerSerieActuelle() {
   const nouveau = (saisie || '').trim();
   if (!nouveau || nouveau === serie.titre) return;
 
-  let cible = serie;
-  const autreIndex = bibliotheque.findIndex((m, i) => i !== serieIndexActive && normaliserTitre(m.titre) === normaliserTitre(nouveau));
-  if (autreIndex !== -1) {
-    const autre = bibliotheque[autreIndex];
-    if (!(await confirmerAction(`La série « ${autre.titre} » existe déjà.\n\nFusionner les deux ? Tous les tomes seront regroupés dans une seule série.`))) return;
-    fusionnerSeries(autre, serie);
-    bibliotheque.splice(serieIndexActive, 1);
-    cible = autre;
-  }
-  cible.titre = nouveau;
-  // Édition spéciale : le nombre de tomes trouvé automatiquement est celui de l'édition standard
-  if (titreRecherche(nouveau) !== nouveau) delete cible.tomesTotal;
-
-  serieIndexActive = bibliotheque.indexOf(cible);
+  const autre = bibliotheque.find((m, i) => i !== serieIndexActive && normaliserTitre(m.titre) === normaliserTitre(nouveau));
+  if (autre && !(await confirmerAction(`La série « ${autre.titre} » existe déjà.\n\nFusionner les deux ? Tous les tomes seront regroupés dans une seule série.`))) return;
+  serieIndexActive = changerTitreSerie(serieIndexActive, nouveau);
   sauvegarder();
   remplirModalSerie(serieIndexActive);
 }

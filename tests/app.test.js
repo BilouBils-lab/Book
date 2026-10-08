@@ -361,9 +361,12 @@ test('Inventaire : avancement, validation des séries et vérification d\u2019un
   await page.evaluate(() => { fermerModal(); ouvrirModalSerie(2); });
   await page.evaluate(() => { bibliotheque[1].tomes[0].isbn = null; });
   await scanner();
-  await page.waitForSelector('#confirm-modal.active', { timeout: 15000 });
-  verifier((await page.textContent('#confirm-message')).includes("c'est l'édition Prestige, la série est en édition standard"), 'édition différente signalée');
-  await page.click('#confirm-cancel');
+  await page.waitForSelector('#choix-modal.active', { timeout: 15000 });
+  verifier((await page.textContent('#choix-message')).includes("c'est l'édition Prestige, la série est en édition standard"), 'édition différente signalée');
+  egal(await page.$$eval('#choix-boutons button', b => b.map(x => x.textContent)), [
+    '✏️ Corriger la série en « Berserk (Prestige) » (fusion)', '➕ Ranger ce tome dans « Berserk (Prestige) »', 'Ajouter quand même à « Berserk »', 'Annuler'
+  ], 'choix proposés (la bonne édition existe déjà)');
+  await page.click('#choix-boutons button >> text=Annuler');
   egal(await page.evaluate(() => bibliotheque[2].tomes.length), 2, 'rien ajouté');
 
   // Bandeau dans la collection, puis fin de l'inventaire
@@ -421,6 +424,51 @@ test('Code de sauvegarde : réinstallation sans perdre la sauvegarde en ligne', 
   await page.click('#confirm-cancel');
   verifier(/^[0-9a-f]{36}$/.test(await page.inputValue('#form-text-input')), 'nouveau code généré pour une première configuration');
   await page.click('#form-text-cancel');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Mauvaise édition : corriger la série ou en créer une à part', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Dragon Ball. 1 (Perfect edition)', auteurs: [], editeur: 'Glénat' } } : null
+  });
+  const dragonBall = () => [{ titre: 'Dragon Ball', auteur: 'Akira Toriyama', tomesParus: 42, tomesParusSource: 'Manga Insight', parution: { nom: 'Dragon ball', dernier: { vol: 42, k: 24000 } }, tomes: tomes(3, 1) }];
+  const etat = () => page.evaluate(() => bibliotheque.map(s => [s.titre, s.tomes.map(t => t.numero + (t.lu ? 'L' : '') + (t.isbn ? '#' : '')).join(' '), s.tomesParus ?? null, !!s.parution]));
+  const boutons = () => page.$$eval('#choix-boutons button', b => b.map(x => x.textContent));
+
+  // Inventaire, « Corriger » : la série change d'édition, tomes et lectures gardés, parution effacée
+  await page.evaluate(() => localStorage.setItem('inventaire_debut', '1'));
+  await definirBibliotheque(page, dragonBall());
+  await page.evaluate(() => { ouvrirModalSerie(0); verifierTomeScanne('9782344067802', 0); });
+  await page.waitForSelector('#choix-modal.active');
+  egal(await boutons(), ['✏️ Corriger la série en « Dragon Ball (Perfect) »', '➕ Créer la série « Dragon Ball (Perfect) » à part', 'Ajouter quand même à « Dragon Ball »', 'Annuler'], 'choix proposés');
+  await page.click('#choix-boutons button >> nth=0');
+  await page.waitForFunction(() => bibliotheque[0].titre === 'Dragon Ball (Perfect)');
+  egal(await etat(), [['Dragon Ball (Perfect)', '1L# 2 3', null, false]], 'série corrigée');
+  egal(await page.textContent('#modal-title'), 'Dragon Ball (Perfect)', 'fiche mise à jour');
+
+  // Inventaire, « À part » : une nouvelle série, l'ancienne ne bouge pas
+  await page.evaluate(() => fermerModal());
+  await definirBibliotheque(page, dragonBall());
+  await page.evaluate(() => { ouvrirModalSerie(0); verifierTomeScanne('9782344067802', 0); });
+  await page.waitForSelector('#choix-modal.active');
+  await page.click('#choix-boutons button >> nth=1');
+  await page.waitForFunction(() => bibliotheque.length === 2);
+  egal(await etat(), [['Dragon Ball', '1L 2 3', 42, true], ['Dragon Ball (Perfect)', '1#', null, false]], 'nouvelle série créée à part');
+  egal(await page.evaluate(() => bibliotheque[1].auteur), 'Akira Toriyama', 'auteur repris');
+
+  // Scan hors inventaire : la série existe dans une autre édition → même choix
+  await page.evaluate(() => { fermerModal(); localStorage.removeItem('inventaire_debut'); });
+  await definirBibliotheque(page, dragonBall());
+  await page.evaluate(() => { afficherLivreIsbn('9782344067802'); });
+  await page.click('#isbn-ajouter');
+  await page.waitForSelector('#choix-modal.active');
+  verifier((await page.textContent('#choix-message')).includes('« Dragon Ball » (édition standard), mais ce livre est l\u2019édition Perfect'.replace('\u2019', "'")), 'message hors inventaire');
+  await page.click('#choix-boutons button >> nth=0');
+  egal(await page.inputValue('#form-serie-titre'), 'Dragon Ball (Perfect)', 'titre proposé');
+  await page.click('#form-serie-ok');
+  await page.waitForFunction(() => bibliotheque[0].tomes[0].isbn);
+  egal(await etat(), [['Dragon Ball (Perfect)', '1L# 2 3', null, false]], 'série corrigée depuis le scan');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });

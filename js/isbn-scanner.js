@@ -43,6 +43,22 @@ function analyserTitreLivre(titre, sousTitre) {
   return { serie: serie || titre, tome, edition };
 }
 
+// Édition d'une série d'après son titre : « Berserk (Prestige) » → 'Prestige', sinon null (standard)
+function editionDuTitre(titre) {
+  const p = (titre.match(/\(([^)]*)\)\s*$/) || [])[1];
+  if (!p) return null;
+  return (EDITIONS.find(([, motif]) => motif.test(p.toLowerCase())) || [])[0] || null;
+}
+
+function titreSansEdition(titre) {
+  return normaliserRecherche(titre.replace(/\s*\([^)]*\)\s*$/, ''));
+}
+
+// Titre complet d'un livre analysé : « Dragon Ball (Perfect) », ou « Dragon Ball » en édition standard
+function titreAvecEdition(analyse) {
+  return analyse.edition ? `${analyse.serie} (${analyse.edition})` : analyse.serie;
+}
+
 function ligneInfo(parent, libelle, valeur) {
   if (!valeur) return;
   const div = document.createElement('div');
@@ -150,7 +166,21 @@ async function afficherLivreIsbn(isbn) {
   document.getElementById('isbn-fermer').onclick = () => modal.classList.remove('active');
   document.getElementById('isbn-ajouter').onclick = async () => {
     modal.classList.remove('active');
-    const titrePropose = analyse.edition ? `${analyse.serie} (${analyse.edition})` : analyse.serie;
+    let titrePropose = titreAvecEdition(analyse);
+    // La même série existe dans une autre édition : corriger la série, ou en créer une à part ?
+    const exacte = bibliotheque.some(s => normaliserTitre(s.titre) === normaliserTitre(titrePropose));
+    const autreIndex = exacte ? -1 : bibliotheque.findIndex(s => titreSansEdition(s.titre) === normaliserRecherche(analyse.serie) && editionDuTitre(s.titre) !== analyse.edition);
+    if (autreIndex !== -1) {
+      const autre = bibliotheque[autreIndex];
+      const action = await choisirAction(`Ta collection contient « ${autre.titre} » (édition ${editionDuTitre(autre.titre) || 'standard'}), mais ce livre est l'édition ${analyse.edition || 'standard'}.\n\n✏️ Corriger : toute la série devient « ${titrePropose} », tes tomes et tes lectures sont gardés.`, [
+        { libelle: `✏️ Corriger la série en « ${titrePropose} »`, valeur: 'corriger', principal: true },
+        { libelle: `➕ Créer la série « ${titrePropose} » à part`, valeur: 'creer' },
+        { libelle: `Ajouter quand même à « ${autre.titre} »`, valeur: 'ici' }
+      ]);
+      if (!action) return;
+      if (action === 'corriger') changerTitreSerie(autreIndex, titrePropose);
+      if (action === 'ici') titrePropose = autre.titre;
+    }
     const choix = await demanderSerieEtTome(titrePropose, analyse.tome || 1, 'Ajouter ce tome');
     if (!choix) return;
     await enregistrerSerie(choix.titre, choix.tome);
