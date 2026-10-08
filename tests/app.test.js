@@ -306,6 +306,66 @@ test('Sauvegarde : état dans les Paramètres et restauration d\u2019une ancienn
   await fermer();
 });
 
+test('Inventaire : avancement, validation des séries et vérification d\u2019un tome scanné', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Berserk. 1 (Éd. prestige)', auteurs: [], editeur: 'Glénat' } } : null
+  });
+  await definirBibliotheque(page, [
+    { titre: 'Kagurabachi', tomes: tomes(5, 0, [4]) },
+    { titre: 'Berserk (Prestige)', tomes: [{ numero: 2, possede: true, lu: false }, { numero: 3, possede: true, lu: false }] },
+    { titre: 'Berserk', tomes: tomes(2) }]);
+  const lignes = () => page.$$eval('#inventaire-liste > *', els => els.map(e => e.classList.contains('pal-section') ? '# ' + e.textContent
+    : e.querySelector('.inventaire-titre').textContent + ' — ' + e.querySelector('.inventaire-detail').textContent + ' ' + e.querySelector('.inventaire-marque').textContent));
+  const scanner = async () => {
+    await page.click('text=📷 Scanner un tome');
+    await page.setInputFiles('#scanner-photo-input', path.join(DONNEES, 'codebarre-berserk-prestige-1.png'));
+  };
+
+  await page.evaluate(() => ouvrirParametres());
+  await page.click("text=📋 Faire l'inventaire");
+  await page.click('#confirm-ok');
+  await page.waitForSelector('#inventaire-modal.active');
+  egal(await page.textContent('#inventaire-compteur'), '0 / 3 séries vérifiées', 'compteur au départ');
+  egal(await lignes(), ['# À vérifier (3)', 'Berserk — 2 tomes : 1–2 ›', 'Berserk (Prestige) — 2 tomes : 2–3 ›', 'Kagurabachi — 4 tomes : 1–3, 5 ›'], 'séries à vérifier');
+
+  // Une série vérifiée
+  await page.click('.inventaire-ligne:has-text("Kagurabachi")');
+  egal(await page.textContent('#fiche-inventaire-tomes'), 'Dans l\u2019app : 4 tomes : 1–3, 5', 'rappel des tomes dans la fiche');
+  await page.click('#fiche-inventaire-valider');
+  verifier((await page.textContent('#toast span')).includes('Kagurabachi vérifiée · 1 / 3'), 'message de validation');
+  egal((await lignes()).slice(-2), ['# Vérifiées (1)', 'Kagurabachi — 4 tomes : 1–3, 5 ✓'], 'série passée dans « Vérifiées »');
+
+  // Scan d'un tome de la bonne édition : il est ajouté avec son ISBN
+  await page.click('.inventaire-ligne:has-text("Berserk (Prestige)")');
+  await scanner();
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Tome 1'));
+  egal(await page.textContent('#toast span'), "✅ Tome 1 · édition Prestige : c'est le bon (ajouté)", 'tome scanné reconnu');
+  egal(await page.evaluate(() => bibliotheque[1].tomes.map(t => t.numero + (t.isbn ? '#' : ''))), ['1#', '2', '3'], 'tome 1 ajouté avec son ISBN');
+  await scanner();
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes("c'est bien celui"), null, { timeout: 15000 });
+
+  // Scan d'un tome d'une autre édition : alerte, rien n'est ajouté si on refuse
+  await page.evaluate(() => { fermerModal(); ouvrirModalSerie(2); });
+  await page.evaluate(() => { bibliotheque[1].tomes[0].isbn = null; });
+  await scanner();
+  await page.waitForSelector('#confirm-modal.active', { timeout: 15000 });
+  verifier((await page.textContent('#confirm-message')).includes("c'est l'édition Prestige, la série est en édition standard"), 'édition différente signalée');
+  await page.click('#confirm-cancel');
+  egal(await page.evaluate(() => bibliotheque[2].tomes.length), 2, 'rien ajouté');
+
+  // Bandeau dans la collection, puis fin de l'inventaire
+  await page.evaluate(() => { fermerModal(); fermerInventaire(); });
+  egal(await page.textContent('.bandeau-inventaire'), '📋 Inventaire en cours · 1 / 3Continuer ›', 'bandeau de la collection');
+  await page.click('.bandeau-inventaire');
+  await page.click("text=Terminer l'inventaire");
+  verifier((await page.textContent('#confirm-message')).includes("2 séries n'ont pas été vérifiées"), 'avertissement avant de terminer');
+  await page.click('#confirm-ok');
+  egal(await page.$$('.bandeau-inventaire').then(b => b.length), 0, 'bandeau retiré');
+  egal(await page.evaluate(() => { ouvrirModalSerie(0); return document.getElementById('fiche-inventaire').style.display; }), 'none', 'barre d\u2019inventaire masquée hors inventaire');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Recherche par ISBN (BnF) puis ajout du tome', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
     worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Berserk. 1 (Éd. prestige)', auteurs: ['Kentarō Miura'], editeur: 'Glénat (Grenoble)', date: '2025' } } : null

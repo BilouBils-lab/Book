@@ -106,6 +106,8 @@ function rendreVues() {
     });
   }
 
+  rendreInventaire();
+
   if (serieIndexActive !== null && bibliotheque[serieIndexActive]) {
     remplirModalSerie(serieIndexActive);
   }
