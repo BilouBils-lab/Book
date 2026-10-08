@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="Mangas">
   <link rel="apple-touch-icon" href="https://img.icons8.com/color/180/manga.png">
 
-  <link rel="stylesheet" href="css/style.css?v=3.31">
+  <link rel="stylesheet" href="css/style.css?v=3.32">
 </head>
 <body>
 
@@ -57,7 +57,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.31</div>
+  <div class="version-tag">v3.32</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -70,6 +70,7 @@
         <button class="btn btn-secondary" onclick="majTomesParusCollection()">🔄 Mettre à jour mes séries</button>
         <button class="btn btn-secondary" onclick="rechercherIsbn()">🔎 Rechercher par ISBN</button>
         <button class="btn btn-secondary" onclick="configurerCleBooks()">📚 Clé Google Books (optionnelle)</button>
+        <button class="btn btn-secondary" onclick="ouvrirInventaire()">📋 Faire l'inventaire</button>
         <div class="settings-titre">Sauvegarde</div>
         <div id="etat-sauvegarde" class="etat-sauvegarde"></div>
         <button class="btn btn-secondary" onclick="configurerCodeCloud()">🔑 Code de sauvegarde cloud</button>
@@ -84,6 +85,19 @@
       <input type="file" id="file-input" style="display: none;" accept=".json" onchange="importerSauvegarde(event)">
       <input type="file" id="csv-input" style="display: none;" accept=".csv" onchange="importerCSV(event)">
       <input type="file" id="cover-file-input" style="display: none;" accept="image/*" onchange="chargerJaquetteFichier(event)">
+    </div>
+  </div>
+
+  <!-- Inventaire : liste des séries à vérifier (sous la fiche, qui s'ouvre par-dessus) -->
+  <div id="inventaire-modal" class="modal-overlay">
+    <div class="modal-content inventaire">
+      <button class="close-modal" onclick="fermerInventaire()">×</button>
+      <h2 style="font-size: 18px; margin-bottom: 6px;">📋 Inventaire</h2>
+      <div class="inventaire-intro">Ouvre chaque série et compare avec ton étagère : touche un tome pour le corriger, scanne un tome pour vérifier son édition, puis valide.</div>
+      <div id="inventaire-compteur" class="inventaire-compteur"></div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="inventaire-barre" style="width: 0%;"></div></div>
+      <div id="inventaire-liste" class="inventaire-liste"></div>
+      <button class="btn btn-secondary" style="margin-top: 14px;" onclick="terminerInventaire()">Terminer l'inventaire</button>
     </div>
   </div>
 
@@ -119,6 +133,15 @@
       <div id="modal-volumes-grid" class="volumes-grid"></div>
 
       <button class="btn btn-secondary fiche-ajouter" onclick="ajouterNouveauTomeModal()">+ Ajouter un tome</button>
+
+      <!-- Pendant un inventaire -->
+      <div id="fiche-inventaire" class="fiche-inventaire" style="display: none;">
+        <div id="fiche-inventaire-tomes" class="fiche-inventaire-tomes"></div>
+        <div class="fiche-inventaire-boutons">
+          <button class="btn btn-secondary" onclick="verifierTomeParScan()">📷 Scanner un tome</button>
+          <button class="btn" id="fiche-inventaire-valider" onclick="validerSerieInventaire()"></button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -268,15 +291,16 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.31"></script>
-  <script src="js/recherche-infos.js?v=3.31"></script>
-  <script src="js/isbn-scanner.js?v=3.31"></script>
-  <script src="js/mise-a-jour.js?v=3.31"></script>
-  <script src="js/stockage.js?v=3.31"></script>
-  <script src="js/jaquettes.js?v=3.31"></script>
-  <script src="js/import-export.js?v=3.31"></script>
-  <script src="js/vues.js?v=3.31"></script>
-  <script src="js/fiche.js?v=3.31"></script>
-  <script src="js/demarrage.js?v=3.31"></script>
+  <script src="js/outils.js?v=3.32"></script>
+  <script src="js/recherche-infos.js?v=3.32"></script>
+  <script src="js/isbn-scanner.js?v=3.32"></script>
+  <script src="js/mise-a-jour.js?v=3.32"></script>
+  <script src="js/stockage.js?v=3.32"></script>
+  <script src="js/jaquettes.js?v=3.32"></script>
+  <script src="js/import-export.js?v=3.32"></script>
+  <script src="js/vues.js?v=3.32"></script>
+  <script src="js/fiche.js?v=3.32"></script>
+  <script src="js/inventaire.js?v=3.32"></script>
+  <script src="js/demarrage.js?v=3.32"></script>
 </body>
 </html>

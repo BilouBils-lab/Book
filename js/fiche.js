@@ -47,6 +47,7 @@ function remplirModalSerie(index) {
   const statut = serie.statut || 'En cours';
   pastilles.appendChild(creerPastille(statut, 'statut ' + (CLASSES_STATUT[statut] || '')));
   (serie.genre || '').split(/\s*,\s*/).filter(Boolean).slice(0, 3).forEach(g => pastilles.appendChild(creerPastille(g)));
+  remplirBarreInventaire(serie);
 
   // Vérification discrète à la BnF si l'info manque ou date de plus d'une semaine
   if (serie.tomesParusSource !== 'Manga Insight' && (!serie.tomesParusMaj || Date.now() - serie.tomesParusMaj > DELAI_MAJ_TOMES_PARUS)) {

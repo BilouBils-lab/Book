@@ -91,7 +91,8 @@ async function chercherLivreParIsbn(isbn) {
   return { trouve: false, erreurs };
 }
 
-async function rechercherIsbn() {
+// sIndex : série à vérifier (inventaire), sinon recherche normale
+async function rechercherIsbn(sIndex) {
   const saisie = await demanderTexte("ISBN (les 13 chiffres sous le code-barres) :", '');
   if (saisie === null) return;
   const isbn = nettoyerIsbn(saisie);
@@ -100,7 +101,8 @@ async function rechercherIsbn() {
     return;
   }
   fermerParametres();
-  await afficherLivreIsbn(isbn);
+  if (sIndex != null) await verifierTomeScanne(isbn, sIndex);
+  else await afficherLivreIsbn(isbn);
 }
 
 // Cherche le livre puis affiche sa fiche ; propose le scan de jaquette s'il est introuvable
@@ -221,6 +223,7 @@ function arreterCamera() {
 
 function fermerScanner() {
   scanTermine = true;
+  serieAVerifier = null;
   arreterCamera();
   document.getElementById('scanner-modal').classList.remove('active');
 }
@@ -234,8 +237,10 @@ async function codeBarresLu(texte) {
     return;
   }
   if (navigator.vibrate) navigator.vibrate(80);
+  const sIndex = serieAVerifier;
   fermerScanner();
-  await afficherLivreIsbn(isbn);
+  if (sIndex !== null) await verifierTomeScanne(isbn, sIndex);
+  else await afficherLivreIsbn(isbn);
 }
 
 function scannerDepuisPhoto() {
@@ -262,8 +267,9 @@ async function decoderPhotoCodeBarres(event) {
 }
 
 function scannerSaisieManuelle() {
+  const sIndex = serieAVerifier;
   fermerScanner();
-  rechercherIsbn();
+  rechercherIsbn(sIndex);
 }
 
 function scannerJaquetteIA() {

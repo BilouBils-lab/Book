@@ -693,3 +693,23 @@ main {
 .version-item { text-align: left; padding: 10px 12px; border-radius: 10px; background: var(--card-bg); border: 1px solid var(--card-border); color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
 .version-item small { display: block; color: var(--text-sub); font-size: 12px; margin-top: 2px; }
 .version-item.actuelle { border-color: var(--accent, #6366f1); }
+
+/* Inventaire */
+.modal-content.inventaire { max-width: 420px; max-height: 90vh; overflow-y: auto; }
+.inventaire-intro { font-size: 12px; color: var(--text-sub); line-height: 1.4; margin-bottom: 12px; }
+.inventaire-compteur { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.inventaire-liste { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.inventaire-ligne { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px; border-radius: 10px; background: var(--card-bg); border: 1px solid var(--card-border); color: inherit; font: inherit; cursor: pointer; }
+.inventaire-ligne img { width: 34px; height: 48px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+.inventaire-ligne > div { flex: 1; min-width: 0; }
+.inventaire-titre { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inventaire-detail { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+.inventaire-marque { font-size: 18px; color: var(--text-sub); }
+.inventaire-ligne.verifiee { opacity: 0.6; }
+.inventaire-ligne.verifiee .inventaire-marque { color: #22c55e; }
+.inventaire-bravo { font-size: 14px; padding: 12px; border-radius: 10px; background: var(--card-bg); text-align: center; line-height: 1.4; }
+.bandeau-inventaire { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px 14px; margin-bottom: 12px; border-radius: 12px; border: 1px solid var(--accent); background: var(--card-bg); color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.bandeau-inventaire span:last-child { color: var(--accent); font-weight: 600; }
+.fiche-inventaire { margin-top: 14px; padding: 12px; border-radius: 12px; border: 1px solid var(--accent); }
+.fiche-inventaire-tomes { font-size: 13px; color: var(--text-sub); margin-bottom: 10px; line-height: 1.4; }
+.fiche-inventaire-boutons { display: flex; flex-direction: column; gap: 8px; }
