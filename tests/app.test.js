@@ -492,6 +492,53 @@ test('Mauvaise édition : corriger la série ou en créer une à part', async ({
   await fermer();
 });
 
+test('Édition, tomes et jaquette d\u2019une série (Slam Dunk Star Edition)', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  const imagesDemandees = [];
+  await page.route('https://covers.openlibrary.org/**', route => { imagesDemandees.push(route.request().url()); route.fulfill({ path: path.join(DONNEES, 'codebarre-berserk-prestige-1.png'), contentType: 'image/png' }); });
+  // Amazon renvoie une image de 1 pixel quand il n'a pas la couverture : elle doit être masquée
+  await page.route('https://images-na.ssl-images-amazon.com/**', route => route.fulfill({ contentType: 'image/gif', body: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64') }));
+  await avecMangaInsight(page, [{ titre: 'Slam Dunk', editeur: 'Kana', tomes: tomes(20, 5) }]);
+  const etat = () => page.evaluate(() => { const s = bibliotheque[0]; return [s.titre, s.tomesParus, s.tomesParusSource, s.parution ? s.parution.nom : null, s.tomes[0].isbn || null]; });
+  egal(await etat(), ['Slam Dunk', 31, 'Manga Insight', 'Slam dunk', '9782871292296'], 'au départ : édition standard');
+
+  await page.evaluate(() => ouvrirModalSerie(0));
+  await page.click('button[aria-label="Plus d\'actions"]');
+  await page.click('text=🔄 Édition, tomes et jaquette');
+  await page.waitForSelector('#choix-modal.active');
+  egal(await page.$$eval('#choix-boutons button', b => b.map(x => x.textContent)), [
+    '✓ Édition standard · 31 tomes · Kana · 1999–2004', 'Édition Star · 20 tomes · Kana · 2019–2021', 'Édition Deluxe · 16 tomes · Kana · 2024–2026',
+    '✍️ Saisir le nombre de tomes à la main', 'Annuler'
+  ], 'éditions proposées');
+  await page.click('#choix-boutons button >> text=Édition Star');
+  await page.waitForSelector('#jaquettes-modal.active');
+  egal(await etat(), ['Slam Dunk (Star)', 20, 'Manga Insight', 'Slam dunk - Star Edition', '9782505076506'], 'édition Star : titre, tomes, sorties et ISBN');
+  egal(await page.textContent('#modal-title'), 'Slam Dunk (Star)', 'fiche mise à jour');
+
+  // Jaquettes : seules les vraies images sont proposées
+  await page.waitForFunction(() => document.getElementById('jaquettes-statut').textContent.startsWith('Touche'));
+  egal(await page.$$eval('.jaquette-choix', imgs => imgs.filter(i => i.style.display !== 'none').length), 2, 'deux jaquettes (tome 1 et dernier tome), image vide masquée');
+  await page.click('.jaquette-choix:visible >> nth=0');
+  egal(await page.evaluate(() => bibliotheque[0].couverture), 'https://covers.openlibrary.org/b/isbn/9782505076506-L.jpg?default=false', 'jaquette du tome 1 de l\u2019édition Star');
+
+  // L'édition choisie tient après une nouvelle mise à jour automatique
+  await page.evaluate(async () => { await majMangaInsightAuDemarrage(); });
+  egal((await etat()).slice(1, 4), [20, 'Manga Insight', 'Slam dunk - Star Edition'], 'édition gardée après mise à jour');
+
+  // Nombre de tomes saisi à la main : plus modifié automatiquement
+  await page.click('button[aria-label="Plus d\'actions"]');
+  await page.click('text=🔄 Édition, tomes et jaquette');
+  await page.click('#choix-boutons button >> text=Saisir le nombre');
+  await page.fill('#form-text-input', '25');
+  await page.click('#form-text-ok');
+  await page.waitForSelector('#jaquettes-modal.active');
+  await page.click('#jaquettes-garder');
+  await page.evaluate(async () => { await majMangaInsightAuDemarrage(); });
+  egal((await etat()).slice(1, 4), [25, 'manuel', null], 'nombre de tomes manuel conservé');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Recherche par ISBN (BnF) puis ajout du tome', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
     worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Berserk. 1 (Éd. prestige)', auteurs: ['Kentarō Miura'], editeur: 'Glénat (Grenoble)', date: '2025' } } : null

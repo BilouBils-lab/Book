@@ -50,7 +50,7 @@ function remplirModalSerie(index) {
   remplirBarreInventaire(serie);
 
   // Vérification discrète à la BnF si l'info manque ou date de plus d'une semaine
-  if (serie.tomesParusSource !== 'Manga Insight' && (!serie.tomesParusMaj || Date.now() - serie.tomesParusMaj > DELAI_MAJ_TOMES_PARUS)) {
+  if (serie.tomesParusSource !== 'Manga Insight' && serie.tomesParusSource !== 'manuel' && (!serie.tomesParusMaj || Date.now() - serie.tomesParusMaj > DELAI_MAJ_TOMES_PARUS)) {
     const avant = serie.tomesParus;
     majTomesParus(serie).then((correction) => {
       sauvegarderLocal();
@@ -327,7 +327,7 @@ function changerTitreSerie(index, nouveau) {
   // Édition spéciale : le nombre de tomes trouvé automatiquement est celui de l'édition standard
   if (titreRecherche(nouveau) !== nouveau) delete cible.tomesTotal;
   if (editionDuTitre(nouveau) !== ancienneEdition) {
-    for (const champ of ['tomesTotal', 'tomesParus', 'tomesParusSource', 'tomesParusMaj', 'tomesParusDiagnostic', 'parution']) delete cible[champ];
+    for (const champ of ['tomesTotal', 'tomesParus', 'tomesParusSource', 'tomesParusMaj', 'tomesParusDiagnostic', 'parution', 'miNom', 'miEditeur']) delete cible[champ];
   }
   return bibliotheque.indexOf(cible);
 }

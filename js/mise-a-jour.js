@@ -210,7 +210,13 @@ function infosMangaInsight(serie) {
   const cible = normaliserRecherche(base);
   const editionN = edition ? normaliserRecherche(edition) : null;
   const groupes = new Map();
-  for (const cle of new Set([cible, normaliserRecherche(base.split(' - ')[0])])) {
+  // Édition choisie avec « Mettre à jour cette série » : on prend exactement celle-là
+  if (serie.miNom) {
+    const choisie = (indexMI.get(normaliserRecherche(serie.miNom.split(' - ')[0])) || [])
+      .filter(s => s.nom === serie.miNom && (!serie.miEditeur || s.editeur === serie.miEditeur));
+    if (choisie.length) groupes.set('choisie', choisie);
+  }
+  for (const cle of serie.miNom && groupes.size ? [] : new Set([cible, normaliserRecherche(base.split(' - ')[0])])) {
     for (const s of indexMI.get(cle) || []) {
       const nomN = normaliserRecherche(s.nom);
       const baseOk = normaliserRecherche(s.base) === cible || nomN.startsWith(cible);
@@ -259,6 +265,7 @@ function infosMangaInsight(serie) {
 
 // Met à jour une série avec Manga Insight. Renvoie true si quelque chose a changé.
 function appliquerMangaInsight(serie) {
+  if (serie.tomesParusSource === 'manuel') return false; // nombre de tomes saisi à la main : on n'y touche pas
   const mi = infosMangaInsight(serie);
   if (!mi) return false;
   const avant = JSON.stringify([serie.tomesParus, serie.editeur, serie.parution, serie.tomes]);
@@ -308,8 +315,10 @@ async function majTomesParusCollection() {
 
   const viaMI = [];
   const restantes = [];
+  let manuelles = 0;
   for (const serie of bibliotheque) {
-    if (miOk && infosMangaInsight(serie)) { appliquerMangaInsight(serie); viaMI.push(serie); }
+    if (serie.tomesParusSource === 'manuel') manuelles++;
+    else if (miOk && infosMangaInsight(serie)) { appliquerMangaInsight(serie); viaMI.push(serie); }
     else restantes.push(serie);
   }
   sauvegarderLocal();
@@ -333,6 +342,7 @@ async function majTomesParusCollection() {
     ? `${viaMI.length} série(s) mises à jour avec Manga Insight (données du ${new Date(dateMI).toLocaleDateString('fr-FR')}).`
     : `Manga Insight injoignable : recherche à la BnF uniquement.`;
   if (restantes.length) bilan += `\n${viaBnf} série(s) trouvée(s) à la BnF.`;
+  if (manuelles) bilan += `\n${manuelles} série(s) avec un nombre de tomes saisi à la main (inchangées).`;
   if (corrections.length) bilan += `\n\nÉditeur corrigé d'après la BnF (${corrections.length}) :\n${corrections.join('\n')}`;
   if (introuvables.length) bilan += `\n\nIntrouvables (${introuvables.length}) :\n${introuvables.join('\n')}\n\nVérifie le titre de ces séries : une édition spéciale se note entre parenthèses, ex. « Berserk (Prestige) ».`;
   document.getElementById('completion-bilan').textContent = bilan;

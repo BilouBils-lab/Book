@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.37">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.37">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.38">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.38">
 
-  <link rel="stylesheet" href="css/style.css?v=3.37">
+  <link rel="stylesheet" href="css/style.css?v=3.38">
 </head>
 <body>
 
@@ -59,7 +59,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.37</div>
+  <div class="version-tag">v3.38</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -154,6 +154,7 @@
   <div class="modal-overlay" id="menu-serie-modal">
     <div class="modal-content" style="max-width: 340px;">
       <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button class="btn btn-secondary" onclick="actionMenuSerie(majSerieActuelle)">🔄 Édition, tomes et jaquette</button>
         <button class="btn btn-secondary" onclick="actionMenuSerie(renommerSerieActuelle)">✏️ Renommer la série</button>
         <button class="btn btn-secondary" onclick="actionMenuSerie(ouvrirInfosSerie)">ℹ️ Modifier les infos</button>
         <button class="btn btn-secondary" onclick="actionMenuSerie(ouvrirMenuImage)">🖼️ Changer la jaquette</button>
@@ -216,6 +217,16 @@
     </div>
   </div>
 
+  <!-- Modal : jaquettes trouvées pour une édition -->
+  <div class="modal-overlay" id="jaquettes-modal">
+    <div class="modal-content" style="max-width: 380px;">
+      <h3 style="font-size: 16px; margin-bottom: 8px;">🖼️ Jaquette de ton édition</h3>
+      <div id="jaquettes-statut" style="font-size: 13px; color: var(--text-sub); margin-bottom: 12px; line-height: 1.4;"></div>
+      <div id="jaquettes-grille" class="jaquettes-grille"></div>
+      <button class="btn btn-secondary" id="jaquettes-garder" style="margin-top: 14px;">Garder la jaquette actuelle</button>
+    </div>
+  </div>
+
   <!-- Modal générique : choix entre plusieurs actions -->
   <div class="modal-overlay" id="choix-modal">
     <div class="modal-content" style="max-width: 360px;">
@@ -267,6 +278,7 @@
     <div class="modal-content" style="max-width: 340px;">
       <h3 style="font-size: 16px; margin-bottom: 16px; text-align: center;">Changer la jaquette</h3>
       <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button class="btn btn-secondary" id="cover-choice-isbn">🔎 Chercher la jaquette de mon édition</button>
         <button class="btn btn-secondary" id="cover-choice-file">📁 Depuis mon téléphone</button>
         <button class="btn btn-secondary" id="cover-choice-url">🔗 Coller un lien</button>
         <button class="btn btn-secondary" id="cover-choice-cancel" style="background: transparent;">Annuler</button>
@@ -301,16 +313,17 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.37"></script>
-  <script src="js/recherche-infos.js?v=3.37"></script>
-  <script src="js/isbn-scanner.js?v=3.37"></script>
-  <script src="js/mise-a-jour.js?v=3.37"></script>
-  <script src="js/stockage.js?v=3.37"></script>
-  <script src="js/jaquettes.js?v=3.37"></script>
-  <script src="js/import-export.js?v=3.37"></script>
-  <script src="js/vues.js?v=3.37"></script>
-  <script src="js/fiche.js?v=3.37"></script>
-  <script src="js/inventaire.js?v=3.37"></script>
-  <script src="js/demarrage.js?v=3.37"></script>
+  <script src="js/outils.js?v=3.38"></script>
+  <script src="js/recherche-infos.js?v=3.38"></script>
+  <script src="js/isbn-scanner.js?v=3.38"></script>
+  <script src="js/mise-a-jour.js?v=3.38"></script>
+  <script src="js/stockage.js?v=3.38"></script>
+  <script src="js/jaquettes.js?v=3.38"></script>
+  <script src="js/import-export.js?v=3.38"></script>
+  <script src="js/vues.js?v=3.38"></script>
+  <script src="js/fiche.js?v=3.38"></script>
+  <script src="js/maj-serie.js?v=3.38"></script>
+  <script src="js/inventaire.js?v=3.38"></script>
+  <script src="js/demarrage.js?v=3.38"></script>
 </body>
 </html>
