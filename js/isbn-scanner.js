@@ -50,8 +50,14 @@ function editionDuTitre(titre) {
   return (EDITIONS.find(([, motif]) => motif.test(p.toLowerCase())) || [])[0] || null;
 }
 
+// Clé de comparaison d'un titre : sans accents, ponctuation ni espaces
+// (la BnF écrit « Dragonball » ce que l'on note souvent « Dragon Ball »)
+function cleTitre(titre) {
+  return normaliserRecherche(titre).replace(/ /g, '');
+}
+
 function titreSansEdition(titre) {
-  return normaliserRecherche(titre.replace(/\s*\([^)]*\)\s*$/, ''));
+  return cleTitre(titre.replace(/\s*\([^)]*\)\s*$/, ''));
 }
 
 // Titre complet d'un livre analysé : « Dragon Ball (Perfect) », ou « Dragon Ball » en édition standard
@@ -169,7 +175,7 @@ async function afficherLivreIsbn(isbn) {
     let titrePropose = titreAvecEdition(analyse);
     // La même série existe dans une autre édition : corriger la série, ou en créer une à part ?
     const exacte = bibliotheque.some(s => normaliserTitre(s.titre) === normaliserTitre(titrePropose));
-    const autreIndex = exacte ? -1 : bibliotheque.findIndex(s => titreSansEdition(s.titre) === normaliserRecherche(analyse.serie) && editionDuTitre(s.titre) !== analyse.edition);
+    const autreIndex = exacte ? -1 : bibliotheque.findIndex(s => titreSansEdition(s.titre) === cleTitre(analyse.serie) && editionDuTitre(s.titre) !== analyse.edition);
     if (autreIndex !== -1) {
       const autre = bibliotheque[autreIndex];
       const action = await choisirAction(`Ta collection contient « ${autre.titre} » (édition ${editionDuTitre(autre.titre) || 'standard'}), mais ce livre est l'édition ${analyse.edition || 'standard'}.\n\n✏️ Corriger : toute la série devient « ${titrePropose} », tes tomes et tes lectures sont gardés.`, [

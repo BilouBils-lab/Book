@@ -116,7 +116,9 @@ async function analyserImageJaquette(event) {
 
 async function ouvrirMenuImage() {
   const choix = await demanderChoixJaquette();
-  if (choix === 'fichier') {
+  if (choix === 'isbn') {
+    await chercherJaquetteEdition();
+  } else if (choix === 'fichier') {
     document.getElementById('cover-file-input').click();
   } else if (choix === 'url') {
     const url = await demanderTexte("Lien de l'image :");

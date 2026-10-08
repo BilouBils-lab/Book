@@ -715,3 +715,8 @@ main {
 .fiche-inventaire { margin-top: 14px; padding: 12px; border-radius: 12px; border: 1px solid var(--accent); }
 .fiche-inventaire-tomes { font-size: 13px; color: var(--text-sub); margin-bottom: 10px; line-height: 1.4; }
 .fiche-inventaire-boutons { display: flex; flex-direction: column; gap: 8px; }
+
+/* Jaquettes trouvées pour une édition */
+.jaquettes-grille { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.jaquette-choix { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; border: 2px solid var(--card-border); cursor: pointer; background: var(--card-bg); }
+.jaquette-choix:active { border-color: var(--accent); }

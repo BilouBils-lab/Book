@@ -429,8 +429,9 @@ test('Code de sauvegarde : réinstallation sans perdre la sauvegarde en ligne', 
 });
 
 test('Mauvaise édition : corriger la série ou en créer une à part', async ({ navigateur, base }) => {
+  let livreBnf = 'Dragon Ball. 1 (Perfect edition)';
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
-    worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Dragon Ball. 1 (Perfect edition)', auteurs: [], editeur: 'Glénat' } } : null
+    worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: livreBnf, auteurs: [], editeur: 'Glénat' } } : null
   });
   const dragonBall = () => [{ titre: 'Dragon Ball', auteur: 'Akira Toriyama', tomesParus: 42, tomesParusSource: 'Manga Insight', parution: { nom: 'Dragon ball', dernier: { vol: 42, k: 24000 } }, tomes: tomes(3, 1) }];
   const etat = () => page.evaluate(() => bibliotheque.map(s => [s.titre, s.tomes.map(t => t.numero + (t.lu ? 'L' : '') + (t.isbn ? '#' : '')).join(' '), s.tomesParus ?? null, !!s.parution]));
@@ -457,6 +458,24 @@ test('Mauvaise édition : corriger la série ou en créer une à part', async ({
   egal(await etat(), [['Dragon Ball', '1L 2 3', 42, true], ['Dragon Ball (Perfect)', '1#', null, false]], 'nouvelle série créée à part');
   egal(await page.evaluate(() => bibliotheque[1].auteur), 'Akira Toriyama', 'auteur repris');
 
+  // « Dragonball » (BnF) et « Dragon ball » (saisi à la main) : même série, même édition → reconnu directement
+  await page.evaluate(() => fermerModal());
+  livreBnf = 'Dragonball. 01';
+  await definirBibliotheque(page, [{ titre: 'Dragon ball', tomes: tomes(1) }]);
+  await page.evaluate(() => { ouvrirModalSerie(0); verifierTomeScanne('9782344067802', 0); });
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes("c'est le bon"));
+  egal(await page.evaluate(() => [bibliotheque.length, bibliotheque[0].tomes[0].isbn]), [1, '9782344067802'], 'tome reconnu malgré l\u2019espace');
+
+  // Titre vraiment différent : on peut renommer la série
+  await page.evaluate(() => fermerModal());
+  livreBnf = 'Dr. Slump. 1';
+  await definirBibliotheque(page, [{ titre: 'Dragon ball', tomes: tomes(1) }]);
+  await page.evaluate(() => { ouvrirModalSerie(0); verifierTomeScanne('9782344067802', 0); });
+  await page.waitForSelector('#choix-modal.active');
+  egal(await boutons(), ['✏️ Renommer la série en « Dr. Slump »', '➕ Créer la série « Dr. Slump » à part', 'Ajouter quand même à « Dragon ball »', 'Annuler'], 'renommage proposé si le titre diffère');
+  await page.click('#choix-boutons button >> text=Annuler');
+  livreBnf = 'Dragon Ball. 1 (Perfect edition)';
+
   // Scan hors inventaire : la série existe dans une autre édition → même choix
   await page.evaluate(() => { fermerModal(); localStorage.removeItem('inventaire_debut'); });
   await definirBibliotheque(page, dragonBall());
@@ -469,6 +488,53 @@ test('Mauvaise édition : corriger la série ou en créer une à part', async ({
   await page.click('#form-serie-ok');
   await page.waitForFunction(() => bibliotheque[0].tomes[0].isbn);
   egal(await etat(), [['Dragon Ball (Perfect)', '1L# 2 3', null, false]], 'série corrigée depuis le scan');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Édition, tomes et jaquette d\u2019une série (Slam Dunk Star Edition)', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  const imagesDemandees = [];
+  await page.route('https://covers.openlibrary.org/**', route => { imagesDemandees.push(route.request().url()); route.fulfill({ path: path.join(DONNEES, 'codebarre-berserk-prestige-1.png'), contentType: 'image/png' }); });
+  // Amazon renvoie une image de 1 pixel quand il n'a pas la couverture : elle doit être masquée
+  await page.route('https://images-na.ssl-images-amazon.com/**', route => route.fulfill({ contentType: 'image/gif', body: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64') }));
+  await avecMangaInsight(page, [{ titre: 'Slam Dunk', editeur: 'Kana', tomes: tomes(20, 5) }]);
+  const etat = () => page.evaluate(() => { const s = bibliotheque[0]; return [s.titre, s.tomesParus, s.tomesParusSource, s.parution ? s.parution.nom : null, s.tomes[0].isbn || null]; });
+  egal(await etat(), ['Slam Dunk', 31, 'Manga Insight', 'Slam dunk', '9782871292296'], 'au départ : édition standard');
+
+  await page.evaluate(() => ouvrirModalSerie(0));
+  await page.click('button[aria-label="Plus d\'actions"]');
+  await page.click('text=🔄 Édition, tomes et jaquette');
+  await page.waitForSelector('#choix-modal.active');
+  egal(await page.$$eval('#choix-boutons button', b => b.map(x => x.textContent)), [
+    '✓ Édition standard · 31 tomes · Kana · 1999–2004', 'Édition Star · 20 tomes · Kana · 2019–2021', 'Édition Deluxe · 16 tomes · Kana · 2024–2026',
+    '✍️ Saisir le nombre de tomes à la main', 'Annuler'
+  ], 'éditions proposées');
+  await page.click('#choix-boutons button >> text=Édition Star');
+  await page.waitForSelector('#jaquettes-modal.active');
+  egal(await etat(), ['Slam Dunk (Star)', 20, 'Manga Insight', 'Slam dunk - Star Edition', '9782505076506'], 'édition Star : titre, tomes, sorties et ISBN');
+  egal(await page.textContent('#modal-title'), 'Slam Dunk (Star)', 'fiche mise à jour');
+
+  // Jaquettes : seules les vraies images sont proposées
+  await page.waitForFunction(() => document.getElementById('jaquettes-statut').textContent.startsWith('Touche'));
+  egal(await page.$$eval('.jaquette-choix', imgs => imgs.filter(i => i.style.display !== 'none').length), 2, 'deux jaquettes (tome 1 et dernier tome), image vide masquée');
+  await page.click('.jaquette-choix:visible >> nth=0');
+  egal(await page.evaluate(() => bibliotheque[0].couverture), 'https://covers.openlibrary.org/b/isbn/9782505076506-L.jpg?default=false', 'jaquette du tome 1 de l\u2019édition Star');
+
+  // L'édition choisie tient après une nouvelle mise à jour automatique
+  await page.evaluate(async () => { await majMangaInsightAuDemarrage(); });
+  egal((await etat()).slice(1, 4), [20, 'Manga Insight', 'Slam dunk - Star Edition'], 'édition gardée après mise à jour');
+
+  // Nombre de tomes saisi à la main : plus modifié automatiquement
+  await page.click('button[aria-label="Plus d\'actions"]');
+  await page.click('text=🔄 Édition, tomes et jaquette');
+  await page.click('#choix-boutons button >> text=Saisir le nombre');
+  await page.fill('#form-text-input', '25');
+  await page.click('#form-text-ok');
+  await page.waitForSelector('#jaquettes-modal.active');
+  await page.click('#jaquettes-garder');
+  await page.evaluate(async () => { await majMangaInsightAuDemarrage(); });
+  egal((await etat()).slice(1, 4), [25, 'manuel', null], 'nombre de tomes manuel conservé');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });

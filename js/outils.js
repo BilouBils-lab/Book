@@ -126,21 +126,25 @@ function demanderChoixJaquette() {
     const modal = document.getElementById('cover-choice-modal');
     modal.classList.add('active');
 
+    const btnIsbn = document.getElementById('cover-choice-isbn');
     const btnFile = document.getElementById('cover-choice-file');
     const btnUrl = document.getElementById('cover-choice-url');
     const btnCancel = document.getElementById('cover-choice-cancel');
 
     function nettoyer(resultat) {
       modal.classList.remove('active');
+      btnIsbn.removeEventListener('click', onIsbn);
       btnFile.removeEventListener('click', onFile);
       btnUrl.removeEventListener('click', onUrl);
       btnCancel.removeEventListener('click', onCancel);
       resolve(resultat);
     }
+    function onIsbn() { nettoyer('isbn'); }
     function onFile() { nettoyer('fichier'); }
     function onUrl() { nettoyer('url'); }
     function onCancel() { nettoyer(null); }
 
+    btnIsbn.addEventListener('click', onIsbn);
     btnFile.addEventListener('click', onFile);
     btnUrl.addEventListener('click', onUrl);
     btnCancel.addEventListener('click', onCancel);
