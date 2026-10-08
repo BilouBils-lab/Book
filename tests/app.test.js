@@ -429,8 +429,9 @@ test('Code de sauvegarde : réinstallation sans perdre la sauvegarde en ligne', 
 });
 
 test('Mauvaise édition : corriger la série ou en créer une à part', async ({ navigateur, base }) => {
+  let livreBnf = 'Dragon Ball. 1 (Perfect edition)';
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
-    worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Dragon Ball. 1 (Perfect edition)', auteurs: [], editeur: 'Glénat' } } : null
+    worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: livreBnf, auteurs: [], editeur: 'Glénat' } } : null
   });
   const dragonBall = () => [{ titre: 'Dragon Ball', auteur: 'Akira Toriyama', tomesParus: 42, tomesParusSource: 'Manga Insight', parution: { nom: 'Dragon ball', dernier: { vol: 42, k: 24000 } }, tomes: tomes(3, 1) }];
   const etat = () => page.evaluate(() => bibliotheque.map(s => [s.titre, s.tomes.map(t => t.numero + (t.lu ? 'L' : '') + (t.isbn ? '#' : '')).join(' '), s.tomesParus ?? null, !!s.parution]));
@@ -456,6 +457,24 @@ test('Mauvaise édition : corriger la série ou en créer une à part', async ({
   await page.waitForFunction(() => bibliotheque.length === 2);
   egal(await etat(), [['Dragon Ball', '1L 2 3', 42, true], ['Dragon Ball (Perfect)', '1#', null, false]], 'nouvelle série créée à part');
   egal(await page.evaluate(() => bibliotheque[1].auteur), 'Akira Toriyama', 'auteur repris');
+
+  // « Dragonball » (BnF) et « Dragon ball » (saisi à la main) : même série, même édition → reconnu directement
+  await page.evaluate(() => fermerModal());
+  livreBnf = 'Dragonball. 01';
+  await definirBibliotheque(page, [{ titre: 'Dragon ball', tomes: tomes(1) }]);
+  await page.evaluate(() => { ouvrirModalSerie(0); verifierTomeScanne('9782344067802', 0); });
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes("c'est le bon"));
+  egal(await page.evaluate(() => [bibliotheque.length, bibliotheque[0].tomes[0].isbn]), [1, '9782344067802'], 'tome reconnu malgré l\u2019espace');
+
+  // Titre vraiment différent : on peut renommer la série
+  await page.evaluate(() => fermerModal());
+  livreBnf = 'Dr. Slump. 1';
+  await definirBibliotheque(page, [{ titre: 'Dragon ball', tomes: tomes(1) }]);
+  await page.evaluate(() => { ouvrirModalSerie(0); verifierTomeScanne('9782344067802', 0); });
+  await page.waitForSelector('#choix-modal.active');
+  egal(await boutons(), ['✏️ Renommer la série en « Dr. Slump »', '➕ Créer la série « Dr. Slump » à part', 'Ajouter quand même à « Dragon ball »', 'Annuler'], 'renommage proposé si le titre diffère');
+  await page.click('#choix-boutons button >> text=Annuler');
+  livreBnf = 'Dragon Ball. 1 (Perfect edition)';
 
   // Scan hors inventaire : la série existe dans une autre édition → même choix
   await page.evaluate(() => { fermerModal(); localStorage.removeItem('inventaire_debut'); });

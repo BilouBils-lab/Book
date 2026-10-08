@@ -190,7 +190,7 @@ async function verifierTomeScanne(isbn, sIndex) {
 
   const attendue = editionDuTitre(serie.titre);
   const memeSerie = (() => {
-    const a = titreSansEdition(serie.titre), b = normaliserRecherche(analyse.serie);
+    const a = titreSansEdition(serie.titre), b = cleTitre(analyse.serie);
     return !!a && !!b && (a.includes(b) || b.includes(a));
   })();
   const problemes = [];
@@ -205,14 +205,12 @@ async function verifierTomeScanne(isbn, sIndex) {
   const autre = bibliotheque.find((s, i) => i !== sIndex && normaliserTitre(s.titre) === normaliserTitre(titreLivre));
   if (problemes.length) {
     const choix = [];
-    if (memeSerie) {
-      choix.push({ libelle: `✏️ Corriger la série en « ${titreLivre} »` + (autre ? ' (fusion)' : ''), valeur: 'corriger', principal: true });
-    }
+    // Même série dans une autre édition : on propose d'abord de la corriger.
+    // Titre différent : on peut aussi la renommer, si c'est le nom de la série qui était mal saisi.
+    choix.push({ libelle: (memeSerie ? '✏️ Corriger la série en « ' : '✏️ Renommer la série en « ') + titreLivre + ' »' + (autre ? ' (fusion)' : ''), valeur: 'corriger', principal: memeSerie });
     choix.push({ libelle: autre ? `➕ Ranger ce tome dans « ${autre.titre} »` : `➕ Créer la série « ${titreLivre} » à part`, valeur: 'autre' });
     choix.push({ libelle: `Ajouter quand même à « ${serie.titre} »`, valeur: 'ici' });
-    const explication = memeSerie
-      ? `\n\n✏️ Corriger : toute la série devient « ${titreLivre} », tes tomes et tes lectures sont gardés.\n➕ À part : la série actuelle ne change pas (tu pourras la supprimer avec ⋯).`
-      : '';
+    const explication = `\n\n✏️ ${memeSerie ? 'Corriger' : 'Renommer'} : toute la série devient « ${titreLivre} », tes tomes et tes lectures sont gardés.\n➕ À part : la série actuelle ne change pas (tu pourras la supprimer avec ⋯).`;
     action = await choisirAction(`⚠️ Livre scanné : ${nomLivre}\n\nAttention : ${problemes.join(' ; ')}.${explication}`, choix);
     if (!action) return;
   }
