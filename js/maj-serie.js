@@ -1,6 +1,6 @@
 // Mettre à jour une série : choisir son édition (Manga Insight), le nombre de tomes, puis sa jaquette
 
-const HORS_SERIE_MI = /illustration|artbook|art ?book|guide|fanbook|roman|novel|coffret|anime ?comics|re:source/i;
+const HORS_SERIE_MI = /illustration|artbook|art ?book|guide|fanbook|roman|novel|coffret|anime ?comics|re:source|sketchbook|quiz|dictionnaire/i;
 
 // Éditions françaises connues pour la série (même titre de base), de la plus ancienne à la plus récente
 function editionsMangaInsight(serie) {
@@ -21,7 +21,7 @@ function editionsMangaInsight(serie) {
     ...g,
     tomes: Math.max(...g.vols),
     // Nom court de l'édition pour le titre : « Star Edition » → « Star », « Edition Deluxe » → « Deluxe »
-    edition: g.suffixe ? ((EDITIONS.find(([, motif]) => motif.test(g.suffixe.toLowerCase())) || [])[0] || g.suffixe) : null
+    edition: editionDepuisSuffixe(g.suffixe)
   })).sort((a, b) => a.debut - b.debut);
 }
 
@@ -40,9 +40,16 @@ async function majSerieActuelle() {
 
   let index = serieIndexActive;
   const serie = bibliotheque[index];
-  const editions = editionsMangaInsight(serie);
+  const isbnsSerie = new Set(serie.tomes.filter(t => t.isbn && !t.isbnAuto).map(t => t.isbn));
+  // Les éditions des tomes scannés d'abord : c'est sûrement la bonne
+  const editions = editionsMangaInsight(serie)
+    .map(e => ({ ...e, scannee: [...e.isbns].some(i => isbnsSerie.has(i)) }))
+    .sort((a, b) => b.scannee - a.scannee);
   const actuelle = serie.parution && serie.parution.nom;
-  const choix = editions.map((e, i) => ({ libelle: (e.nom === actuelle ? '✓ ' : '') + texteEdition(e), valeur: 'edition:' + i, principal: e.nom === actuelle }));
+  const choix = editions.map((e, i) => ({
+    libelle: (e.nom === actuelle ? '✓ ' : '') + texteEdition(e) + (e.scannee ? ' · 📷 tes tomes scannés' : ''),
+    valeur: 'edition:' + i, principal: e.scannee || (e.nom === actuelle && !editions.some(x => x.scannee))
+  }));
   choix.push({ libelle: '✍️ Saisir le nombre de tomes à la main', valeur: 'manuel' });
   const message = editions.length
     ? `Quelle édition de « ${decomposerTitreSerie(serie.titre).base} » possèdes-tu ?\n\nLe nombre de tomes, les sorties et la jaquette suivront cette édition.`
@@ -79,7 +86,7 @@ async function majSerieActuelle() {
     if (cible.tomesParusSource === 'manuel') delete cible.tomesParusSource;
     // ISBN remplis d'après une autre édition : remplacés par ceux de l'édition choisie
     const autresIsbn = new Set(editions.filter(x => x !== e).flatMap(x => [...x.isbns]));
-    for (const t of cible.tomes) if (t.isbn && autresIsbn.has(t.isbn)) delete t.isbn;
+    for (const t of cible.tomes) if (t.isbn && (t.isbnAuto || autresIsbn.has(t.isbn))) { delete t.isbn; delete t.isbnAuto; }
     cible.miNom = e.nom;
     cible.miEditeur = e.editeur;
     appliquerMangaInsight(cible);

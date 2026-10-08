@@ -167,12 +167,36 @@ function compacterMangaInsight(core, rows) {
   return sorties;
 }
 
+let isbnMI = null; // ISBN → sortie Manga Insight
+
+// Nom court d'une édition d'après le suffixe Manga Insight : « Perfect Edition » → « Perfect »
+function editionDepuisSuffixe(suffixe) {
+  if (!suffixe) return null;
+  return (EDITIONS.find(([, motif]) => motif.test(suffixe.toLowerCase())) || [])[0] || suffixe;
+}
+
+// Le livre de cet ISBN dans Manga Insight : série, édition et tome exacts (null si inconnu)
+function livreMangaInsight(isbn) {
+  const s = isbnMI && isbnMI.get(isbn);
+  return s ? { nom: s.nom, serie: s.base, edition: editionDepuisSuffixe(s.suffixe), tome: s.vol, editeur: s.editeur } : null;
+}
+
+// Retient l'édition Manga Insight d'une série (elle ne sera plus devinée d'après le titre)
+function epinglerEditionMI(serie, livre) {
+  if (!livre) return;
+  serie.miNom = livre.nom;
+  serie.miEditeur = livre.editeur;
+  if (serie.tomesParusSource !== 'manuel') appliquerMangaInsight(serie);
+}
+
 function indexerMangaInsight(sorties) {
   const index = new Map();
+  isbnMI = new Map();
   for (const [nom, vol, annee, mois, editeur, ean] of sorties) {
     const morceaux = nom.split(' - ');
     const entree = { nom, base: morceaux[0], suffixe: morceaux.slice(1).join(' - '), vol, k: annee * 12 + mois - 1, editeur, ean };
     const cle = normaliserRecherche(entree.base);
+    if (ean) isbnMI.set(ean, entree);
     if (!index.has(cle)) index.set(cle, []);
     index.get(cle).push(entree);
   }
@@ -274,7 +298,12 @@ function appliquerMangaInsight(serie) {
   serie.tomesParusMaj = Date.now();
   serie.parution = { nom: mi.nom, dernier: mi.dernier, rythme: mi.rythme };
   if (!serie.editeur && mi.editeur) serie.editeur = editeurFrancais(mi.editeur) || mi.editeur;
-  for (const tome of serie.tomes) if (tome.possede && !tome.isbn && mi.isbnParTome[tome.numero]) tome.isbn = mi.isbnParTome[tome.numero];
+  // ISBN déduits de l'édition supposée : marqués « auto » pour ne pas les confondre avec des tomes scannés
+  for (const tome of serie.tomes) {
+    const isbn = mi.isbnParTome[tome.numero];
+    if (tome.possede && !tome.isbn && isbn) { tome.isbn = isbn; tome.isbnAuto = true; }
+    else if (tome.isbn && tome.isbnAuto === undefined && tome.isbn === isbn) tome.isbnAuto = true; // anciennes données
+  }
   return JSON.stringify([serie.tomesParus, serie.editeur, serie.parution, serie.tomes]) !== avant;
 }
 
