@@ -220,6 +220,28 @@
 
     .pal-item { cursor: pointer; }
 
+    .selecteur-vue {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      background: #141418;
+      border-radius: 12px;
+      margin-bottom: 14px;
+    }
+    .selecteur-vue button {
+      flex: 1;
+      padding: 8px 6px;
+      border: none;
+      border-radius: 9px;
+      background: none;
+      color: var(--text-sub);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .selecteur-vue button.actif { background: #2a2a30; color: var(--text-main); }
+
     .achat-item {
       display: flex;
       align-items: center;
@@ -721,7 +743,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.27</div>
+  <div class="version-tag">v3.28</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -2581,6 +2603,7 @@
     }
 
     // --- À venir : prochains tomes estimés, regroupés par mois ---
+    let vueAVenir = 'sorties';
     function rendreAVenir() {
       const container = document.getElementById('view-avenir');
       container.innerHTML = '';
@@ -2597,22 +2620,38 @@
         parMois.get(prochaine.k).push(item);
       });
 
-      // 🛒 Tomes déjà sortis, pas encore achetés : un appui sur un numéro l'ajoute à la collection
+      // Sélecteur : prochaines sorties (par défaut) ou tomes déjà sortis à acheter
       const achats = bibliotheque.map((serie, sIndex) => ({ serie, sIndex, manquants: statsSerie(serie).manquants }))
         .filter(a => a.manquants.length && !a.serie.misDeCote && a.serie.tomesParus)
         .sort((a, b) => a.manquants.length - b.manquants.length || a.serie.titre.localeCompare(b.serie.titre, 'fr', { sensitivity: 'base' }));
-      if (achats.length) {
-        const entete = document.createElement('div');
-        entete.className = 'pal-section';
-        entete.innerHTML = '🛒 À acheter maintenant <small>touche un tome acheté</small>';
-        container.appendChild(entete);
+      const nbTomesAAcheter = achats.reduce((total, a) => total + a.manquants.length, 0);
+      const selecteur = document.createElement('div');
+      selecteur.className = 'selecteur-vue';
+      for (const [cle, libelle] of [['sorties', '📅 Prochaines sorties'], ['achats', `🛒 À acheter${nbTomesAAcheter ? ' (' + nbTomesAAcheter + ')' : ''}`]]) {
+        const bouton = document.createElement('button');
+        bouton.textContent = libelle;
+        bouton.className = vueAVenir === cle ? 'actif' : '';
+        bouton.onclick = () => { vueAVenir = cle; rendreAVenir(); };
+        selecteur.appendChild(bouton);
+      }
+      container.appendChild(selecteur);
+
+      if (vueAVenir === 'achats') {
+        if (!achats.length) {
+          container.insertAdjacentHTML('beforeend', `<div class="empty-state">Rien à acheter : tu as tous les tomes parus de tes séries. 🎉</div>`);
+          return;
+        }
+        const aide = document.createElement('div');
+        aide.className = 'avenir-intro';
+        aide.textContent = 'Tomes déjà sortis que tu n’as pas. En magasin, touche un numéro acheté : il rejoint ta collection.';
+        container.appendChild(aide);
         for (const achat of achats) container.appendChild(carteAchat(achat));
+        return;
       }
 
       const intro = document.createElement('div');
       intro.className = 'avenir-intro';
-      if (achats.length) intro.style.marginTop = '18px';
-      intro.textContent = "Prochaines sorties : estimations d'après le rythme de parution des tomes en France (Manga Insight). Un éditeur peut toujours décaler une sortie.";
+      intro.textContent = "Estimations d'après le rythme de parution des tomes en France (Manga Insight). Un éditeur peut toujours décaler une sortie.";
       container.appendChild(intro);
 
       if (!imminents.length && !parMois.size) {
@@ -2690,7 +2729,7 @@
         <div class="avenir-infos">
           <div class="pal-title"></div>
           <div class="pal-tome">Tome ${prochaine.vol} <span>· environ tous les ${serie.parution.rythme > 1 ? serie.parution.rythme + ' mois' : 'mois'}</span></div>
-          ${manquants.length ? `<div class="avenir-retard">🛒 ${manquants.length} déjà sorti${manquants.length > 1 ? 's' : ''} à acheter</div>` : ''}
+          ${manquants.length ? `<div class="avenir-retard">+ ${manquants.length} déjà sorti${manquants.length > 1 ? 's' : ''} à acheter</div>` : ''}
         </div>
       `;
       carte.querySelector('.pal-title').textContent = serie.titre;
