@@ -220,6 +220,57 @@
 
     .pal-item { cursor: pointer; }
 
+    .achat-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .achat-item .pal-title { cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .achat-tomes { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .achat-tome {
+      min-width: 38px;
+      height: 34px;
+      padding: 0 8px;
+      border-radius: 8px;
+      border: 1.5px dashed #fbbf24;
+      background: rgba(251, 191, 36, 0.08);
+      color: #fbbf24;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .achat-reste { font-size: 12px; color: var(--text-sub); }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(90px, calc(78px + env(safe-area-inset-bottom)));
+      transform: translate(-50%, 20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: calc(100% - 32px);
+      background: #2a2a30;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 13px;
+      z-index: 300;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    }
+    .toast.visible { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+    .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .toast button { background: none; border: none; color: #60a5fa; font-weight: 700; font-size: 13px; cursor: pointer; flex-shrink: 0; }
+
     .avenir-intro { font-size: 12px; color: var(--text-sub); line-height: 1.4; margin: 2px 2px 6px; }
 
     .avenir-item {
@@ -670,7 +721,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.26</div>
+  <div class="version-tag">v3.27</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -733,6 +784,9 @@
     </div>
   </div>
 
+  <!-- Petit message temporaire (ex. tome ajouté, avec « Annuler ») -->
+  <div id="toast" class="toast"><span></span><button>Annuler</button></div>
+
   <!-- Menu « ⋯ » de la fiche : actions rares -->
   <div class="modal-overlay" id="menu-serie-modal">
     <div class="modal-content" style="max-width: 340px;">
@@ -740,6 +794,7 @@
         <button class="btn btn-secondary" onclick="actionMenuSerie(renommerSerieActuelle)">✏️ Renommer la série</button>
         <button class="btn btn-secondary" onclick="actionMenuSerie(ouvrirInfosSerie)">ℹ️ Modifier les infos</button>
         <button class="btn btn-secondary" onclick="actionMenuSerie(ouvrirMenuImage)">🖼️ Changer la jaquette</button>
+        <button class="btn btn-secondary" id="menu-mise-de-cote" onclick="actionMenuSerie(basculerMiseDeCote)">⏸ Mettre de côté</button>
         <button class="btn btn-secondary" style="color: #ef4444;" onclick="actionMenuSerie(supprimerSerieActuelle)">🗑️ Supprimer la série</button>
         <button class="btn btn-secondary" style="background: transparent;" onclick="fermerMenuSerie()">Annuler</button>
       </div>
@@ -1871,7 +1926,7 @@
     // Prochaine sortie estimée d'après le rythme : { vol, k, retard } ou null (série terminée ou en pause)
     function prochaineSortie(serie) {
       const p = serie.parution;
-      if (!p || !p.rythme || serie.statut === 'Terminée' || serie.statut === 'Abandonnée') return null;
+      if (!p || !p.rythme || serie.misDeCote || serie.statut === 'Terminée' || serie.statut === 'Abandonnée') return null;
       const maintenant = new Date().getFullYear() * 12 + new Date().getMonth();
       // Rien depuis bien plus longtemps que d'habitude : on ne devine pas
       if (maintenant - p.dernier.k > Math.max(3 * p.rythme, 12)) return null;
@@ -2470,6 +2525,7 @@
       } else if (triActif === 'completer') {
         // D'abord les séries où il manque le moins de tomes, puis les complètes, puis les inconnues
         const rang = (serie) => {
+          if (serie.misDeCote) return 300000;
           const { manquants } = statsSerie(serie);
           if (manquants.length) return manquants.length;
           return serie.tomesParus ? 100000 : 200000;
@@ -2488,7 +2544,8 @@
           const pctPossedes = total ? Math.round(possedes / total * 100) : 0;
           const pctLus = total ? Math.round(lus / total * 100) : 0;
           let etat;
-          if (manquants.length) etat = `<span class="a-acheter">${manquants.length} à acheter</span>`;
+          if (serie.misDeCote) etat = '⏸ mise de côté';
+          else if (manquants.length) etat = `<span class="a-acheter">${manquants.length} à acheter</span>`;
           else if (serie.tomesParus) {
             const prochaine = prochaineSortie(serie);
             etat = `<span class="complete">${serie.statut === 'Terminée' ? 'Complète' : 'À jour'} ✓</span>` +
@@ -2540,9 +2597,22 @@
         parMois.get(prochaine.k).push(item);
       });
 
+      // 🛒 Tomes déjà sortis, pas encore achetés : un appui sur un numéro l'ajoute à la collection
+      const achats = bibliotheque.map((serie, sIndex) => ({ serie, sIndex, manquants: statsSerie(serie).manquants }))
+        .filter(a => a.manquants.length && !a.serie.misDeCote && a.serie.tomesParus)
+        .sort((a, b) => a.manquants.length - b.manquants.length || a.serie.titre.localeCompare(b.serie.titre, 'fr', { sensitivity: 'base' }));
+      if (achats.length) {
+        const entete = document.createElement('div');
+        entete.className = 'pal-section';
+        entete.innerHTML = '🛒 À acheter maintenant <small>touche un tome acheté</small>';
+        container.appendChild(entete);
+        for (const achat of achats) container.appendChild(carteAchat(achat));
+      }
+
       const intro = document.createElement('div');
       intro.className = 'avenir-intro';
-      intro.textContent = "Estimations d'après le rythme de parution des tomes en France (Manga Insight). Un éditeur peut toujours décaler une sortie.";
+      if (achats.length) intro.style.marginTop = '18px';
+      intro.textContent = "Prochaines sorties : estimations d'après le rythme de parution des tomes en France (Manga Insight). Un éditeur peut toujours décaler une sortie.";
       container.appendChild(intro);
 
       if (!imminents.length && !parMois.size) {
@@ -2580,6 +2650,35 @@
       }
     }
 
+    const TOMES_AFFICHES_ACHAT = 3;
+
+    function carteAchat({ serie, sIndex, manquants }) {
+      const carte = document.createElement('div');
+      carte.className = 'achat-item';
+      const titre = document.createElement('div');
+      titre.className = 'pal-title';
+      titre.textContent = serie.titre;
+      titre.onclick = () => ouvrirModalSerie(sIndex);
+      const tomes = document.createElement('div');
+      tomes.className = 'achat-tomes';
+      for (const n of manquants.slice(0, TOMES_AFFICHES_ACHAT)) {
+        const pastille = document.createElement('button');
+        pastille.className = 'achat-tome';
+        pastille.textContent = n;
+        pastille.setAttribute('aria-label', `Tome ${n} acheté`);
+        pastille.onclick = () => marquerPossede(sIndex, n);
+        tomes.appendChild(pastille);
+      }
+      if (manquants.length > TOMES_AFFICHES_ACHAT) {
+        const reste = document.createElement('span');
+        reste.className = 'achat-reste';
+        reste.textContent = `+${manquants.length - TOMES_AFFICHES_ACHAT}`;
+        tomes.appendChild(reste);
+      }
+      carte.append(titre, tomes);
+      return carte;
+    }
+
     function carteAVenir(item) {
       const { serie, prochaine } = item;
       const { manquants } = statsSerie(serie);
@@ -2591,7 +2690,7 @@
         <div class="avenir-infos">
           <div class="pal-title"></div>
           <div class="pal-tome">Tome ${prochaine.vol} <span>· environ tous les ${serie.parution.rythme > 1 ? serie.parution.rythme + ' mois' : 'mois'}</span></div>
-          ${manquants.length ? `<div class="avenir-retard">+ ${manquants.length} déjà sorti${manquants.length > 1 ? 's' : ''} à acheter</div>` : ''}
+          ${manquants.length ? `<div class="avenir-retard">🛒 ${manquants.length} déjà sorti${manquants.length > 1 ? 's' : ''} à acheter</div>` : ''}
         </div>
       `;
       carte.querySelector('.pal-title').textContent = serie.titre;
@@ -2752,7 +2851,9 @@
       }
 
       const prochain = document.getElementById('fiche-prochain');
-      if (manquants.length) {
+      if (serie.misDeCote) {
+        prochain.textContent = '⏸ Série mise de côté : plus dans tes achats ni tes prochaines sorties';
+      } else if (manquants.length) {
         prochain.innerHTML = `Prochain à acheter : <b>tome ${manquants[0]}</b>` +
           (manquants.length > 1 ? ` · ${manquants.length} manquants` : '');
       } else if (serie.tomesParus) {
@@ -2879,7 +2980,48 @@
     }
 
     function ouvrirMenuSerie() {
+      const serie = bibliotheque[serieIndexActive];
+      document.getElementById('menu-mise-de-cote').textContent = serie && serie.misDeCote
+        ? '▶ Reprendre la série' : '⏸ Mettre de côté (je ne la suis plus)';
       document.getElementById('menu-serie-modal').classList.add('active');
+    }
+
+    // Série mise de côté : plus dans les achats ni les estimations, mais gardée dans la collection
+    function basculerMiseDeCote() {
+      const serie = bibliotheque[serieIndexActive];
+      if (!serie) return;
+      if (serie.misDeCote) delete serie.misDeCote; else serie.misDeCote = true;
+      sauvegarder();
+    }
+
+    // Marque un tome comme possédé (l'ajoute à la liste s'il n'y est pas), avec possibilité d'annuler
+    function marquerPossede(sIndex, numero) {
+      const serie = bibliotheque[sIndex];
+      const existant = serie.tomes.find(t => t.numero === numero);
+      const avant = existant ? { ...existant } : null;
+      if (existant) existant.possede = true;
+      else {
+        serie.tomes.push({ numero, possede: true, lu: false });
+        serie.tomes.sort((a, b) => a.numero - b.numero);
+      }
+      sauvegarder();
+      afficherToast(`✓ ${serie.titre} — tome ${numero} ajouté`, () => {
+        if (avant) Object.assign(serie.tomes.find(t => t.numero === numero), avant);
+        else serie.tomes = serie.tomes.filter(t => t.numero !== numero);
+        sauvegarder();
+      });
+    }
+
+    let toastMinuteur = null;
+    function afficherToast(texte, annuler) {
+      const toast = document.getElementById('toast');
+      toast.querySelector('span').textContent = texte;
+      const bouton = toast.querySelector('button');
+      bouton.style.display = annuler ? '' : 'none';
+      bouton.onclick = () => { toast.classList.remove('visible'); annuler(); };
+      toast.classList.add('visible');
+      clearTimeout(toastMinuteur);
+      toastMinuteur = setTimeout(() => toast.classList.remove('visible'), 4000);
     }
 
     function fermerMenuSerie() {
