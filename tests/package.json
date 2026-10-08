@@ -1,0 +1,12 @@
+{
+  "name": "ma-mangatheque-tests",
+  "private": true,
+  "description": "Tests automatiques de Ma MangaThèque",
+  "scripts": {
+    "test": "node app.test.js"
+  },
+  "devDependencies": {
+    "@zxing/library": "0.23.0",
+    "playwright": "1.56.1"
+  }
+}
