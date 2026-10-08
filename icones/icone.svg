@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Icône de l app (style BD) : source du PNG apple-touch-icon.png -->
+  <defs><pattern id="trame" width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="2" fill="#f97316" opacity="0.35"/></pattern></defs>
+  <rect width="180" height="180" fill="#fde047"/>
+  <rect width="180" height="180" fill="url(#trame)"/>
+  <polygon points="140,18 148,34 166,32 154,46 162,62 145,56 134,70 132,52 116,46 132,38" fill="#ef4444" stroke="#111" stroke-width="3" stroke-linejoin="round"/>
+  <g stroke="#111" stroke-width="5" stroke-linejoin="round">
+    <rect x="28" y="62" width="24" height="84" rx="4" fill="#3b82f6"/>
+    <rect x="54" y="48" width="24" height="98" rx="4" fill="#ec4899"/>
+    <rect x="80" y="70" width="24" height="76" rx="4" fill="#22c55e"/>
+    <rect x="106" y="56" width="24" height="92" rx="4" fill="#ffffff" transform="rotate(16 118 148)"/>
+    <line x1="18" y1="150" x2="160" y2="150" stroke-linecap="round" stroke-width="7"/>
+  </g>
+  <g fill="#111"><rect x="33" y="74" width="14" height="5" rx="2"/><rect x="59" y="60" width="14" height="5" rx="2"/><rect x="85" y="82" width="14" height="5" rx="2"/></g>
+</svg>
