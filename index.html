@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.39">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.39">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.40">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.40">
 
-  <link rel="stylesheet" href="css/style.css?v=3.39">
+  <link rel="stylesheet" href="css/style.css?v=3.40">
 </head>
 <body>
 
@@ -59,31 +59,44 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.39</div>
+  <div class="version-tag">v3.40</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
     <div class="modal-content">
       <button class="close-modal" onclick="fermerParametres()">×</button>
-      <h2 style="font-size: 18px; margin-bottom: 16px;">Paramètres</h2>
-      
-      <div class="settings-list">
-        <button class="btn btn-secondary" onclick="completerCollection()">✨ Compléter ma collection</button>
-        <button class="btn btn-secondary" onclick="majTomesParusCollection()">🔄 Mettre à jour mes séries</button>
-        <button class="btn btn-secondary" onclick="rechercherIsbn()">🔎 Rechercher par ISBN</button>
-        <button class="btn btn-secondary" onclick="configurerCleBooks()">📚 Clé Google Books (optionnelle)</button>
-        <button class="btn btn-secondary" onclick="ouvrirInventaire()">📋 Faire l'inventaire</button>
-        <div class="settings-titre">Sauvegarde</div>
-        <div id="etat-sauvegarde" class="etat-sauvegarde"></div>
-        <button class="btn btn-secondary" onclick="configurerCodeCloud()">🔑 Code de sauvegarde cloud</button>
-        <button class="btn btn-secondary" onclick="ouvrirVersions()">🕘 Restaurer une sauvegarde en ligne</button>
-        <button class="btn btn-secondary" onclick="forcerEnvoiCloud()">⬆️ Forcer l'envoi vers le cloud</button>
-        <button class="btn btn-secondary" onclick="exporterSauvegarde()">📥 Exporter la sauvegarde (JSON)</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📤 Importer la sauvegarde (JSON)</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('csv-input').click()">📊 Importer un fichier CSV (Sheets)</button>
+      <h2 style="font-size: 18px; margin-bottom: 14px;">Paramètres</h2>
+
+      <!-- État de la sauvegarde : un appui ouvre l'historique -->
+      <button id="etat-sauvegarde" class="etat-sauvegarde" onclick="ouvrirVersions()"></button>
+
+      <div class="settings-titre">Ma collection</div>
+      <div class="settings-groupe">
+        <button onclick="majTomesParusCollection()"><span>🔄</span>Mettre à jour mes séries<i>›</i></button>
+        <button onclick="completerCollection()"><span>✨</span>Compléter les infos manquantes<i>›</i></button>
+        <button onclick="ouvrirInventaire()"><span>📋</span>Faire l'inventaire<i>›</i></button>
+        <button onclick="rechercherIsbn()"><span>🔎</span>Rechercher par ISBN<i>›</i></button>
       </div>
 
-      <div style="font-size: 11px; color: var(--text-sub); margin-top: 14px; line-height: 1.4;">Données de parution : <a href="https://mangainsight.fr/" style="color: inherit;">Manga Insight</a> (CC BY 4.0) et catalogue de la BnF.</div>
+      <div class="settings-titre">Sauvegarde</div>
+      <div class="settings-groupe">
+        <button onclick="ouvrirVersions()"><span>🕘</span>Restaurer une sauvegarde<i>›</i></button>
+        <button onclick="exporterSauvegarde()"><span>📥</span>Exporter dans un fichier<i>›</i></button>
+      </div>
+
+      <!-- Réglages rares, repliés par défaut -->
+      <details class="settings-avance">
+        <summary>Réglages avancés</summary>
+        <div class="settings-groupe">
+          <button onclick="configurerCodeCloud()"><span>🔑</span>Code de sauvegarde cloud<i>›</i></button>
+          <button onclick="configurerCleBooks()"><span>📚</span>Clé Google Books<i>›</i></button>
+          <button onclick="forcerEnvoiCloud()"><span>⬆️</span>Forcer l'envoi vers le cloud<i>›</i></button>
+          <button onclick="document.getElementById('file-input').click()"><span>📤</span>Importer une sauvegarde<i>›</i></button>
+          <button onclick="document.getElementById('csv-input').click()"><span>📊</span>Importer un fichier CSV<i>›</i></button>
+        </div>
+      </details>
+
+      <div class="settings-credits">Données de parution : <a href="https://mangainsight.fr/" style="color: inherit;">Manga Insight</a> (CC BY 4.0) et catalogue de la BnF.</div>
       <input type="file" id="file-input" style="display: none;" accept=".json" onchange="importerSauvegarde(event)">
       <input type="file" id="csv-input" style="display: none;" accept=".csv" onchange="importerCSV(event)">
       <input type="file" id="cover-file-input" style="display: none;" accept="image/*" onchange="chargerJaquetteFichier(event)">
@@ -313,17 +326,17 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.39"></script>
-  <script src="js/recherche-infos.js?v=3.39"></script>
-  <script src="js/isbn-scanner.js?v=3.39"></script>
-  <script src="js/mise-a-jour.js?v=3.39"></script>
-  <script src="js/stockage.js?v=3.39"></script>
-  <script src="js/jaquettes.js?v=3.39"></script>
-  <script src="js/import-export.js?v=3.39"></script>
-  <script src="js/vues.js?v=3.39"></script>
-  <script src="js/fiche.js?v=3.39"></script>
-  <script src="js/maj-serie.js?v=3.39"></script>
-  <script src="js/inventaire.js?v=3.39"></script>
-  <script src="js/demarrage.js?v=3.39"></script>
+  <script src="js/outils.js?v=3.40"></script>
+  <script src="js/recherche-infos.js?v=3.40"></script>
+  <script src="js/isbn-scanner.js?v=3.40"></script>
+  <script src="js/mise-a-jour.js?v=3.40"></script>
+  <script src="js/stockage.js?v=3.40"></script>
+  <script src="js/jaquettes.js?v=3.40"></script>
+  <script src="js/import-export.js?v=3.40"></script>
+  <script src="js/vues.js?v=3.40"></script>
+  <script src="js/fiche.js?v=3.40"></script>
+  <script src="js/maj-serie.js?v=3.40"></script>
+  <script src="js/inventaire.js?v=3.40"></script>
+  <script src="js/demarrage.js?v=3.40"></script>
 </body>
 </html>
