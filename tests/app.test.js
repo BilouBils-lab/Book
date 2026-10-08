@@ -539,6 +539,41 @@ test('Édition, tomes et jaquette d\u2019une série (Slam Dunk Star Edition)', a
   await fermer();
 });
 
+test('Édition retrouvée par l\u2019ISBN : Dragon Ball Perfect Edition (titre BnF sans édition)', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Dragonball. 02', auteurs: [], editeur: 'Glénat' } } : null
+  });
+  // Tome 1 déjà enregistré « à tort » dans l'édition standard
+  await avecMangaInsight(page, [{ titre: 'Dragon ball', editeur: 'Glénat', tomes: [{ numero: 1, possede: true, lu: true, isbn: '9782723467681' }, { numero: 2, possede: true, lu: false }] }]);
+  const etat = () => page.evaluate(() => { const s = bibliotheque[0]; return [s.titre, s.tomesParus, s.parution ? s.parution.nom : null, s.tomes.map(t => t.numero + (t.lu ? 'L' : '') + (t.isbn ? '#' : '')).join(' ')]; });
+  egal(await etat(), ['Dragon ball', 42, 'Dragon ball', '1L# 2#'], 'au départ : édition standard (ISBN du tome 2 déduit)');
+  egal(await page.evaluate(() => bibliotheque[0].tomes.map(t => t.isbnAuto ?? null)), [null, true], 'ISBN déduit marqué « auto »');
+
+  // Inventaire : le tome 1 déjà connu n'est plus validé à tort, l'édition Perfect est détectée
+  await page.evaluate(() => { localStorage.setItem('inventaire_debut', '1'); ouvrirModalSerie(0); verifierTomeScanne('9782723467681', 0); });
+  await page.waitForSelector('#choix-modal.active');
+  verifier((await page.textContent('#choix-message')).includes("Dragon Ball - Perfect Edition, tome 1"), 'livre reconnu par Manga Insight');
+  verifier((await page.textContent('#choix-message')).includes("c'est l'édition Perfect, la série est en édition standard"), 'édition Perfect détectée');
+  await page.click('#choix-boutons button >> text=Corriger');
+  await page.waitForFunction(() => bibliotheque[0].titre === 'Dragon Ball (Perfect)');
+  egal(await etat(), ['Dragon Ball (Perfect)', 34, 'Dragon Ball - Perfect Edition', '1L# 2#'], 'série corrigée : 34 tomes, sorties et ISBN de la Perfect Edition');
+
+  // Tome 2 (ISBN de la photo) : la BnF dit « Dragonball. 02 », Manga Insight dit Perfect → c'est le bon
+  await page.evaluate(() => { bibliotheque[0].tomes[1].isbn = null; verifierTomeScanne('9782723467698', 0); });
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes("c'est le bon"));
+  egal(await page.textContent('#toast span'), "✅ Tome 2 · édition Perfect : c'est le bon", 'tome 2 reconnu');
+
+  // Menu « Édition, tomes et jaquette » : l'édition des tomes scannés en premier
+  await page.evaluate(() => { fermerModal(); bibliotheque[0].titre = 'Dragon ball'; delete bibliotheque[0].miNom; ouvrirModalSerie(0); majSerieActuelle(); });
+  await page.waitForSelector('#choix-modal.active');
+  const premier = await page.textContent('#choix-boutons button >> nth=0');
+  egal(premier, '✓ Édition Perfect · 34 tomes · Glénat · 2009–2015 · 📷 tes tomes scannés', 'édition des tomes scannés proposée en premier');
+  verifier(!(await page.textContent('#choix-boutons')).includes('standard · 42 tomes · Glénat · 1993–2000 · 📷'), 'pas de 📷 sur une édition seulement déduite');
+  await page.click('#choix-boutons button >> text=Annuler');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Recherche par ISBN (BnF) puis ajout du tome', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
     worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Berserk. 1 (Éd. prestige)', auteurs: ['Kentarō Miura'], editeur: 'Glénat (Grenoble)', date: '2025' } } : null

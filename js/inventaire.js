@@ -162,8 +162,11 @@ function verifierTomeParScan() {
 async function verifierTomeScanne(isbn, sIndex) {
   const serie = bibliotheque[sIndex];
   if (!serie) return;
+  // Tome déjà connu de cette série : c'est le bon, sauf si Manga Insight le range dans une autre édition
   const connu = serie.tomes.find(t => t.isbn === isbn);
-  if (connu) {
+  const editionMI = livreMangaInsight(isbn);
+  if (connu && (!editionMI || editionMI.edition === editionDuTitre(serie.titre))) {
+    connu.isbnAuto = false;
     if (!connu.possede) { connu.possede = true; sauvegarder(); }
     afficherToast(`✅ Tome ${connu.numero} : c'est bien celui de cette série`);
     return;
@@ -175,17 +178,25 @@ async function verifierTomeScanne(isbn, sIndex) {
     return;
   }
 
-  const loader = document.getElementById('loader-ia');
-  document.getElementById('loader-status').textContent = 'Vérification du tome…';
-  loader.style.display = 'flex';
-  const livre = await chercherLivreParIsbn(isbn);
-  loader.style.display = 'none';
-  if (!livre.trouve) {
-    alert(`Livre introuvable pour l'ISBN ${isbn} : vérifie ce tome à l'œil.`);
-    return;
+  // Manga Insight connaît l'édition exacte de chaque ISBN ; sinon, on interroge la BnF
+  const livreMI = livreMangaInsight(isbn);
+  let livre, analyse;
+  if (livreMI) {
+    livre = { titre: `${livreMI.nom}, tome ${livreMI.tome}` };
+    analyse = { serie: livreMI.serie, edition: livreMI.edition, tome: livreMI.tome };
+  } else {
+    const loader = document.getElementById('loader-ia');
+    document.getElementById('loader-status').textContent = 'Vérification du tome…';
+    loader.style.display = 'flex';
+    livre = await chercherLivreParIsbn(isbn);
+    loader.style.display = 'none';
+    if (!livre.trouve) {
+      alert(`Livre introuvable pour l'ISBN ${isbn} : vérifie ce tome à l'œil.`);
+      return;
+    }
+    analyse = analyserTitreLivre(livre.titre, livre.sousTitre);
+    if (!analyse.tome && livre.numero) analyse.tome = livre.numero;
   }
-  const analyse = analyserTitreLivre(livre.titre, livre.sousTitre);
-  if (!analyse.tome && livre.numero) analyse.tome = livre.numero;
   const nomLivre = livre.titre + (analyse.edition ? '' : ' (édition standard)');
 
   const attendue = editionDuTitre(serie.titre);
@@ -226,6 +237,7 @@ async function verifierTomeScanne(isbn, sIndex) {
     const index = changerTitreSerie(sIndex, titreLivre);
     if (serieIndexActive !== null) serieIndexActive = index;
     ajouterTomeScanne(bibliotheque[index], numero, isbn);
+    epinglerEditionMI(bibliotheque[index], livreMI);
     sauvegarder();
     afficherToast(`✏️ Série corrigée : « ${titreLivre} » · tome ${numero} enregistré`);
     return;
@@ -235,6 +247,7 @@ async function verifierTomeScanne(isbn, sIndex) {
     if (!cible) {
       cible = { titre: titreLivre, auteur: serie.auteur || '', genre: serie.genre || '', editeur: serie.editeur || '', statut: 'En cours', couverture: '', tomes: [] };
       bibliotheque.push(cible);
+      epinglerEditionMI(cible, livreMI);
     }
     ajouterTomeScanne(cible, numero, isbn);
     sauvegarder();

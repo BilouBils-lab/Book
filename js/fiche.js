@@ -327,6 +327,8 @@ function changerTitreSerie(index, nouveau) {
   // Édition spéciale : le nombre de tomes trouvé automatiquement est celui de l'édition standard
   if (titreRecherche(nouveau) !== nouveau) delete cible.tomesTotal;
   if (editionDuTitre(nouveau) !== ancienneEdition) {
+    // ISBN déduits de l'ancienne édition : faux pour la nouvelle
+    for (const t of cible.tomes) if (t.isbnAuto) { delete t.isbn; delete t.isbnAuto; }
     for (const champ of ['tomesTotal', 'tomesParus', 'tomesParusSource', 'tomesParusMaj', 'tomesParusDiagnostic', 'parution', 'miNom', 'miEditeur']) delete cible[champ];
   }
   return bibliotheque.indexOf(cible);
@@ -341,7 +343,7 @@ function ajouterTomeScanne(serie, numero, isbn) {
     serie.tomes.push({ numero, possede: true, lu: false });
     serie.tomes.sort((a, b) => a.numero - b.numero);
   }
-  serie.tomes.find(t => t.numero === numero).isbn = isbn;
+  Object.assign(serie.tomes.find(t => t.numero === numero), { isbn, isbnAuto: false });
   return etaitPossede;
 }
 

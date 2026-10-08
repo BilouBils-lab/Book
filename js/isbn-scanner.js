@@ -142,6 +142,9 @@ async function afficherLivreIsbn(isbn) {
   }
   const analyse = analyserTitreLivre(livre.titre, livre.sousTitre);
   if (!analyse.tome && livre.numero) analyse.tome = livre.numero;
+  // Manga Insight connaît l'édition exacte de l'ISBN (la BnF ne la précise pas toujours)
+  const livreMI = livreMangaInsight(isbn);
+  if (livreMI) Object.assign(analyse, { serie: livreMI.serie, edition: livreMI.edition, tome: livreMI.tome });
   const couvertureHttps = livre.couverture;
   const vi = { publisher: livre.editeur };
 
@@ -184,7 +187,7 @@ async function afficherLivreIsbn(isbn) {
         { libelle: `Ajouter quand même à « ${autre.titre} »`, valeur: 'ici' }
       ]);
       if (!action) return;
-      if (action === 'corriger') changerTitreSerie(autreIndex, titrePropose);
+      if (action === 'corriger') epinglerEditionMI(bibliotheque[changerTitreSerie(autreIndex, titrePropose)], livreMI);
       if (action === 'ici') titrePropose = autre.titre;
     }
     const choix = await demanderSerieEtTome(titrePropose, analyse.tome || 1, 'Ajouter ce tome');
@@ -193,9 +196,10 @@ async function afficherLivreIsbn(isbn) {
     const serie = bibliotheque.find(m => normaliserTitre(m.titre) === normaliserTitre(choix.titre));
     if (!serie) return;
     const tome = serie.tomes.find(t => t.numero === choix.tome);
-    if (tome) tome.isbn = isbn;
+    if (tome) Object.assign(tome, { isbn, isbnAuto: false });
     if (!serie.editeur) serie.editeur = editeurFrancais(vi.publisher) || vi.publisher || '';
     if (!serie.couverture && couvertureHttps) serie.couverture = couvertureHttps;
+    if (livreMI && !serie.miNom && normaliserTitre(serie.titre) === normaliserTitre(titreAvecEdition(analyse))) epinglerEditionMI(serie, livreMI);
     sauvegarder();
   };
 }
