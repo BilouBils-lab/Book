@@ -301,7 +301,7 @@ test('Sauvegarde : état dans les Paramètres et restauration d\u2019une ancienn
   await page.evaluate(() => { bibliotheque[1].tomes.push({ numero: 3, possede: true, lu: false }); });
   verifier((await etat()).includes('sur cet appareil : 2 séries, 6 tomes'), 'différence entre l\u2019appareil et le cloud signalée');
 
-  await page.click('text=Restaurer une sauvegarde en ligne');
+  await page.click('#settings-modal button:has-text("Restaurer une sauvegarde")');
   await page.waitForSelector('.version-item');
   egal(await page.$$eval('.version-item', b => b.map(x => x.textContent)), [
     "Dernière sauvegarde · aujourd'hui à 10:152 séries, 5 tomes",
@@ -335,7 +335,7 @@ test('Inventaire : avancement, validation des séries et vérification d\u2019un
   };
 
   await page.evaluate(() => ouvrirParametres());
-  await page.click("text=📋 Faire l'inventaire");
+  await page.click("#settings-modal button:has-text(\"Faire l'inventaire\")");
   await page.click('#confirm-ok');
   await page.waitForSelector('#inventaire-modal.active');
   egal(await page.textContent('#inventaire-compteur'), '0 / 3 séries vérifiées', 'compteur au départ');

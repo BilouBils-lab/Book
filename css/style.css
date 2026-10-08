@@ -720,3 +720,21 @@ main {
 .jaquettes-grille { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .jaquette-choix { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; border: 2px solid var(--card-border); cursor: pointer; background: var(--card-bg); }
 .jaquette-choix:active { border-color: var(--accent); }
+
+/* Paramètres : listes compactes regroupées */
+.settings-groupe { display: flex; flex-direction: column; background: #141418; border: 1px solid var(--card-border); border-radius: 12px; overflow: hidden; }
+.settings-groupe button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; background: none; border: none; border-top: 1px solid var(--card-border); color: var(--text-main); font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+.settings-groupe button:first-child { border-top: none; }
+.settings-groupe button:active { background: #2a2a30; }
+.settings-groupe button span { width: 22px; text-align: center; flex-shrink: 0; }
+.settings-groupe button i { margin-left: auto; font-style: normal; color: var(--text-sub); font-size: 18px; }
+#settings-modal .settings-titre { margin: 18px 4px 6px; }
+.settings-avance { margin-top: 18px; }
+.settings-avance summary { font-size: 13px; color: var(--text-sub); cursor: pointer; padding: 4px; list-style: none; }
+.settings-avance summary::-webkit-details-marker { display: none; }
+.settings-avance summary::before { content: '›'; display: inline-block; margin-right: 6px; transition: transform 0.2s; }
+.settings-avance[open] summary::before { transform: rotate(90deg); }
+.settings-avance .settings-groupe { margin-top: 8px; }
+.settings-credits { font-size: 11px; color: var(--text-sub); margin-top: 16px; line-height: 1.4; }
+button.etat-sauvegarde { width: 100%; background: #141418; text-align: left; color: var(--text-main); font: inherit; font-size: 13px; cursor: pointer; }
+#settings-modal .modal-content { max-height: 90vh; overflow-y: auto; }
