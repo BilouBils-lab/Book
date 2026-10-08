@@ -83,7 +83,8 @@
 
     .tab-btn {
       flex: 1;
-      padding: 10px 16px;
+      padding: 10px 6px;
+      white-space: nowrap;
       background: transparent;
       border: none;
       color: var(--text-sub);
@@ -218,6 +219,23 @@
     }
 
     .pal-item { cursor: pointer; }
+
+    .avenir-intro { font-size: 12px; color: var(--text-sub); line-height: 1.4; margin: 2px 2px 6px; }
+
+    .avenir-item {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+    .avenir-jaquette { width: 34px; height: 51px; border-radius: 4px; object-fit: cover; background: #2a2a30; flex-shrink: 0; }
+    .avenir-infos { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .avenir-retard { font-size: 12px; color: #fbbf24; }
     .pal-tome span { color: var(--text-sub); font-weight: 400; }
 
     .pal-section {
@@ -621,6 +639,7 @@
     <div class="tabs-nav">
       <button class="tab-btn" id="tab-pal-btn" onclick="changerOnglet('pal')">Pile à lire (<span id="pal-count">0</span>)</button>
       <button class="tab-btn active" id="tab-col-btn" onclick="changerOnglet('collection')">Collection</button>
+      <button class="tab-btn" id="tab-avenir-btn" onclick="changerOnglet('avenir')">À venir</button>
     </div>
   </header>
 
@@ -636,6 +655,7 @@
       </select>
     </div>
     <div id="view-collection"></div>
+    <div id="view-avenir" style="display: none;"></div>
   </main>
 
   <div class="actions-bar">
@@ -650,7 +670,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.25</div>
+  <div class="version-tag">v3.26</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -2398,6 +2418,8 @@
       ongletActif = onglet;
       document.getElementById('tab-pal-btn').classList.toggle('active', onglet === 'pal');
       document.getElementById('tab-col-btn').classList.toggle('active', onglet === 'collection');
+      document.getElementById('tab-avenir-btn').classList.toggle('active', onglet === 'avenir');
+      document.getElementById('view-avenir').style.display = onglet === 'avenir' ? 'block' : 'none';
       
       document.getElementById('view-pal').style.display = onglet === 'pal' ? 'block' : 'none';
       document.getElementById('view-collection').style.display = onglet === 'collection' ? 'block' : 'none';
@@ -2425,6 +2447,7 @@
       document.getElementById('pal-count').innerText = elementsPAL.length;
 
       rendrePileALire();
+      rendreAVenir();
 
       const containerCol = document.getElementById('view-collection');
       containerCol.innerHTML = '';
@@ -2498,6 +2521,81 @@
       if (serieIndexActive !== null && bibliotheque[serieIndexActive]) {
         remplirModalSerie(serieIndexActive);
       }
+    }
+
+    // --- À venir : prochains tomes estimés, regroupés par mois ---
+    function rendreAVenir() {
+      const container = document.getElementById('view-avenir');
+      container.innerHTML = '';
+      const maintenant = new Date().getFullYear() * 12 + new Date().getMonth();
+      const parMois = new Map();
+      const imminents = [];
+      let sansEstimation = 0;
+      bibliotheque.forEach((serie, sIndex) => {
+        const prochaine = prochaineSortie(serie);
+        if (!prochaine) { sansEstimation++; return; }
+        const item = { serie, sIndex, prochaine };
+        if (prochaine.retard) { imminents.push(item); return; }
+        if (!parMois.has(prochaine.k)) parMois.set(prochaine.k, []);
+        parMois.get(prochaine.k).push(item);
+      });
+
+      const intro = document.createElement('div');
+      intro.className = 'avenir-intro';
+      intro.textContent = "Estimations d'après le rythme de parution des tomes en France (Manga Insight). Un éditeur peut toujours décaler une sortie.";
+      container.appendChild(intro);
+
+      if (!imminents.length && !parMois.size) {
+        const vide = document.createElement('div');
+        vide.className = 'empty-state';
+        vide.innerHTML = bibliotheque.some(s => s.parution)
+          ? 'Aucune sortie estimée pour tes séries en cours.'
+          : 'Pas encore de données de parution.<br>Lance ⚙️ → 🔄 Mettre à jour mes séries.';
+        container.appendChild(vide);
+        return;
+      }
+
+      const parTitre = (a, b) => a.serie.titre.localeCompare(b.serie.titre, 'fr', { sensitivity: 'base' });
+      const groupe = (titre, items) => {
+        const entete = document.createElement('div');
+        entete.className = 'pal-section';
+        entete.innerHTML = titre;
+        container.appendChild(entete);
+        for (const item of items.sort(parTitre)) container.appendChild(carteAVenir(item));
+      };
+
+      if (imminents.length) groupe('⏳ Imminent <small>la date estimée est passée</small>', imminents);
+      for (const k of [...parMois.keys()].sort((a, b) => a - b)) {
+        const nom = moisTexte(k);
+        const titre = nom.charAt(0).toUpperCase() + nom.slice(1);
+        groupe(k === maintenant ? `📅 ${titre} <small>ce mois-ci</small>` : k === maintenant + 1 ? `📅 ${titre} <small>le mois prochain</small>` : `📅 ${titre}`, parMois.get(k));
+      }
+
+      if (sansEstimation) {
+        const pied = document.createElement('div');
+        pied.className = 'avenir-intro';
+        pied.style.marginTop = '16px';
+        pied.textContent = `${sansEstimation} série(s) sans estimation : terminées, en pause ou pas assez de tomes parus pour connaître le rythme.`;
+        container.appendChild(pied);
+      }
+    }
+
+    function carteAVenir(item) {
+      const { serie, prochaine } = item;
+      const { manquants } = statsSerie(serie);
+      const carte = document.createElement('div');
+      carte.className = 'avenir-item';
+      carte.onclick = () => ouvrirModalSerie(item.sIndex);
+      carte.innerHTML = `
+        <img class="avenir-jaquette" src="${serie.couverture || JAQUETTE_DEFAUT}" alt="" onerror="this.onerror=null; this.src=JAQUETTE_DEFAUT">
+        <div class="avenir-infos">
+          <div class="pal-title"></div>
+          <div class="pal-tome">Tome ${prochaine.vol} <span>· environ tous les ${serie.parution.rythme > 1 ? serie.parution.rythme + ' mois' : 'mois'}</span></div>
+          ${manquants.length ? `<div class="avenir-retard">+ ${manquants.length} déjà sorti${manquants.length > 1 ? 's' : ''} à acheter</div>` : ''}
+        </div>
+      `;
+      carte.querySelector('.pal-title').textContent = serie.titre;
+      return carte;
     }
 
     // --- Pile à lire : une carte par série, rangée par intention de lecture ---
