@@ -8,7 +8,9 @@ let serieIndexActive = null;
 let longPressTimer = null;
 let db = null;
 
-function confirmerAction(message) {
+// options (facultatif) : { ok: 'Libellé', annuler: 'Libellé' } pour une question à deux réponses
+// (le bouton de droite n'est alors plus rouge : aucune des deux n'est dangereuse)
+function confirmerAction(message, options = {}) {
   return new Promise((resolve) => {
     const modal = document.getElementById('confirm-modal');
     document.getElementById('confirm-message').textContent = message;
@@ -16,9 +18,15 @@ function confirmerAction(message) {
 
     const btnOk = document.getElementById('confirm-ok');
     const btnCancel = document.getElementById('confirm-cancel');
+    const avant = { ok: btnOk.textContent, annuler: btnCancel.textContent, fond: btnOk.style.background };
+    if (options.ok) { btnOk.textContent = options.ok; btnOk.style.background = 'var(--accent)'; }
+    if (options.annuler) btnCancel.textContent = options.annuler;
 
     function nettoyer(resultat) {
       modal.classList.remove('active');
+      btnOk.textContent = avant.ok;
+      btnCancel.textContent = avant.annuler;
+      btnOk.style.background = avant.fond;
       btnOk.removeEventListener('click', onOk);
       btnCancel.removeEventListener('click', onCancel);
       resolve(resultat);

@@ -70,15 +70,50 @@ function genererCodeCloud() {
   return Array.from(octets, o => o.toString(16).padStart(2, '0')).join('');
 }
 
+// Sans code enregistré, on demande d'abord s'il en existe déjà un : un nouveau raccourci sur
+// l'écran d'accueil ou une réinstallation repartent sans code, et en générer un nouveau
+// couperait la sauvegarde en ligne (le serveur ne le connaîtrait pas).
 async function configurerCodeCloud() {
-  const code = await demanderTexte("Code de sauvegarde cloud (le même que BACKUP_TOKEN sur le Worker, et sur tous tes appareils) :", codeCloud() || genererCodeCloud());
-  if (code !== null) {
-    if (code) {
-      localStorage.setItem('cloud_backup_token', code);
-    } else {
-      localStorage.removeItem('cloud_backup_token');
-    }
+  let code;
+  if (codeCloud()) {
+    code = await demanderTexte("Code de sauvegarde cloud (le même que BACKUP_TOKEN sur le Worker, et sur tous tes appareils) :", codeCloud());
+  } else {
+    const dejaUnCode = await confirmerAction("As-tu déjà un code de sauvegarde ?\n\nOui si tu as déjà utilisé la sauvegarde en ligne : autre appareil, app réinstallée, nouveau raccourci sur l'écran d'accueil.\n\nNon si c'est ta toute première configuration.",
+      { ok: "Oui, j'ai un code", annuler: 'Non, première fois' });
+    code = dejaUnCode
+      ? await demanderTexte("Colle ton code de sauvegarde (le même que BACKUP_TOKEN sur le Worker) :", '')
+      : await demanderTexte("Voici ton nouveau code. Note-le précieusement (gestionnaire de mots de passe), puis enregistre-le comme BACKUP_TOKEN dans les réglages du Worker Cloudflare :", genererCodeCloud());
   }
+  if (code === null) return;
+  if (!code) {
+    localStorage.removeItem('cloud_backup_token');
+    afficherEtatSauvegarde();
+    return;
+  }
+  localStorage.setItem('cloud_backup_token', code);
+  alerteCloudAffichee = false;
+  await verifierCodeCloud();
+}
+
+// Vérifie tout de suite le code auprès du serveur, et propose de récupérer la collection
+// si cet appareil est vide alors qu'une sauvegarde existe en ligne
+async function verifierCodeCloud() {
+  let r;
+  try { r = await lireVersionsCloud(); } catch (e) { r = { statut: 'hors-ligne' }; }
+  afficherEtatSauvegarde();
+  if (r.statut === 'code-incorrect') {
+    alert("⚠️ Le serveur ne reconnaît pas ce code.\n\nIl doit être identique au BACKUP_TOKEN du Worker (Cloudflare → manga-gemini-proxy → Settings → Variables and Secrets). Tant qu'ils diffèrent, rien n'est sauvegardé en ligne.");
+    return;
+  }
+  if (r.statut !== 'ok') return;
+  if (r.actuelle && r.actuelle.series > 0 && bibliotheque.length === 0) {
+    const message = `✅ Code reconnu ! Une sauvegarde en ligne existe : ${texteResume(r.actuelle)}` + (r.actuelle.date ? ', ' + texteDate(r.actuelle.date) : '') + ".\n\nLa récupérer sur cet appareil ?";
+    if (await confirmerAction(message, { ok: 'Récupérer', annuler: 'Plus tard' })) {
+      await restaurerVersion(null, 'la dernière sauvegarde en ligne', r.actuelle, true);
+    }
+    return;
+  }
+  afficherToast('✅ Code reconnu par le serveur');
 }
 
 function signalerProblemeCloud(message) {
@@ -204,7 +239,7 @@ async function afficherEtatSauvegarde() {
   } else if (r.statut === 'ok') {
     afficher(true, '⚠️ Aucune sauvegarde en ligne pour l\u2019instant', 'Elle sera faite à la prochaine modification.');
   } else if (r.statut === 'code-incorrect') {
-    afficher(true, '⚠️ Code de sauvegarde incorrect', 'Les sauvegardes en ligne ne passent pas. Vérifie le code ci-dessous.');
+    afficher(true, '⚠️ Code de sauvegarde incorrect', 'Rien n\u2019est sauvegardé en ligne : le code de cet appareil n\u2019est pas celui du Worker. Touche 🔑 ci-dessous et colle le bon code.');
   } else if (r.statut === 'ancien-worker') {
     afficher(false, '☁️ Dernier envoi depuis cet appareil : ' + (dernierEnvoi ? texteDate(dernierEnvoi) : 'inconnu'), "Mets à jour le Worker pour voir l'état complet et l'historique.");
   } else {
@@ -252,11 +287,11 @@ function fermerVersions() {
 }
 
 // id null = dernière sauvegarde ; sinon une version de l'historique
-async function restaurerVersion(id, nom, resume) {
+async function restaurerVersion(id, nom, resume, dejaConfirme) {
   const enLigne = resume && resume.series != null ? ` (${texteResume(resume)})` : '';
   const message = `Remplacer la bibliothèque de cet appareil (${texteResume(resumeBibliotheque(bibliotheque))}) par ${nom}${enLigne} ?`
     + (id ? "\n\nL'état actuel en ligne sera gardé dans l'historique." : '');
-  if (!(await confirmerAction(message))) return;
+  if (!dejaConfirme && !(await confirmerAction(message))) return;
   try {
     const res = await fetch(BACKUP_URL + (id ? '?version=' + encodeURIComponent(id) : ''), { headers: { 'X-Backup-Token': codeCloud() } });
     if (res.status === 401) { alert("Code de sauvegarde incorrect."); return; }
