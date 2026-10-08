@@ -202,16 +202,26 @@ test('Pile à lire : en cours, encore un effort, à commencer', async ({ navigat
     { titre: 'Berserk (Prestige)', tomes: t(4, 0) },
     { titre: 'Dragon Ball', tomes: t(42, 42) }]);
   await page.evaluate(() => changerOnglet('pal'));
-  const lire = () => page.$$eval('#view-pal > div', els => els.map(e => e.className === 'pal-section'
-    ? '# ' + e.querySelector('span').textContent
-    : e.querySelector('.pal-title').textContent + ' — ' + e.querySelector('.pal-tome').textContent));
-  egal(await lire(), [
-    '# ▶ En cours', 'Ao Ashi — Tome 31 · encore 6 à lire', 'Kagurabachi — Tome 4 · encore 7 à lire',
-    '# 💪 Encore un effort !', 'Berserk of Gluttony — Tome 13 · le dernier, courage !',
-    '# 📚 À commencer', 'Berserk (Prestige) — Tome 1 · 4 tomes à lire'
-  ], 'groupes de la pile');
+  const onglets = () => page.$$eval('#view-pal .selecteur-vue button', b => b.map(x => (x.className === 'actif' ? '*' : '') + x.textContent));
+  const cartes = () => page.$$eval('#view-pal .pal-item', els => els.map(e => e.querySelector('.pal-title').textContent + ' — ' + e.querySelector('.pal-tome').textContent));
+  egal(await onglets(), ['*En cours2', 'Effort1', 'À commencer1'], 'sous-onglets avec leur nombre de séries');
+  egal(await cartes(), ['Ao Ashi — Tome 31 · encore 6 à lire', 'Kagurabachi — Tome 4 · encore 7 à lire'], 'en cours : la dernière lue en haut');
+  await page.click('#view-pal .selecteur-vue button >> text=Effort');
+  egal(await cartes(), ['Berserk of Gluttony — Tome 13 · le dernier, courage !'], 'encore un effort');
+  await page.click('#view-pal .selecteur-vue button >> text=À commencer');
+  egal(await cartes(), ['Berserk (Prestige) — Tome 1 · 4 tomes à lire'], 'à commencer');
+
+  // « Lu ✓ » : la série change de sous-onglet, un message le signale
+  await page.click('.pal-item:has-text("Berserk (Prestige)") .btn-read-action');
+  egal(await page.textContent('#toast span'), 'Berserk (Prestige) passe dans « Effort »', 'message de changement de groupe');
+  egal(await onglets(), ['En cours2', 'Effort2', '*À commencer0'], 'on reste sur le sous-onglet choisi');
+  verifier((await page.textContent('#view-pal')).includes('Rien à commencer'), 'message quand le groupe est vide');
+  await page.click('#view-pal .selecteur-vue button >> text=En cours');
   await page.click('.pal-item:has-text("Kagurabachi") .btn-read-action');
-  egal((await lire()).slice(1, 3), ['Kagurabachi — Tome 5 · encore 6 à lire', 'Ao Ashi — Tome 31 · encore 6 à lire'], '« Lu ✓ » fait remonter la série lue');
+  egal((await cartes()).slice(0, 2), ['Kagurabachi — Tome 5 · encore 6 à lire', 'Ao Ashi — Tome 31 · encore 6 à lire'], '« Lu ✓ » fait remonter la série lue');
+  await page.click('#view-pal .selecteur-vue button >> text=Effort');
+  await page.click('.pal-item:has-text("Berserk of Gluttony") .btn-read-action');
+  egal(await page.textContent('#toast span'), '🎉 Berserk of Gluttony : plus rien à lire, bravo !', 'série terminée');
   egal(await page.evaluate(() => document.getElementById('detail-modal').classList.contains('active')), false, '« Lu ✓ » n’ouvre pas la fiche');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();

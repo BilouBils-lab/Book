@@ -250,42 +250,73 @@ function carteAVenir(item) {
 // --- Pile à lire : une carte par série, rangée par intention de lecture ---
 const SEUIL_ENCORE_UN_EFFORT = 3;
 
+// Groupes de la pile : en cours, presque finies (« encore un effort »), pas encore commencées
+const GROUPES_PILE = [
+  { cle: 'enCours', onglet: 'En cours', intro: '▶ La dernière série lue en haut.',
+    vide: 'Aucune série en cours : choisis-en une dans « À commencer » !', reste: (n) => `encore ${n} à lire` },
+  { cle: 'effort', onglet: 'Effort', intro: '💪 Encore un effort ! La ligne d\u2019arrivée est en vue.',
+    vide: 'Aucune série presque finie pour l\u2019instant.', reste: (n) => n === 1 ? 'le dernier, courage !' : `plus que ${n} !` },
+  { cle: 'aCommencer', onglet: 'À commencer', intro: '📚 Pour quand tu auras fini le reste…',
+    vide: 'Rien à commencer : toutes tes séries sont entamées.', reste: (n) => `${n} tome${n > 1 ? 's' : ''} à lire` }
+];
+let vuePile = null; // null : premier groupe non vide
+
+function groupePile(serie) {
+  const aLire = serie.tomes.filter(t => t.possede && !t.lu).length;
+  if (!aLire) return null;
+  if (!serie.tomes.some(t => t.lu)) return 'aCommencer';
+  return aLire <= SEUIL_ENCORE_UN_EFFORT ? 'effort' : 'enCours';
+}
+
 function rendrePileALire() {
   const container = document.getElementById('view-pal');
   container.innerHTML = '';
-  const enCours = [], effort = [], aCommencer = [];
+  const groupes = { enCours: [], effort: [], aCommencer: [] };
   bibliotheque.forEach((serie, sIndex) => {
+    const groupe = groupePile(serie);
+    if (!groupe) return;
     const aLire = serie.tomes.filter(t => t.possede && !t.lu).sort((a, b) => a.numero - b.numero);
-    if (!aLire.length) return;
-    const lus = serie.tomes.filter(t => t.lu);
-    const item = { serie, sIndex, aLire, derniereLecture: Math.max(0, ...lus.map(t => t.luLe || 0)) };
-    if (!lus.length) aCommencer.push(item);
-    else if (aLire.length <= SEUIL_ENCORE_UN_EFFORT) effort.push(item);
-    else enCours.push(item);
+    const derniereLecture = Math.max(0, ...serie.tomes.filter(t => t.lu).map(t => t.luLe || 0));
+    groupes[groupe].push({ serie, sIndex, aLire, derniereLecture });
   });
 
-  if (!enCours.length && !effort.length && !aCommencer.length) {
+  if (!groupes.enCours.length && !groupes.effort.length && !groupes.aCommencer.length) {
     container.innerHTML = `<div class="empty-state">Pile à lire vide : tu es à jour ! 🎉<br>Il est peut-être temps de passer en librairie…</div>`;
     return;
   }
 
   const parTitre = (a, b) => a.serie.titre.localeCompare(b.serie.titre, 'fr', { sensitivity: 'base' });
-  enCours.sort((a, b) => b.derniereLecture - a.derniereLecture || parTitre(a, b));
-  effort.sort((a, b) => a.aLire.length - b.aLire.length || parTitre(a, b));
-  aCommencer.sort(parTitre);
+  groupes.enCours.sort((a, b) => b.derniereLecture - a.derniereLecture || parTitre(a, b));
+  groupes.effort.sort((a, b) => a.aLire.length - b.aLire.length || parTitre(a, b));
+  groupes.aCommencer.sort(parTitre);
 
-  const section = (titre, sousTitre, items, texteReste) => {
-    if (!items.length) return;
-    const entete = document.createElement('div');
-    entete.className = 'pal-section';
-    entete.innerHTML = `<span>${titre}</span><small>${sousTitre}</small>`;
-    container.appendChild(entete);
-    for (const item of items) container.appendChild(cartePileALire(item, texteReste(item.aLire.length)));
-  };
+  // Sélecteur, comme dans « À venir » : un seul groupe affiché à la fois
+  const actif = GROUPES_PILE.find(g => g.cle === vuePile) || GROUPES_PILE.find(g => groupes[g.cle].length);
+  const selecteur = document.createElement('div');
+  selecteur.className = 'selecteur-vue';
+  for (const g of GROUPES_PILE) {
+    const bouton = document.createElement('button');
+    bouton.textContent = g.onglet;
+    const compte = document.createElement('span');
+    compte.className = 'selecteur-compte';
+    compte.textContent = groupes[g.cle].length;
+    bouton.appendChild(compte);
+    bouton.className = g === actif ? 'actif' : '';
+    bouton.onclick = () => { vuePile = g.cle; rendrePileALire(); };
+    selecteur.appendChild(bouton);
+  }
+  container.appendChild(selecteur);
 
-  section('▶ En cours', 'la dernière lue en haut', enCours, (n) => `encore ${n} à lire`);
-  section('💪 Encore un effort !', 'la ligne d’arrivée est en vue', effort, (n) => n === 1 ? 'le dernier, courage !' : `plus que ${n} !`);
-  section('📚 À commencer', 'pour quand tu auras fini le reste…', aCommencer, (n) => `${n} tome${n > 1 ? 's' : ''} à lire`);
+  const items = groupes[actif.cle];
+  if (!items.length) {
+    container.insertAdjacentHTML('beforeend', `<div class="empty-state">${actif.vide}</div>`);
+    return;
+  }
+  const intro = document.createElement('div');
+  intro.className = 'avenir-intro';
+  intro.textContent = actif.intro;
+  container.appendChild(intro);
+  for (const item of items) container.appendChild(cartePileALire(item, actif.reste(item.aLire.length)));
 }
 
 function cartePileALire(item, texteReste) {
@@ -320,7 +351,14 @@ function onTriChange(valeur) {
 }
 
 function marquerCommeLu(sIndex, tIndex) {
-  bibliotheque[sIndex].tomes[tIndex].lu = true;
-  bibliotheque[sIndex].tomes[tIndex].luLe = Date.now();
+  const serie = bibliotheque[sIndex];
+  const avant = groupePile(serie);
+  serie.tomes[tIndex].lu = true;
+  serie.tomes[tIndex].luLe = Date.now();
   sauvegarder();
+  // La série change de sous-onglet : on le signale, puisqu'elle disparaît de l'écran
+  const apres = groupePile(serie);
+  if (apres === avant) return;
+  if (!apres) afficherToast(`🎉 ${serie.titre} : plus rien à lire, bravo !`);
+  else afficherToast(`${serie.titre} passe dans « ${GROUPES_PILE.find(g => g.cle === apres).onglet} »`);
 }

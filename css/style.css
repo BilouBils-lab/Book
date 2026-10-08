@@ -227,6 +227,8 @@ main {
   white-space: nowrap;
 }
 .selecteur-vue button.actif { background: #2a2a30; color: var(--text-main); }
+.selecteur-compte { margin-left: 5px; padding: 1px 6px; border-radius: 8px; background: #2a2a30; font-size: 11px; }
+.selecteur-vue button.actif .selecteur-compte { background: var(--accent); color: #fff; }
 
 .achat-item {
   display: flex;
