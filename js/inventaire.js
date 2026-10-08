@@ -149,17 +149,6 @@ function validerSerieInventaire() {
 
 // --- Vérification d'un tome par son code-barres ---
 
-// Édition d'une série d'après son titre : « Berserk (Prestige) » → 'Prestige', sinon null (standard)
-function editionDuTitre(titre) {
-  const p = (titre.match(/\(([^)]*)\)\s*$/) || [])[1];
-  if (!p) return null;
-  return (EDITIONS.find(([, motif]) => motif.test(p.toLowerCase())) || [])[0] || null;
-}
-
-function titreSansEdition(titre) {
-  return normaliserRecherche(titre.replace(/\s*\([^)]*\)\s*$/, ''));
-}
-
 // Série à vérifier pendant le scan (index dans la bibliothèque), ou null pour un scan normal
 let serieAVerifier = null;
 
@@ -210,24 +199,52 @@ async function verifierTomeScanne(isbn, sIndex) {
     problemes.push(`c'est l'édition ${analyse.edition || 'standard'}, la série est en édition ${attendue || 'standard'}`);
   }
 
-  let numero = analyse.tome;
+  // Livre différent de la série : la corriger, ranger le livre ailleurs, ou l'ajouter quand même
+  let action = 'ici';
+  const titreLivre = titreAvecEdition(analyse);
+  const autre = bibliotheque.find((s, i) => i !== sIndex && normaliserTitre(s.titre) === normaliserTitre(titreLivre));
   if (problemes.length) {
-    const message = `⚠️ Livre scanné : ${nomLivre}\n\nAttention : ${problemes.join(' ; ')}.\n\nL'ajouter quand même à « ${serie.titre} » ?`;
-    if (!(await confirmerAction(message))) return;
+    const choix = [];
+    if (memeSerie) {
+      choix.push({ libelle: `✏️ Corriger la série en « ${titreLivre} »` + (autre ? ' (fusion)' : ''), valeur: 'corriger', principal: true });
+    }
+    choix.push({ libelle: autre ? `➕ Ranger ce tome dans « ${autre.titre} »` : `➕ Créer la série « ${titreLivre} » à part`, valeur: 'autre' });
+    choix.push({ libelle: `Ajouter quand même à « ${serie.titre} »`, valeur: 'ici' });
+    const explication = memeSerie
+      ? `\n\n✏️ Corriger : toute la série devient « ${titreLivre} », tes tomes et tes lectures sont gardés.\n➕ À part : la série actuelle ne change pas (tu pourras la supprimer avec ⋯).`
+      : '';
+    action = await choisirAction(`⚠️ Livre scanné : ${nomLivre}\n\nAttention : ${problemes.join(' ; ')}.${explication}`, choix);
+    if (!action) return;
   }
+
+  let numero = analyse.tome;
   if (!numero) {
     const saisie = await demanderTexte(`Livre scanné : ${livre.titre}\n\nNuméro du tome ?`, '');
     numero = Number(saisie);
     if (!numero) return;
   }
-  const existant = serie.tomes.find(t => t.numero === numero);
-  const etaitPossede = !!(existant && existant.possede);
-  if (existant) existant.possede = true;
-  else {
-    serie.tomes.push({ numero, possede: true, lu: false });
-    serie.tomes.sort((a, b) => a.numero - b.numero);
+
+  if (action === 'corriger') {
+    const index = changerTitreSerie(sIndex, titreLivre);
+    if (serieIndexActive !== null) serieIndexActive = index;
+    ajouterTomeScanne(bibliotheque[index], numero, isbn);
+    sauvegarder();
+    afficherToast(`✏️ Série corrigée : « ${titreLivre} » · tome ${numero} enregistré`);
+    return;
   }
-  serie.tomes.find(t => t.numero === numero).isbn = isbn;
+  if (action === 'autre') {
+    let cible = autre;
+    if (!cible) {
+      cible = { titre: titreLivre, auteur: serie.auteur || '', genre: serie.genre || '', editeur: serie.editeur || '', statut: 'En cours', couverture: '', tomes: [] };
+      bibliotheque.push(cible);
+    }
+    ajouterTomeScanne(cible, numero, isbn);
+    sauvegarder();
+    afficherToast(`➕ Tome ${numero} rangé dans « ${cible.titre} »`);
+    return;
+  }
+
+  const etaitPossede = ajouterTomeScanne(serie, numero, isbn);
   sauvegarder();
   if (!problemes.length) {
     afficherToast(`✅ Tome ${numero}${attendue ? ' · édition ' + attendue : ''} : c'est le bon` + (etaitPossede ? '' : ' (ajouté)'));

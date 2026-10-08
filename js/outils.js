@@ -72,6 +72,26 @@ function demanderSerieEtTome(titreParDefaut, tomeParDefaut, entete) {
   });
 }
 
+// Question à plusieurs réponses : choix = [{ libelle, valeur, principal }].
+// Renvoie la valeur choisie, ou null pour « Annuler ».
+function choisirAction(message, choix) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('choix-modal');
+    document.getElementById('choix-message').textContent = message;
+    const zone = document.getElementById('choix-boutons');
+    zone.innerHTML = '';
+    const terminer = (valeur) => { modal.classList.remove('active'); resolve(valeur); };
+    for (const c of [...choix, { libelle: 'Annuler', valeur: null }]) {
+      const b = document.createElement('button');
+      b.className = 'btn' + (c.principal ? '' : ' btn-secondary');
+      b.textContent = c.libelle;
+      b.onclick = () => terminer(c.valeur);
+      zone.appendChild(b);
+    }
+    modal.classList.add('active');
+  });
+}
+
 function demanderTexte(entete, valeurParDefaut) {
   return new Promise((resolve) => {
     const modal = document.getElementById('form-text-modal');
