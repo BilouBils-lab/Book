@@ -66,7 +66,7 @@ function rendreVues() {
   // 'ajout' : on garde l'ordre naturel du tableau (ordre d'ajout), rien à trier
 
   if (bibliotheque.length === 0) {
-    containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Clique sur ⚙️ pour importer un CSV ou sur ➕ pour ajouter une série.</div>`;
+    containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Clique sur ➕ pour ajouter une série.<br><br>Tu avais déjà une collection (nouveau raccourci, autre appareil) ?<br>⚙️ → 🔑 Code de sauvegarde cloud pour la récupérer.</div>`;
   } else if (listeAffichee.length === 0) {
     containerCol.innerHTML = `<div class="empty-state">Aucune série ne correspond à "${rechercheTexte}".</div>`;
   } else {

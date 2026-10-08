@@ -55,7 +55,8 @@ async function ouvrirApp(navigateur, base, services = {}) {
   const page = await contexte.newPage();
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
-  page.on('dialog', d => d.accept());
+  const alertes = [];
+  page.on('dialog', d => { alertes.push(d.message()); d.accept(); });
   await page.clock.setFixedTime(DATE_TEST);
 
   const repondre = (route, rep) => route.fulfill({
@@ -79,7 +80,7 @@ async function ouvrirApp(navigateur, base, services = {}) {
   await page.goto(base + '/index.html');
   await page.waitForFunction(() => typeof rendreVues === 'function' && document.readyState === 'complete');
   await page.waitForTimeout(300);
-  return { page, erreurs, fermer: () => contexte.close() };
+  return { page, erreurs, alertes, fermer: () => contexte.close() };
 }
 
 // Tomes 1..n possédés ; les `lus` premiers sont lus ; `sauf` = numéros non possédés
@@ -374,6 +375,52 @@ test('Inventaire : avancement, validation des séries et vérification d\u2019un
   await page.click('#confirm-ok');
   egal(await page.$$('.bandeau-inventaire').then(b => b.length), 0, 'bandeau retiré');
   egal(await page.evaluate(() => { ouvrirModalSerie(0); return document.getElementById('fiche-inventaire').style.display; }), 'none', 'barre d\u2019inventaire masquée hors inventaire');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Code de sauvegarde : réinstallation sans perdre la sauvegarde en ligne', async ({ navigateur, base }) => {
+  const enLigne = [{ titre: 'Ao Ashi', tomes: tomes(3) }, { titre: 'Berserk (Prestige)', tomes: tomes(4) }];
+  const { page, erreurs, alertes, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => {
+      if (req.headers()['x-backup-token'] !== 'bon-code') return { status: 401, body: {} };
+      if (req.url().endsWith('/backup/versions')) return { body: { actuelle: { date: '2026-10-08T08:15:00.000Z', series: 2, tomes: 7 }, versions: [] } };
+      if (req.method() === 'GET') return { body: enLigne };
+      return { body: { ok: true } };
+    }
+  });
+  await definirBibliotheque(page, []);
+  verifier((await page.textContent('#view-collection')).includes('Code de sauvegarde cloud pour la récupérer'), 'collection vide : piste pour récupérer sa collection');
+
+  // Nouveau raccourci : pas de code → on demande d'abord s'il en existe un
+  await page.evaluate(() => { configurerCodeCloud(); });
+  verifier((await page.textContent('#confirm-message')).startsWith('As-tu déjà un code'), 'question posée avant de générer un code');
+  egal([await page.textContent('#confirm-ok'), await page.textContent('#confirm-cancel')], ["Oui, j'ai un code", 'Non, première fois'], 'libellés des deux réponses');
+  await page.click('#confirm-ok');
+  egal(await page.inputValue('#form-text-input'), '', 'aucun code inventé quand on en a déjà un');
+
+  // Mauvais code : prévenu tout de suite
+  await page.fill('#form-text-input', 'faux-code');
+  await page.click('#form-text-ok');
+  await page.waitForFunction(() => document.getElementById('etat-sauvegarde').textContent.includes('incorrect'));
+  verifier(alertes.some(a => a.includes('Le serveur ne reconnaît pas ce code')), 'alerte immédiate si le code est faux');
+
+  // Bon code : la collection en ligne est proposée et récupérée
+  await page.evaluate(() => { configurerCodeCloud(); });
+  egal(await page.inputValue('#form-text-input'), 'faux-code', 'le code enregistré est proposé pour être corrigé');
+  await page.fill('#form-text-input', 'bon-code');
+  await page.click('#form-text-ok');
+  await page.waitForFunction(() => document.getElementById('confirm-message').textContent.includes('Code reconnu'));
+  verifier((await page.textContent('#confirm-message')).includes('2 séries, 7 tomes'), 'résumé de la sauvegarde en ligne');
+  await page.click('#confirm-ok');
+  await page.waitForFunction(() => bibliotheque.length === 2);
+  egal(await page.textContent('#confirm-ok'), 'Confirmer', 'le bouton de confirmation retrouve son libellé');
+
+  // Toute première configuration : un nouveau code est proposé
+  await page.evaluate(() => { localStorage.removeItem('cloud_backup_token'); configurerCodeCloud(); });
+  await page.click('#confirm-cancel');
+  verifier(/^[0-9a-f]{36}$/.test(await page.inputValue('#form-text-input')), 'nouveau code généré pour une première configuration');
+  await page.click('#form-text-cancel');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });
