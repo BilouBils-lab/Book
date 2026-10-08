@@ -116,6 +116,8 @@ test('Le numéro de version est le même partout', async () => {
   verifier(affiche, 'numéro de version affiché introuvable');
   verifier(fichiers.length >= 10, 'fichiers CSS / JS non référencés avec ?v=');
   egal([...new Set(fichiers)], [affiche], 'les ?v= des fichiers doivent correspondre à la version affichée');
+  const icone = (html.match(/rel="apple-touch-icon" href="([^"?]+)/) || [])[1];
+  verifier(icone && fs.existsSync(path.join(RACINE, icone)), "l'icône de l'écran d'accueil est un fichier du dépôt : " + icone);
 });
 
 test("L'app démarre sans erreur, avec ses trois onglets", async ({ navigateur, base }) => {
