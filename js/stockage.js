@@ -196,8 +196,10 @@ async function afficherEtatSauvegarde() {
   const dernierEnvoi = localStorage.getItem('cloud_dernier_envoi');
   if (r.statut === 'ok' && r.actuelle) {
     const identique = r.actuelle.series === ici.series && r.actuelle.tomes === ici.tomes;
-    afficher(!identique, (identique ? '✅ Sauvegardée en ligne ' : '⚠️ Dernière sauvegarde en ligne ') + texteDate(r.actuelle.date),
-      identique ? texteResume(ici) + (r.versions.length ? ` · ${r.versions.length} version${r.versions.length > 1 ? 's' : ''} précédente${r.versions.length > 1 ? 's' : ''}` : '')
+    // Sauvegarde envoyée par l'ancien Worker : pas de date connue jusqu'au prochain envoi
+    const quand = r.actuelle.date ? ' ' + texteDate(r.actuelle.date) : '';
+    afficher(!identique, (identique ? '✅ Sauvegardée en ligne' : '⚠️ Dernière sauvegarde en ligne') + quand,
+      identique ? texteResume(ici) + (r.actuelle.date ? '' : ' · la date s\u2019affichera après ta prochaine modification') + (r.versions.length ? ` · ${r.versions.length} version${r.versions.length > 1 ? 's' : ''} précédente${r.versions.length > 1 ? 's' : ''}` : '')
         : `En ligne : ${texteResume(r.actuelle)} · sur cet appareil : ${texteResume(ici)}`);
   } else if (r.statut === 'ok') {
     afficher(true, '⚠️ Aucune sauvegarde en ligne pour l\u2019instant', 'Elle sera faite à la prochaine modification.');
