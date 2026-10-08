@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="Mangas">
   <link rel="apple-touch-icon" href="https://img.icons8.com/color/180/manga.png">
 
-  <link rel="stylesheet" href="css/style.css?v=3.29">
+  <link rel="stylesheet" href="css/style.css?v=3.30">
 </head>
 <body>
 
@@ -57,7 +57,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.29</div>
+  <div class="version-tag">v3.30</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -70,8 +70,10 @@
         <button class="btn btn-secondary" onclick="majTomesParusCollection()">🔄 Mettre à jour mes séries</button>
         <button class="btn btn-secondary" onclick="rechercherIsbn()">🔎 Rechercher par ISBN</button>
         <button class="btn btn-secondary" onclick="configurerCleBooks()">📚 Clé Google Books (optionnelle)</button>
+        <div class="settings-titre">Sauvegarde</div>
+        <div id="etat-sauvegarde" class="etat-sauvegarde"></div>
         <button class="btn btn-secondary" onclick="configurerCodeCloud()">🔑 Code de sauvegarde cloud</button>
-        <button class="btn btn-secondary" onclick="restaurerDepuisCloud()">☁️ Restaurer depuis le cloud</button>
+        <button class="btn btn-secondary" onclick="ouvrirVersions()">🕘 Restaurer une sauvegarde en ligne</button>
         <button class="btn btn-secondary" onclick="forcerEnvoiCloud()">⬆️ Forcer l'envoi vers le cloud</button>
         <button class="btn btn-secondary" onclick="exporterSauvegarde()">📥 Exporter la sauvegarde (JSON)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📤 Importer la sauvegarde (JSON)</button>
@@ -179,6 +181,16 @@
     </div>
   </div>
 
+  <!-- Modal : choisir une sauvegarde en ligne à restaurer -->
+  <div class="modal-overlay" id="versions-modal">
+    <div class="modal-content" style="max-width: 360px;">
+      <button class="close-modal" onclick="fermerVersions()">×</button>
+      <h3 style="font-size: 16px; margin-bottom: 6px;">🕘 Sauvegardes en ligne</h3>
+      <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 12px; line-height: 1.4;">Une version est gardée par jour d'utilisation (les 30 dernières). Touche celle à remettre sur cet appareil.</div>
+      <div id="versions-liste" class="versions-liste"></div>
+    </div>
+  </div>
+
   <!-- Modal générique : confirmation -->
   <div class="modal-overlay" id="confirm-modal">
     <div class="modal-content" style="max-width: 340px;">
@@ -256,15 +268,15 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.29"></script>
-  <script src="js/recherche-infos.js?v=3.29"></script>
-  <script src="js/isbn-scanner.js?v=3.29"></script>
-  <script src="js/mise-a-jour.js?v=3.29"></script>
-  <script src="js/stockage.js?v=3.29"></script>
-  <script src="js/jaquettes.js?v=3.29"></script>
-  <script src="js/import-export.js?v=3.29"></script>
-  <script src="js/vues.js?v=3.29"></script>
-  <script src="js/fiche.js?v=3.29"></script>
-  <script src="js/demarrage.js?v=3.29"></script>
+  <script src="js/outils.js?v=3.30"></script>
+  <script src="js/recherche-infos.js?v=3.30"></script>
+  <script src="js/isbn-scanner.js?v=3.30"></script>
+  <script src="js/mise-a-jour.js?v=3.30"></script>
+  <script src="js/stockage.js?v=3.30"></script>
+  <script src="js/jaquettes.js?v=3.30"></script>
+  <script src="js/import-export.js?v=3.30"></script>
+  <script src="js/vues.js?v=3.30"></script>
+  <script src="js/fiche.js?v=3.30"></script>
+  <script src="js/demarrage.js?v=3.30"></script>
 </body>
 </html>

@@ -51,7 +51,7 @@ function demarrerServeur() {
 // `services` : fonctions facultatives { anilist, jikan, googleBooks, worker } qui reçoivent la requête
 // et renvoient { status, body } (objet → JSON). Par défaut : 404.
 async function ouvrirApp(navigateur, base, services = {}) {
-  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera'] });
+  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera'], locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const page = await contexte.newPage();
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
@@ -259,6 +259,50 @@ test('« Mettre à jour mes séries » affiche un bilan', async ({ navigateur, b
   await fermer();
 });
 
+test('Sauvegarde : état dans les Paramètres et restauration d\u2019une ancienne version', async ({ navigateur, base }) => {
+  const envois = [];
+  const versions = {
+    actuelle: { date: '2026-10-08T08:15:00.000Z', series: 2, tomes: 5 },
+    versions: [{ id: '2026-10-06T19:40:00.000Z', date: '2026-10-06T19:40:00.000Z', series: 3, tomes: 9 }, { id: 'x', date: null, series: 1, tomes: 1 }]
+  };
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => {
+      if (req.headers()['x-backup-token'] !== 'code') return { status: 401, body: {} };
+      if (req.url().endsWith('/backup/versions')) return { body: versions };
+      if (req.method() === 'POST') { envois.push([JSON.parse(req.postData()).length, req.headers()['x-backup-force']]); return { body: { ok: true } }; }
+      if (req.url().includes('version=2026-10-06')) return { body: [{ titre: 'A', tomes: tomes(3) }, { titre: 'B', tomes: tomes(3) }, { titre: 'C', tomes: tomes(3) }] };
+      return null;
+    }
+  });
+  await definirBibliotheque(page, [{ titre: 'A', tomes: tomes(3) }, { titre: 'B', tomes: tomes(2) }]);
+  const etat = async () => { await page.evaluate(() => ouvrirParametres()); await page.waitForFunction(() => !document.getElementById('etat-sauvegarde').textContent.includes('Vérification')); return page.textContent('#etat-sauvegarde'); };
+
+  verifier((await etat()).includes('non configurée'), 'sans code : alerte');
+  await page.evaluate(() => localStorage.setItem('cloud_backup_token', 'faux'));
+  verifier((await etat()).includes('Code de sauvegarde incorrect'), 'code incorrect signalé');
+  await page.evaluate(() => localStorage.setItem('cloud_backup_token', 'code'));
+  egal(await etat(), "✅ Sauvegardée en ligne aujourd'hui à 10:15" + '2 séries, 5 tomes · 2 versions précédentes', 'sauvegarde à jour');
+  await page.evaluate(() => { bibliotheque[1].tomes.push({ numero: 3, possede: true, lu: false }); });
+  verifier((await etat()).includes('sur cet appareil : 2 séries, 6 tomes'), 'différence entre l\u2019appareil et le cloud signalée');
+
+  await page.click('text=Restaurer une sauvegarde en ligne');
+  await page.waitForSelector('.version-item');
+  egal(await page.$$eval('.version-item', b => b.map(x => x.textContent)), [
+    "Dernière sauvegarde · aujourd'hui à 10:152 séries, 5 tomes",
+    'Le 6 octobre à 21:403 séries, 9 tomes',
+    "Avant la mise en place de l'historique1 série, 1 tome"
+  ], 'liste des versions');
+  await page.click('.version-item >> nth=1');
+  verifier((await page.textContent('#confirm-message')).includes('par la sauvegarde du 6 octobre à 21:40 (3 séries, 9 tomes)'), 'confirmation');
+  await page.click('#confirm-ok');
+  await page.waitForFunction(() => bibliotheque.length === 3);
+  await page.waitForTimeout(300);
+  egal(envois, [[3, '1']], 'la version restaurée devient la sauvegarde en ligne (envoi forcé)');
+  egal(await page.evaluate(() => document.getElementById('settings-modal').classList.contains('active')), false, 'Paramètres refermés');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Recherche par ISBN (BnF) puis ajout du tome', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
     worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Berserk. 1 (Éd. prestige)', auteurs: ['Kentarō Miura'], editeur: 'Glénat (Grenoble)', date: '2025' } } : null
@@ -349,15 +393,49 @@ test('Worker : sauvegarde protégée, ISBN et éditions BnF', async () => {
   if (!crypto.subtle.timingSafeEqual) crypto.subtle.timingSafeEqual = (a, b) => nodeCrypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
   const fetchOriginal = globalThis.fetch;
   try {
+    // Faux stockage KV de Cloudflare (valeurs + métadonnées, liste triée par nom)
     const kv = new Map();
-    const env = { BACKUP_TOKEN: 'secret', MANGA_KV: { get: async k => kv.get(k) ?? null, put: async (k, v) => kv.set(k, v) } };
+    const env = { BACKUP_TOKEN: 'secret', MANGA_KV: {
+      get: async k => kv.has(k) ? kv.get(k).value : null,
+      getWithMetadata: async k => kv.has(k) ? { value: kv.get(k).value, metadata: kv.get(k).metadata ?? null } : { value: null, metadata: null },
+      put: async (k, value, options = {}) => { kv.set(k, { value, metadata: options.metadata }); },
+      delete: async k => { kv.delete(k); },
+      list: async ({ prefix }) => ({ keys: [...kv.keys()].filter(k => k.startsWith(prefix)).sort().map(name => ({ name, metadata: kv.get(name).metadata })) })
+    } };
     const appel = (chemin, init) => worker.fetch(new Request('https://w.dev' + chemin, init), env);
-    const series = (n) => JSON.stringify(Array.from({ length: n }, (_, i) => ({ titre: 'S' + i, tomes: [] })));
+    const series = (n) => JSON.stringify(Array.from({ length: n }, (_, i) => ({ titre: 'S' + i, tomes: [{ numero: 1, possede: true }, { numero: 2, possede: false }] })));
+    const envoyer = (n, force) => appel('/backup', { method: 'POST', headers: { 'X-Backup-Token': 'secret', ...(force ? { 'X-Backup-Force': '1' } : {}) }, body: series(n) });
+    const versions = async () => (await appel('/backup/versions', { headers: { 'X-Backup-Token': 'secret' } })).json();
+    const resume = (v) => v && [v.series, v.tomes];
 
     egal((await appel('/backup')).status, 401, 'sauvegarde sans code refusée');
-    egal((await appel('/backup', { method: 'POST', headers: { 'X-Backup-Token': 'secret' }, body: series(10) })).status, 200, 'sauvegarde avec code');
-    egal((await appel('/backup', { method: 'POST', headers: { 'X-Backup-Token': 'secret' }, body: series(2) })).status, 409, 'sauvegarde qui viderait le cloud refusée');
-    egal((await appel('/backup', { method: 'POST', headers: { 'X-Backup-Token': 'secret', 'X-Backup-Force': '1' }, body: series(2) })).status, 200, 'envoi forcé accepté');
+    egal((await appel('/backup/versions')).status, 401, 'historique sans code refusé');
+    egal((await envoyer(10)).status, 200, 'sauvegarde avec code');
+    await envoyer(11);
+    let v = await versions();
+    egal([resume(v.actuelle), v.versions.length], [[11, 11], 0], 'sauvegarde actuelle (séries, tomes possédés), pas d\u2019historique le même jour');
+    verifier(Date.now() - new Date(v.actuelle.date) < 5000, 'date de la sauvegarde');
+
+    kv.get('bibliotheque').metadata.date = '2026-10-07T18:00:00.000Z';
+    await envoyer(12);
+    v = await versions();
+    egal(v.versions.map(x => [x.id, ...resume(x)]), [['2026-10-07T18:00:00.000Z', 11, 11]], 'premier envoi du jour : la version de la veille est archivée');
+
+    egal((await envoyer(2)).status, 409, 'sauvegarde qui viderait le cloud refusée');
+    egal((await envoyer(2, true)).status, 200, 'envoi forcé accepté');
+    v = await versions();
+    egal([resume(v.actuelle), v.versions.map(x => x.series)], [[2, 2], [12, 11]], 'envoi forcé : l\u2019ancienne sauvegarde est archivée');
+    const ancienne = await (await appel('/backup?version=' + v.versions[1].id, { headers: { 'X-Backup-Token': 'secret' } })).json();
+    egal(ancienne.length, 11, 'lecture d\u2019une version archivée');
+
+    for (let i = 0; i < 35; i++) kv.set('historique:2026-01-' + String(i).padStart(2, '0'), { value: series(1), metadata: { date: null, series: 1, tomes: 1 } });
+    await envoyer(3, true);
+    v = await versions();
+    egal([v.versions.length, v.versions[0].series], [30, 2], 'on garde les 30 versions les plus récentes');
+
+    kv.set('bibliotheque', { value: series(4) });
+    v = await versions();
+    egal([v.actuelle.date, resume(v.actuelle)], [null, [4, 4]], 'sauvegarde d\u2019avant l\u2019historique (sans date)');
 
     const notice = (titre, isbn) => `<srw:record><dc:title>${titre}</dc:title><dc:creator>Miura, Kentarō (1966-2021). Auteur du texte</dc:creator><dc:publisher>Glénat (Grenoble)</dc:publisher><dc:identifier>ISBN ${isbn}</dc:identifier></srw:record>`;
     globalThis.fetch = async (url) => new Response(decodeURIComponent(String(url)).includes('bib.isbn')

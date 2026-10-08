@@ -70,12 +70,33 @@ async function codeValide(fourni, attendu) {
   return crypto.subtle.timingSafeEqual(a, b);
 }
 
-function nombreSeries(texte) {
+// Nombre de séries et de tomes possédés d'une sauvegarde (null si ce n'est pas une bibliothèque)
+function resumerBibliotheque(texte) {
   try {
     const data = JSON.parse(texte);
-    return Array.isArray(data) ? data.length : null;
+    if (!Array.isArray(data)) return null;
+    const tomes = data.reduce((n, s) => n + (s && Array.isArray(s.tomes) ? s.tomes.filter(t => t && t.possede !== false).length : 0), 0);
+    return { series: data.length, tomes };
   } catch (e) {
     return null;
+  }
+}
+
+// Historique : on garde les NB_VERSIONS dernières versions, sous les clés "historique:<date ISO>".
+// Une version est archivée au premier envoi de chaque journée (état de la veille) et avant chaque envoi forcé.
+const NB_VERSIONS = 30;
+
+function jourParis(date) {
+  return date.toLocaleDateString("fr-CA", { timeZone: "Europe/Paris" });
+}
+
+async function archiverVersion(env, texte, meta) {
+  const infos = meta || { date: null, ...resumerBibliotheque(texte) };
+  const id = infos.date || new Date().toISOString();
+  await env.MANGA_KV.put("historique:" + id, texte, { metadata: infos });
+  const { keys } = await env.MANGA_KV.list({ prefix: "historique:" });
+  for (const k of keys.slice(0, Math.max(0, keys.length - NB_VERSIONS))) {
+    await env.MANGA_KV.delete(k.name);
   }
 }
 
@@ -183,7 +204,7 @@ export default {
     const { pathname } = url;
 
     // --- Sauvegarde / restauration de la bibliothèque ---
-    if (pathname === "/backup") {
+    if (pathname === "/backup" || pathname === "/backup/versions") {
       try {
         if (!env.MANGA_KV) {
           throw new Error("Binding KV 'MANGA_KV' introuvable — vérifie Settings > Bindings sur le Worker.");
@@ -194,28 +215,40 @@ export default {
         if (!(await codeValide(request.headers.get("X-Backup-Token"), env.BACKUP_TOKEN))) {
           return json({ error: "Code de sauvegarde incorrect" }, 401);
         }
-        if (request.method === "POST") {
+        // Liste : sauvegarde actuelle + versions précédentes, de la plus récente à la plus ancienne
+        if (pathname === "/backup/versions" && request.method === "GET") {
+          const { value, metadata } = await env.MANGA_KV.getWithMetadata("bibliotheque");
+          const actuelle = value ? (metadata || { date: null, ...resumerBibliotheque(value) }) : null;
+          const { keys } = await env.MANGA_KV.list({ prefix: "historique:" });
+          const versions = keys.reverse().map(k => ({ id: k.name.slice("historique:".length), ...(k.metadata || {}) }));
+          return json({ actuelle, versions });
+        }
+        if (pathname === "/backup" && request.method === "POST") {
           const body = await request.text();
-          const nouveau = nombreSeries(body);
-          if (nouveau === null) {
+          const resume = resumerBibliotheque(body);
+          if (!resume) {
             return json({ error: "Sauvegarde invalide" }, 400);
           }
-          const ancienTexte = await env.MANGA_KV.get("bibliotheque");
-          const ancien = ancienTexte ? nombreSeries(ancienTexte) : 0;
+          const { value: ancienTexte, metadata: ancienMeta } = await env.MANGA_KV.getWithMetadata("bibliotheque");
+          const ancien = ancienTexte ? (resumerBibliotheque(ancienTexte) || { series: 0 }).series : 0;
+          const nouveau = resume.series;
           const force = request.headers.get("X-Backup-Force") === "1";
           if (!force && ancien > 0 && nouveau < ancien * RATIO_MIN_SAUVEGARDE) {
             return json({ error: "Sauvegarde refusée : elle ferait passer le cloud de " + ancien + " à " + nouveau + " séries.", ancien, nouveau }, 409);
           }
-          if (ancienTexte) {
-            await env.MANGA_KV.put("bibliotheque_precedente", ancienTexte);
+          const maintenant = new Date();
+          if (ancienTexte && (force || !ancienMeta || !ancienMeta.date || jourParis(new Date(ancienMeta.date)) !== jourParis(maintenant))) {
+            await archiverVersion(env, ancienTexte, ancienMeta);
           }
-          await env.MANGA_KV.put("bibliotheque", body);
-          return json({ ok: true });
+          const meta = { date: maintenant.toISOString(), ...resume };
+          await env.MANGA_KV.put("bibliotheque", body, { metadata: meta });
+          return json({ ok: true, ...meta });
         }
-        if (request.method === "GET") {
-          const data = await env.MANGA_KV.get("bibliotheque");
+        if (pathname === "/backup" && request.method === "GET") {
+          const version = url.searchParams.get("version");
+          const data = await env.MANGA_KV.get(version ? "historique:" + version : "bibliotheque");
           return new Response(data || "null", {
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
+            headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" }
           });
         }
         return new Response("Method not allowed", { status: 405, headers: corsHeaders });

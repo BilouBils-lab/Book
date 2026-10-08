@@ -95,7 +95,10 @@ async function envoyerVersCloud(forcer) {
   if (forcer) entetes['X-Backup-Force'] = '1';
   const res = await fetch(BACKUP_URL, { method: 'POST', headers: entetes, body: JSON.stringify(bibliotheque) });
   const data = await res.json().catch(() => ({}));
-  if (res.ok) return { statut: 'ok' };
+  if (res.ok) {
+    localStorage.setItem('cloud_dernier_envoi', new Date().toISOString());
+    return { statut: 'ok' };
+  }
   if (res.status === 401) return { statut: 'code-incorrect' };
   if (res.status === 409) return { statut: 'refuse', ancien: data.ancien, nouveau: data.nouveau };
   return { statut: 'erreur', message: data.error || ('HTTP ' + res.status) };
@@ -142,21 +145,129 @@ async function forcerEnvoiCloud() {
   }
 }
 
-async function restaurerDepuisCloud() {
+// Nombre de séries et de tomes possédés (même calcul que le Worker)
+function resumeBibliotheque(series) {
+  return { series: series.length, tomes: series.reduce((n, s) => n + s.tomes.filter(t => t.possede !== false).length, 0) };
+}
+
+function texteResume(r) {
+  return `${r.series} série${r.series > 1 ? 's' : ''}, ${r.tomes} tome${r.tomes > 1 ? 's' : ''}`;
+}
+
+// « aujourd'hui à 14:32 », « hier à 09:05 », « le 3 octobre à 18:40 »
+function texteDate(iso) {
+  if (!iso) return "avant la mise en place de l'historique";
+  const d = new Date(iso);
+  const heure = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const jour = (x) => x.toDateString();
+  const hier = new Date(); hier.setDate(hier.getDate() - 1);
+  if (jour(d) === jour(new Date())) return "aujourd'hui à " + heure;
+  if (jour(d) === jour(hier)) return 'hier à ' + heure;
+  const options = { day: 'numeric', month: 'long' };
+  if (d.getFullYear() !== new Date().getFullYear()) options.year = 'numeric';
+  return 'le ' + d.toLocaleDateString('fr-FR', options) + ' à ' + heure;
+}
+
+async function lireVersionsCloud() {
+  const res = await fetchAvecTimeout(BACKUP_URL + '/versions', { headers: { 'X-Backup-Token': codeCloud() } }, 10000);
+  if (res.status === 401) return { statut: 'code-incorrect' };
+  if (res.status === 404) return { statut: 'ancien-worker' };
+  if (!res.ok) return { statut: 'erreur' };
+  return { statut: 'ok', ...(await res.json()) };
+}
+
+// Encadré « Sauvegarde » des Paramètres
+async function afficherEtatSauvegarde() {
+  const zone = document.getElementById('etat-sauvegarde');
+  const ici = resumeBibliotheque(bibliotheque);
+  const afficher = (alerte, texte, detail) => {
+    zone.className = 'etat-sauvegarde' + (alerte ? ' alerte' : '');
+    zone.innerHTML = '';
+    zone.append(texte);
+    if (detail) { const s = document.createElement('small'); s.textContent = detail; zone.append(s); }
+  };
+  if (!codeCloud()) {
+    afficher(true, "⚠️ Sauvegarde en ligne non configurée", "Ta collection n'existe que sur cet appareil. Ajoute un code de sauvegarde ci-dessous.");
+    return;
+  }
+  afficher(false, '☁️ Vérification de la sauvegarde en ligne…');
+  let r;
+  try { r = await lireVersionsCloud(); } catch (e) { r = { statut: 'hors-ligne' }; }
+  const dernierEnvoi = localStorage.getItem('cloud_dernier_envoi');
+  if (r.statut === 'ok' && r.actuelle) {
+    const identique = r.actuelle.series === ici.series && r.actuelle.tomes === ici.tomes;
+    afficher(!identique, (identique ? '✅ Sauvegardée en ligne ' : '⚠️ Dernière sauvegarde en ligne ') + texteDate(r.actuelle.date),
+      identique ? texteResume(ici) + (r.versions.length ? ` · ${r.versions.length} version${r.versions.length > 1 ? 's' : ''} précédente${r.versions.length > 1 ? 's' : ''}` : '')
+        : `En ligne : ${texteResume(r.actuelle)} · sur cet appareil : ${texteResume(ici)}`);
+  } else if (r.statut === 'ok') {
+    afficher(true, '⚠️ Aucune sauvegarde en ligne pour l\u2019instant', 'Elle sera faite à la prochaine modification.');
+  } else if (r.statut === 'code-incorrect') {
+    afficher(true, '⚠️ Code de sauvegarde incorrect', 'Les sauvegardes en ligne ne passent pas. Vérifie le code ci-dessous.');
+  } else if (r.statut === 'ancien-worker') {
+    afficher(false, '☁️ Dernier envoi depuis cet appareil : ' + (dernierEnvoi ? texteDate(dernierEnvoi) : 'inconnu'), "Mets à jour le Worker pour voir l'état complet et l'historique.");
+  } else {
+    afficher(true, '⚠️ Sauvegarde en ligne injoignable', 'Dernier envoi réussi depuis cet appareil : ' + (dernierEnvoi ? texteDate(dernierEnvoi) : 'inconnu'));
+  }
+}
+
+function boutonVersion(titre, detail, actuelle, onclick) {
+  const b = document.createElement('button');
+  b.className = 'version-item' + (actuelle ? ' actuelle' : '');
+  b.textContent = titre;
+  const s = document.createElement('small');
+  s.textContent = detail;
+  b.append(s);
+  b.onclick = onclick;
+  return b;
+}
+
+async function ouvrirVersions() {
   if (!codeCloud()) { alert("Configure d'abord le code de sauvegarde cloud."); return; }
-  if (!(await confirmerAction("Récupérer la dernière sauvegarde en ligne et remplacer la bibliothèque actuelle sur cet appareil ?"))) return;
+  const liste = document.getElementById('versions-liste');
+  liste.textContent = 'Chargement…';
+  document.getElementById('versions-modal').classList.add('active');
+  let r;
+  try { r = await lireVersionsCloud(); } catch (e) { r = { statut: 'hors-ligne' }; }
+  liste.textContent = '';
+  if (r.statut === 'code-incorrect') { liste.textContent = 'Code de sauvegarde incorrect.'; return; }
+  if (r.statut === 'ancien-worker') {
+    liste.append(boutonVersion('Dernière sauvegarde', "Mets à jour le Worker pour voir l'historique.", true, () => restaurerVersion(null, 'la dernière sauvegarde en ligne')));
+    return;
+  }
+  if (r.statut !== 'ok') { liste.textContent = 'Impossible de contacter la sauvegarde en ligne.'; return; }
+  if (!r.actuelle) { liste.textContent = 'Aucune sauvegarde en ligne pour l\u2019instant.'; return; }
+  const nom = (v) => 'la sauvegarde ' + (v.date ? 'du ' + texteDate(v.date).replace(/^le /, '') : texteDate(null));
+  liste.append(boutonVersion('Dernière sauvegarde · ' + texteDate(r.actuelle.date), texteResume(r.actuelle), true,
+    () => restaurerVersion(null, 'la dernière sauvegarde en ligne', r.actuelle)));
+  for (const v of r.versions) {
+    const titre = texteDate(v.date);
+    liste.append(boutonVersion(titre.charAt(0).toUpperCase() + titre.slice(1), v.series != null ? texteResume(v) : '', false, () => restaurerVersion(v.id, nom(v), v)));
+  }
+}
+
+function fermerVersions() {
+  document.getElementById('versions-modal').classList.remove('active');
+}
+
+// id null = dernière sauvegarde ; sinon une version de l'historique
+async function restaurerVersion(id, nom, resume) {
+  const enLigne = resume && resume.series != null ? ` (${texteResume(resume)})` : '';
+  const message = `Remplacer la bibliothèque de cet appareil (${texteResume(resumeBibliotheque(bibliotheque))}) par ${nom}${enLigne} ?`
+    + (id ? "\n\nL'état actuel en ligne sera gardé dans l'historique." : '');
+  if (!(await confirmerAction(message))) return;
   try {
-    const res = await fetch(BACKUP_URL, { headers: { 'X-Backup-Token': codeCloud() } });
+    const res = await fetch(BACKUP_URL + (id ? '?version=' + encodeURIComponent(id) : ''), { headers: { 'X-Backup-Token': codeCloud() } });
     if (res.status === 401) { alert("Code de sauvegarde incorrect."); return; }
     const data = await res.json();
-    if (bibliothequeValide(data)) {
-      bibliotheque = data;
-      sauvegarder();
-      fermerParametres();
-      alert("Bibliothèque restaurée depuis le cloud !");
-    } else {
-      alert("Aucune sauvegarde en ligne trouvée pour l'instant.");
-    }
+    if (!bibliothequeValide(data)) { alert("Cette sauvegarde est introuvable ou illisible."); return; }
+    clearTimeout(cloudBackupTimer);
+    bibliotheque = data;
+    sauvegarderLocal();
+    // Une ancienne version devient la sauvegarde en ligne (l'actuelle part dans l'historique)
+    if (id) await envoyerVersCloud(true);
+    fermerVersions();
+    fermerParametres();
+    afficherToast('✅ Bibliothèque restaurée');
   } catch (e) {
     alert("Impossible de contacter la sauvegarde en ligne.");
   }
@@ -164,6 +275,7 @@ async function restaurerDepuisCloud() {
 
 function ouvrirParametres() {
   document.getElementById('settings-modal').classList.add('active');
+  afficherEtatSauvegarde();
 }
 
 function fermerParametres() {
