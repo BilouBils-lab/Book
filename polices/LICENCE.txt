@@ -1,0 +1,3 @@
+Bangers — Copyright 2010 The Bangers Project Authors (https://github.com/googlefonts/bangers)
+Police distribuée sous licence SIL Open Font License, version 1.1 : https://openfontlicense.org
+Fichier : bangers-latin.woff2 (sous-ensemble latin, depuis Google Fonts).

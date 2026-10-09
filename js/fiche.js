@@ -38,6 +38,7 @@ function creerPastille(texte, classe) {
 function remplirModalSerie(index) {
   const serie = bibliotheque[index];
   document.getElementById('modal-title').innerText = serie.titre;
+  document.getElementById('modal-title').classList.toggle('long', serie.titre.length > 20);
   document.getElementById('modal-author').innerText = [serie.auteur || 'Auteur inconnu', serie.editeur].filter(Boolean).join(' · ');
   document.getElementById('modal-cover').src = serie.couverture || JAQUETTE_DEFAUT;
 
