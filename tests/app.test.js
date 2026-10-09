@@ -662,6 +662,46 @@ test('Toucher le fond autour d\u2019une fenêtre la ferme', async ({ navigateur,
   await fermer();
 });
 
+test('Nouveautés au lancement : sorties depuis la dernière visite et attendus du mois', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  const k = 2026 * 12 + 9; // octobre 2026, date des tests
+  // Ao Ashi : la dernière mise à jour connaissait 35 tomes, Manga Insight en compte 36 → vraie sortie
+  // Série X : estimée ce mois-ci (pas dans Manga Insight)
+  await avecMangaInsight(page, [
+    { titre: 'Ao Ashi', tomesParus: 35, tomesParusSource: 'Manga Insight', parution: { nom: 'Ao Ashi - Playmaker', dernier: { vol: 35, k: k - 3 }, rythme: 3 }, tomes: tomes(35) },
+    { titre: 'Kagurabachi', tomes: tomes(10) },
+    { titre: 'Série X', parution: { nom: 'Série X', dernier: { vol: 4, k: k - 2 }, rythme: 2 }, tomes: tomes(4) }]);
+  egal(await page.evaluate(() => [bibliotheque[0].nouveaute.debut, bibliotheque[0].nouveaute.fin, !!bibliotheque[1].nouveaute]), [36, 36, false],
+    'sortie détectée pour Ao Ashi seulement (pas de « nouveauté » à la première mise à jour de Kagurabachi)');
+
+  await page.evaluate(() => verifierNouveautes());
+  egal(await page.evaluate(() => document.getElementById('nouveautes-modal').classList.contains('active')), true, 'page ouverte au lancement');
+  const lignes = () => page.$$eval('#nouveautes-contenu > *', els => els.map(e => e.classList.contains('pal-section') ? '# ' + e.textContent
+    : [e.querySelector('.pal-title').textContent, e.querySelector('.pal-tome').textContent, (e.querySelector('.nouveaute-etat') || {}).textContent].filter(Boolean).join(' — ')));
+  egal(await lignes(), [
+    '# 🆕 Depuis ta dernière visite', 'Ao Ashi — Tome 36 sorti · septembre 2026 — 🛒 à acheter',
+    '# 📅 Attendus ce mois-ci', 'Série X — Tome 5 · estimé ce mois-ci'
+  ], 'contenu de la page');
+
+  // OK : tout est vu, rien n'est réannoncé
+  await page.click('#nouveautes-modal button:has-text("OK")');
+  await page.evaluate(() => verifierNouveautes());
+  egal(await page.evaluate(() => document.getElementById('nouveautes-modal').classList.contains('active')), false, 'pas de réouverture une fois vu');
+
+  // La sortie reste visible dans « À venir », et l'achat met à jour son état
+  await page.evaluate(() => { marquerPossede(0, 36); changerOnglet('avenir'); });
+  const recentes = await page.$$eval('#view-avenir .avenir-item', els => els.slice(0, 1).map(e => e.querySelector('.pal-title').textContent + ' — ' + e.querySelector('.nouveaute-etat').textContent));
+  egal(recentes, ['Ao Ashi — ✓ déjà dans ta collection'], 'sortie récente dans « À venir »');
+  verifier((await page.textContent('#view-avenir')).includes('🆕 Sorties récentes'), 'section « Sorties récentes »');
+
+  // Un appui sur une ligne ouvre la fiche (et ferme la page)
+  await page.evaluate(() => ouvrirNouveautes());
+  await page.click('#nouveautes-contenu .avenir-item >> nth=0');
+  egal(await page.evaluate(() => [document.getElementById('nouveautes-modal').classList.contains('active'), document.getElementById('modal-title').textContent]), [false, 'Série X'], 'fiche ouverte depuis la page');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Recherche par ISBN (BnF) puis ajout du tome', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
     worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Berserk. 1 (Éd. prestige)', auteurs: ['Kentarō Miura'], editeur: 'Glénat (Grenoble)', date: '2025' } } : null
