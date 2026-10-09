@@ -50,8 +50,9 @@ function demarrerServeur() {
 
 // `services` : fonctions facultatives { anilist, jikan, googleBooks, worker } qui reçoivent la requête
 // et renvoient { status, body } (objet → JSON). Par défaut : 404.
-async function ouvrirApp(navigateur, base, services = {}) {
-  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera'], locale: 'fr-FR', timezoneId: 'Europe/Paris' });
+async function ouvrirApp(navigateur, base, services = {}, options = {}) {
+  // Service worker désactivé ici (il court-circuiterait les services simulés) ; testé à part
+  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera'], locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: options.serviceWorkers || 'block' });
   const page = await contexte.newPage();
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
@@ -80,7 +81,7 @@ async function ouvrirApp(navigateur, base, services = {}) {
   await page.goto(base + '/index.html');
   await page.waitForFunction(() => typeof rendreVues === 'function' && document.readyState === 'complete');
   await page.waitForTimeout(300);
-  return { page, erreurs, alertes, fermer: () => contexte.close() };
+  return { page, contexte, erreurs, alertes, fermer: () => contexte.close() };
 }
 
 // Tomes 1..n possédés ; les `lus` premiers sont lus ; `sauf` = numéros non possédés
@@ -117,6 +118,10 @@ test('Le numéro de version est le même partout', async () => {
   verifier(affiche, 'numéro de version affiché introuvable');
   verifier(fichiers.length >= 10, 'fichiers CSS / JS non référencés avec ?v=');
   egal([...new Set(fichiers)], [affiche], 'les ?v= des fichiers doivent correspondre à la version affichée');
+  const versionSw = (fs.readFileSync(path.join(RACINE, 'sw.js'), 'utf8').match(/const VERSION = '([\d.]+)'/) || [])[1];
+  egal(versionSw, affiche, 'la VERSION du service worker (sw.js) doit correspondre à la version affichée');
+  const zxingApp = (fs.readFileSync(path.join(RACINE, 'js', 'isbn-scanner.js'), 'utf8').match(/ZXING_URL = '([^']+)'/) || [])[1];
+  egal(fs.readFileSync(path.join(RACINE, 'sw.js'), 'utf8').includes(`ZXING_URL = '${zxingApp}'`), true, 'même bibliothèque de scan dans sw.js et isbn-scanner.js');
   const icone = (html.match(/rel="apple-touch-icon" href="([^"?]+)/) || [])[1];
   verifier(icone && fs.existsSync(path.join(RACINE, icone)), "l'icône de l'écran d'accueil est un fichier du dépôt : " + icone);
 });
@@ -570,6 +575,39 @@ test('Édition retrouvée par l\u2019ISBN : Dragon Ball Perfect Edition (titre B
   egal(premier, '✓ Édition Perfect · 34 tomes · Glénat · 2009–2015 · 📷 tes tomes scannés', 'édition des tomes scannés proposée en premier');
   verifier(!(await page.textContent('#choix-boutons')).includes('standard · 42 tomes · Glénat · 1993–2000 · 📷'), 'pas de 📷 sur une édition seulement déduite');
   await page.click('#choix-boutons button >> text=Annuler');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Mode hors-ligne : l\u2019app s\u2019ouvre sans réseau, la sauvegarde part au retour du réseau', async ({ navigateur, base }) => {
+  const envois = [];
+  const { page, contexte, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => { if (req.method() === 'POST') { envois.push(JSON.parse(req.postData()).length); return { body: { ok: true } }; } return null; }
+  }, { serviceWorkers: 'allow' });
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await page.evaluate(() => { localStorage.setItem('cloud_backup_token', 'code'); bibliotheque = [{ titre: 'Ao Ashi', tomes: [1, 2, 3].map(n => ({ numero: n, possede: true, lu: false })) }]; sauvegarderLocal(); });
+  await page.waitForTimeout(300);
+
+  // Coupure du réseau, puis relance de l'app
+  await contexte.setOffline(true);
+  await page.reload();
+  await page.waitForFunction(() => typeof rendreVues === 'function' && bibliotheque.length === 1);
+  egal(await page.$$eval('.series-title', t => t.map(x => x.textContent)), ['Ao Ashi'], 'collection affichée sans réseau');
+  egal(await page.isVisible('#badge-hors-ligne'), true, 'badge « hors ligne » affiché');
+
+  // Une modification hors ligne : enregistrée sur le téléphone, envoi en attente
+  await page.evaluate(() => { marquerCommeLu(0, 0); });
+  await page.waitForTimeout(2500);
+  egal(await page.evaluate(() => localStorage.getItem('cloud_en_attente')), '1', 'envoi mis en attente');
+  await page.evaluate(() => ouvrirParametres());
+  verifier((await page.textContent('#etat-sauvegarde')).includes('partiront en ligne dès que le réseau revient'), 'état « hors ligne » dans les Paramètres');
+
+  // Retour du réseau : la sauvegarde part toute seule
+  await contexte.setOffline(false);
+  await page.waitForFunction(() => !localStorage.getItem('cloud_en_attente'), null, { timeout: 10000 });
+  egal(envois, [1], 'sauvegarde envoyée au retour du réseau');
+  egal(await page.isVisible('#badge-hors-ligne'), false, 'badge retiré');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });

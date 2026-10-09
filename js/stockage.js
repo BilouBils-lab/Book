@@ -151,20 +151,32 @@ function sauvegarderLocal() {
 function sauvegarder() {
   sauvegarderLocal();
   clearTimeout(cloudBackupTimer);
-  cloudBackupTimer = setTimeout(async () => {
-    try {
-      const r = await envoyerVersCloud(false);
-      if (r.statut === 'code-incorrect') {
-        signalerProblemeCloud("Sauvegarde cloud impossible : le code de sauvegarde est incorrect (Paramètres → 🔑 Code de sauvegarde cloud).");
-      } else if (r.statut === 'refuse') {
-        signalerProblemeCloud(`Sauvegarde cloud bloquée : le cloud contient ${r.ancien} séries et cet appareil seulement ${r.nouveau}.\n\nSi c'est un nouvel appareil, utilise « Restaurer depuis le cloud ». Si tu as vraiment supprimé ces séries, utilise « Forcer l'envoi vers le cloud ».`);
-      } else if (r.statut === 'erreur') {
-        console.error('Sauvegarde cloud impossible', r.message);
-      }
-    } catch (e) {
-      console.error('Sauvegarde cloud impossible', e);
+  cloudBackupTimer = setTimeout(envoyerSauvegardeAuto, 2000);
+}
+
+// Hors ligne, l'envoi échoue : on le note, et il repart dès que le réseau revient (ou au prochain lancement)
+async function envoyerSauvegardeAuto() {
+  if (!codeCloud()) return;
+  if (!navigator.onLine) { localStorage.setItem('cloud_en_attente', '1'); return; }
+  try {
+    const r = await envoyerVersCloud(false);
+    if (r.statut === 'ok') localStorage.removeItem('cloud_en_attente');
+    if (r.statut === 'code-incorrect') {
+      signalerProblemeCloud("Sauvegarde cloud impossible : le code de sauvegarde est incorrect (Paramètres → 🔑 Code de sauvegarde cloud).");
+    } else if (r.statut === 'refuse') {
+      signalerProblemeCloud(`Sauvegarde cloud bloquée : le cloud contient ${r.ancien} séries et cet appareil seulement ${r.nouveau}.\n\nSi c'est un nouvel appareil, utilise « Restaurer depuis le cloud ». Si tu as vraiment supprimé ces séries, utilise « Forcer l'envoi vers le cloud ».`);
+    } else if (r.statut === 'erreur') {
+      console.error('Sauvegarde cloud impossible', r.message);
     }
-  }, 2000);
+  } catch (e) {
+    // Pas de réseau (ou réseau coupé pendant l'envoi) : on réessaiera
+    localStorage.setItem('cloud_en_attente', '1');
+    console.error('Sauvegarde cloud impossible', e);
+  }
+}
+
+function envoyerSauvegardeEnAttente() {
+  if (localStorage.getItem('cloud_en_attente') && codeCloud()) envoyerSauvegardeAuto();
 }
 
 async function forcerEnvoiCloud() {
@@ -223,6 +235,12 @@ async function afficherEtatSauvegarde() {
   };
   if (!codeCloud()) {
     afficher(true, "⚠️ Sauvegarde en ligne non configurée", "Ta collection n'existe que sur cet appareil. Ajoute un code de sauvegarde ci-dessous.");
+    return;
+  }
+  if (!navigator.onLine) {
+    afficher(true, '📴 Hors ligne', localStorage.getItem('cloud_en_attente')
+      ? 'Tes dernières modifications sont enregistrées sur ce téléphone et partiront en ligne dès que le réseau revient.'
+      : 'Tout est enregistré sur ce téléphone. La sauvegarde en ligne reprendra avec le réseau.');
     return;
   }
   afficher(false, '☁️ Vérification de la sauvegarde en ligne…');

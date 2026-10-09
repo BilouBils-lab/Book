@@ -738,3 +738,7 @@ main {
 .settings-credits { font-size: 11px; color: var(--text-sub); margin-top: 16px; line-height: 1.4; }
 button.etat-sauvegarde { width: 100%; background: #141418; text-align: left; color: var(--text-main); font: inherit; font-size: 13px; cursor: pointer; }
 #settings-modal .modal-content { max-height: 90vh; overflow-y: auto; }
+
+/* Badge « hors ligne » dans l'en-tête */
+.badge-hors-ligne { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 8px; background: #3f2d0c; color: #fbbf24; font-size: 11px; font-weight: 600; }
+.badge-hors-ligne[hidden] { display: none; }
