@@ -328,7 +328,28 @@ async function restaurerVersion(id, nom, resume, dejaConfirme) {
   }
 }
 
+// Thème : 'auto' (suit l'iPhone), 'clair' ou 'sombre' ; mémorisé sur cet appareil
+function themeChoisi() {
+  return localStorage.getItem('theme') || 'auto';
+}
+
+function choisirTheme(theme) {
+  if (theme === 'auto') {
+    localStorage.removeItem('theme');
+    delete document.documentElement.dataset.theme;
+  } else {
+    localStorage.setItem('theme', theme);
+    document.documentElement.dataset.theme = theme;
+  }
+  majChoixTheme();
+}
+
+function majChoixTheme() {
+  document.querySelectorAll('[data-theme-choix]').forEach(b => { b.className = b.dataset.themeChoix === themeChoisi() ? 'actif' : ''; });
+}
+
 function ouvrirParametres() {
+  majChoixTheme();
   document.getElementById('settings-modal').classList.add('active');
   afficherEtatSauvegarde();
 }

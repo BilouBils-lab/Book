@@ -1,13 +1,13 @@
 // Service worker : garde une copie de l'app sur le téléphone pour qu'elle s'ouvre sans réseau.
 //
 // - La page (index.html) : réseau d'abord (pour avoir la dernière version), copie locale si pas de réseau.
-// - Les fichiers de l'app (js/, css/, icones/) et la bibliothèque du scanner : copie locale d'abord.
+// - Les fichiers de l'app (js/, css/, icones/, polices/) et la bibliothèque du scanner : copie locale d'abord.
 //   Leur nom contient ?v=…, donc une nouvelle version de l'app demande de nouveaux fichiers.
 // - Tout le reste (Worker, AniList, BnF, jaquettes…) passe normalement par le réseau.
 //
 // À chaque nouvelle version de l'app, changer VERSION : le téléphone installe alors la nouvelle copie.
 
-const VERSION = '3.43';
+const VERSION = '3.44';
 const CACHE = 'mangatheque-' + VERSION;
 const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.23.0/umd/index.min.js';
 const DELAI_RESEAU_MS = 4000; // réseau trop lent (fond de magasin) : on ouvre la copie locale
@@ -19,7 +19,7 @@ self.addEventListener('install', (event) => {
     const reponse = await fetch('index.html', { cache: 'reload' });
     const html = await reponse.clone().text();
     await cache.put('index.html', reponse);
-    const fichiers = [...html.matchAll(/(?:src|href)="((?:js|css|icones)\/[^"]+)"/g)].map(m => m[1]);
+    const fichiers = [...html.matchAll(/(?:src|href)="((?:js|css|icones|polices)\/[^"]+)"/g)].map(m => m[1]);
     await cache.addAll(fichiers);
     // La bibliothèque du scanner vient d'un autre site : si elle est injoignable, on s'en passe
     await cache.add(ZXING_URL).catch(() => {});
@@ -66,7 +66,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(requete.url);
   if (requete.mode === 'navigate') {
     event.respondWith(reseauPuisCopie(requete));
-  } else if (url.origin === self.location.origin && /\/(js|css|icones)\//.test(url.pathname)) {
+  } else if (url.origin === self.location.origin && /\/(js|css|icones|polices)\//.test(url.pathname)) {
     event.respondWith(copiePuisReseau(requete));
   } else if (url.href === ZXING_URL) {
     event.respondWith(copiePuisReseau(requete));

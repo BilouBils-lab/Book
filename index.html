@@ -10,10 +10,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.43">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.43">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.44">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.44">
 
-  <link rel="stylesheet" href="css/style.css?v=3.43">
+  <!-- Thème choisi dans les Paramètres, appliqué avant l'affichage (pas de flash de la mauvaise couleur) -->
+  <script>try { var t = localStorage.getItem('theme'); if (t === 'clair' || t === 'sombre') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+  <link rel="preload" href="polices/bangers-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/style.css?v=3.44">
 </head>
 <body>
 
@@ -60,7 +63,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.43</div>
+  <div class="version-tag">v3.44</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -83,6 +86,13 @@
       <div class="settings-groupe">
         <button onclick="ouvrirVersions()"><span>🕘</span>Restaurer une sauvegarde<i>›</i></button>
         <button onclick="exporterSauvegarde()"><span>📥</span>Exporter dans un fichier<i>›</i></button>
+      </div>
+
+      <div class="settings-titre">Apparence</div>
+      <div class="selecteur-vue choix-theme" id="choix-theme">
+        <button data-theme-choix="auto" onclick="choisirTheme('auto')">Automatique</button>
+        <button data-theme-choix="clair" onclick="choisirTheme('clair')">☀️ Clair</button>
+        <button data-theme-choix="sombre" onclick="choisirTheme('sombre')">🌙 Sombre</button>
       </div>
 
       <!-- Réglages rares, repliés par défaut -->
@@ -341,18 +351,18 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.43"></script>
-  <script src="js/recherche-infos.js?v=3.43"></script>
-  <script src="js/isbn-scanner.js?v=3.43"></script>
-  <script src="js/mise-a-jour.js?v=3.43"></script>
-  <script src="js/stockage.js?v=3.43"></script>
-  <script src="js/jaquettes.js?v=3.43"></script>
-  <script src="js/import-export.js?v=3.43"></script>
-  <script src="js/vues.js?v=3.43"></script>
-  <script src="js/fiche.js?v=3.43"></script>
-  <script src="js/maj-serie.js?v=3.43"></script>
-  <script src="js/inventaire.js?v=3.43"></script>
-  <script src="js/nouveautes.js?v=3.43"></script>
-  <script src="js/demarrage.js?v=3.43"></script>
+  <script src="js/outils.js?v=3.44"></script>
+  <script src="js/recherche-infos.js?v=3.44"></script>
+  <script src="js/isbn-scanner.js?v=3.44"></script>
+  <script src="js/mise-a-jour.js?v=3.44"></script>
+  <script src="js/stockage.js?v=3.44"></script>
+  <script src="js/jaquettes.js?v=3.44"></script>
+  <script src="js/import-export.js?v=3.44"></script>
+  <script src="js/vues.js?v=3.44"></script>
+  <script src="js/fiche.js?v=3.44"></script>
+  <script src="js/maj-serie.js?v=3.44"></script>
+  <script src="js/inventaire.js?v=3.44"></script>
+  <script src="js/nouveautes.js?v=3.44"></script>
+  <script src="js/demarrage.js?v=3.44"></script>
 </body>
 </html>

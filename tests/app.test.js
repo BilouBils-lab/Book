@@ -702,6 +702,46 @@ test('Nouveautés au lancement : sorties depuis la dernière visite et attendus 
   await fermer();
 });
 
+test('Thème « Papier & encre » : clair, sombre automatique ou choisi', async ({ navigateur, base }) => {
+  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, colorScheme: 'dark', serviceWorkers: 'block' });
+  const page = await contexte.newPage();
+  const erreurs = [];
+  page.on('pageerror', e => erreurs.push(e.message));
+  await page.goto(base + '/index.html');
+  await page.waitForFunction(() => typeof rendreVues === 'function');
+  const fond = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const choix = () => page.$$eval('#choix-theme button', b => b.map(x => (x.className === 'actif' ? '*' : '') + x.dataset.themeChoix));
+
+  egal(await fond(), 'rgb(28, 26, 23)', 'iPhone en mode sombre : thème « nuit » automatique');
+  await page.evaluate(() => ouvrirParametres());
+  egal(await choix(), ['*auto', 'clair', 'sombre'], 'choix « Automatique » par défaut');
+  await page.click('#choix-theme button[data-theme-choix="clair"]');
+  egal([await fond(), await choix()], ['rgb(246, 241, 231)', ['auto', '*clair', 'sombre']], 'thème clair forcé');
+
+  // Le choix est gardé au prochain lancement, appliqué avant l'affichage
+  await page.reload();
+  await page.waitForFunction(() => typeof rendreVues === 'function');
+  egal([await page.evaluate(() => document.documentElement.dataset.theme), await fond()], ['clair', 'rgb(246, 241, 231)'], 'choix mémorisé');
+  await page.evaluate(() => { ouvrirParametres(); choisirTheme('auto'); });
+  egal(await fond(), 'rgb(28, 26, 23)', 'retour en automatique');
+  await page.emulateMedia({ colorScheme: 'light' });
+  egal(await fond(), 'rgb(246, 241, 231)', 'iPhone en mode clair : thème « papier »');
+
+  // Police des titres fournie avec l'app
+  await page.evaluate(() => document.fonts.ready);
+  egal(await page.evaluate(() => document.fonts.check("30px Bangers")), true, 'police Bangers chargée');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await contexte.close();
+});
+
+test('Plus de couleurs écrites en dur hors des thèmes', async () => {
+  const css = fs.readFileSync(path.join(RACINE, 'css', 'style.css'), 'utf8');
+  const apresThemes = css.slice(css.indexOf('}', css.indexOf(':root[data-theme="sombre"]')) + 1);
+  // Seules exceptions : le fond noir de la caméra et quelques ombres noires
+  const couleurs = [...apresThemes.matchAll(/#[0-9a-fA-F]{3,6}\b|rgba?\([^)]*\)/g)].map(m => m[0]).filter(c => !/^#000$|rgba\(0, ?0, ?0/.test(c));
+  egal(couleurs, [], 'couleurs à remplacer par des variables de thème');
+});
+
 test('Recherche par ISBN (BnF) puis ajout du tome', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
     worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Berserk. 1 (Éd. prestige)', auteurs: ['Kentarō Miura'], editeur: 'Glénat (Grenoble)', date: '2025' } } : null

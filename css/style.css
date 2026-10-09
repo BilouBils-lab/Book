@@ -1,13 +1,108 @@
-:root {
-  --bg-color: #0f0f12;
-  --card-bg: #1a1a1e;
-  --card-border: #2a2a30;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --success: #10b981;
-  --text-main: #f3f4f6;
-  --text-sub: #9ca3af;
+/* Identité « Papier & encre » : papier crème et encre noire le jour, gris chaud et jaune la nuit.
+   Toutes les couleurs passent par ces variables : changer de thème = changer ces valeurs.
+   Thème : automatique (réglage de l'iPhone), ou forcé par data-theme="clair" / "sombre" sur <html>. */
+
+/* Police des titres : Bangers (licence SIL Open Font License), fournie avec l'app pour marcher hors ligne */
+@font-face {
+  font-family: 'Bangers';
+  src: url('../polices/bangers-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
 }
+
+/* Clair « papier » (par défaut) */
+:root {
+  --bg-color: #f6f1e7;
+  --card-bg: #fffdf8;
+  --card-border: #e3d9c6;
+  --text-main: #26231e;
+  --text-sub: #6e665a;
+  --texte-faible: #a39a8a;
+  --accent: #26231e;
+  --accent-hover: #000000;
+  --texte-sur-accent: #fffdf8;
+  --accent-doux: rgba(38, 35, 30, 0.07);
+  --accent-moyen: rgba(38, 35, 30, 0.4);
+  --accent-texte: #26231e;
+  --ombre-accent: rgba(38, 35, 30, 0.25);
+  --surface-creuse: #f0e9db;
+  --surface-relief: #e9dfcc;
+  --fond-entete: rgba(246, 241, 231, 0.94);
+  --barre-etat: #26231e;
+  --voile: rgba(38, 35, 30, 0.45);
+  --alerte: #b7791f;
+  --alerte-doux: rgba(183, 121, 31, 0.12);
+  --ok: #2f7d4f;
+  --ok-doux: rgba(47, 125, 79, 0.12);
+  --success: #2f7d4f;
+  --titre-app: #26231e;
+  --surligneur: #ffd60a;
+  color-scheme: light;
+  --police-titre: 'Bangers', 'Arial Black', sans-serif;
+}
+
+/* Sombre « nuit » : automatique si l'iPhone est en mode sombre… */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) {
+  --bg-color: #1c1a17;
+  --card-bg: #25221e;
+  --card-border: #36322c;
+  --text-main: #e8e1d3;
+  --text-sub: #a59d8f;
+  --texte-faible: #6f685d;
+  --accent: #e9bd4c;
+  --accent-hover: #f2cc68;
+  --texte-sur-accent: #1c1a17;
+  --accent-doux: rgba(233, 189, 76, 0.12);
+  --accent-moyen: rgba(233, 189, 76, 0.45);
+  --accent-texte: #e9bd4c;
+  --ombre-accent: rgba(0, 0, 0, 0.4);
+  --surface-creuse: #191714;
+  --surface-relief: #322e28;
+  --fond-entete: rgba(28, 26, 23, 0.94);
+  --barre-etat: rgba(28, 26, 23, 0.94);
+  --voile: rgba(0, 0, 0, 0.6);
+  --alerte: #e9a23b;
+  --alerte-doux: rgba(233, 162, 59, 0.14);
+  --ok: #7fb685;
+  --ok-doux: rgba(127, 182, 133, 0.14);
+  --success: #7fb685;
+  --titre-app: #e9bd4c;
+  --surligneur: transparent;
+  color-scheme: dark;
+  }
+}
+
+/* …ou choisi dans les Paramètres */
+:root[data-theme="sombre"] {
+  --bg-color: #1c1a17;
+  --card-bg: #25221e;
+  --card-border: #36322c;
+  --text-main: #e8e1d3;
+  --text-sub: #a59d8f;
+  --texte-faible: #6f685d;
+  --accent: #e9bd4c;
+  --accent-hover: #f2cc68;
+  --texte-sur-accent: #1c1a17;
+  --accent-doux: rgba(233, 189, 76, 0.12);
+  --accent-moyen: rgba(233, 189, 76, 0.45);
+  --accent-texte: #e9bd4c;
+  --ombre-accent: rgba(0, 0, 0, 0.4);
+  --surface-creuse: #191714;
+  --surface-relief: #322e28;
+  --fond-entete: rgba(28, 26, 23, 0.94);
+  --barre-etat: rgba(28, 26, 23, 0.94);
+  --voile: rgba(0, 0, 0, 0.6);
+  --alerte: #e9a23b;
+  --alerte-doux: rgba(233, 162, 59, 0.14);
+  --ok: #7fb685;
+  --ok-doux: rgba(127, 182, 133, 0.14);
+  --success: #7fb685;
+  --titre-app: #e9bd4c;
+  --surligneur: transparent;
+  color-scheme: dark;
+}
+
 
 * {
   box-sizing: border-box;
@@ -26,7 +121,7 @@ body {
 header {
   position: sticky;
   top: 0;
-  background-color: rgba(15, 15, 18, 0.9);
+  background: linear-gradient(var(--barre-etat) 0, var(--barre-etat) env(safe-area-inset-top), var(--fond-entete) env(safe-area-inset-top));
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   padding: calc(12px + env(safe-area-inset-top)) 16px 0 16px;
@@ -124,7 +219,7 @@ main {
   height: 95px;
   border-radius: 6px;
   object-fit: cover;
-  background-color: #2a2a30;
+  background-color: var(--surface-relief);
   flex-shrink: 0;
 }
 
@@ -149,7 +244,7 @@ main {
 .progress-bar-bg {
   width: 100%;
   height: 6px;
-  background-color: #2a2a30;
+  background-color: var(--surface-relief);
   border-radius: 3px;
   overflow: hidden;
   margin-top: 4px;
@@ -158,9 +253,9 @@ main {
 /* Barre à deux niveaux : possédés (clair) puis lus (plein) par-dessus */
 .barre-double { position: relative; }
 .barre-double .progress-bar-fill { position: absolute; left: 0; top: 0; }
-.barre-double .progress-bar-fill.possedes { background-color: rgba(37, 99, 235, 0.45); }
+.barre-double .progress-bar-fill.possedes { background-color: var(--accent-moyen); }
 
-.series-meta .a-acheter { color: #fbbf24; }
+.series-meta .a-acheter { color: var(--alerte); }
 .series-meta .complete { color: var(--success); }
 
 .progress-bar-fill {
@@ -210,7 +305,7 @@ main {
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: #141418;
+  background: var(--surface-creuse);
   border-radius: 12px;
   margin-bottom: 14px;
 }
@@ -226,9 +321,9 @@ main {
   cursor: pointer;
   white-space: nowrap;
 }
-.selecteur-vue button.actif { background: #2a2a30; color: var(--text-main); }
-.selecteur-compte { margin-left: 5px; padding: 1px 6px; border-radius: 8px; background: #2a2a30; font-size: 11px; }
-.selecteur-vue button.actif .selecteur-compte { background: var(--accent); color: #fff; }
+.selecteur-vue button.actif { background: var(--surface-relief); color: var(--text-main); }
+.selecteur-compte { margin-left: 5px; padding: 1px 6px; border-radius: 8px; background: var(--surface-relief); font-size: 11px; }
+.selecteur-vue button.actif .selecteur-compte { background: var(--accent); color: var(--texte-sur-accent); }
 
 .achat-item {
   display: flex;
@@ -248,9 +343,9 @@ main {
   height: 34px;
   padding: 0 8px;
   border-radius: 8px;
-  border: 1.5px dashed #fbbf24;
-  background: rgba(251, 191, 36, 0.08);
-  color: #fbbf24;
+  border: 1.5px dashed var(--alerte);
+  background: var(--alerte-doux);
+  color: var(--alerte);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -269,7 +364,7 @@ main {
   align-items: center;
   gap: 12px;
   max-width: calc(100% - 32px);
-  background: #2a2a30;
+  background: var(--surface-relief);
   border: 1px solid var(--card-border);
   border-radius: 12px;
   padding: 10px 14px;
@@ -279,7 +374,7 @@ main {
 }
 .toast.visible { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.toast button { background: none; border: none; color: #60a5fa; font-weight: 700; font-size: 13px; cursor: pointer; flex-shrink: 0; }
+.toast button { background: none; border: none; color: var(--accent-texte); font-weight: 700; font-size: 13px; cursor: pointer; flex-shrink: 0; }
 
 .avenir-intro { font-size: 12px; color: var(--text-sub); line-height: 1.4; margin: 2px 2px 6px; }
 
@@ -294,9 +389,9 @@ main {
   margin-bottom: 8px;
   cursor: pointer;
 }
-.avenir-jaquette { width: 34px; height: 51px; border-radius: 4px; object-fit: cover; background: #2a2a30; flex-shrink: 0; }
+.avenir-jaquette { width: 34px; height: 51px; border-radius: 4px; object-fit: cover; background: var(--surface-relief); flex-shrink: 0; }
 .avenir-infos { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.avenir-retard { font-size: 12px; color: #fbbf24; }
+.avenir-retard { font-size: 12px; color: var(--alerte); }
 .pal-tome span { color: var(--text-sub); font-weight: 400; }
 
 .pal-section {
@@ -313,7 +408,7 @@ main {
 .pal-section small { font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-sub); }
 
 .btn-read-action {
-  background: #2a2a30;
+  background: var(--surface-relief);
   border: none;
   color: var(--text-main);
   padding: 6px 12px;
@@ -338,21 +433,21 @@ main {
 
 .btn-fab {
   background: var(--accent);
-  color: white;
+  color: var(--texte-sur-accent);
   border: none;
   padding: 12px 20px;
   border-radius: 24px;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 8px 20px var(--ombre-accent);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .btn-fab-secondary {
-  background: #2a2a30;
+  background: var(--surface-relief);
   color: var(--text-main);
   border: 1px solid var(--card-border);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
@@ -360,7 +455,7 @@ main {
 
 .btn {
   background: var(--accent);
-  color: white;
+  color: var(--texte-sur-accent);
   border: none;
   padding: 10px 14px;
   border-radius: 12px;
@@ -375,8 +470,8 @@ main {
 }
 
 .btn-secondary {
-  background: #2a2a30;
-  color: white;
+  background: var(--surface-relief);
+  color: var(--texte-sur-accent);
 }
 
 .modal-field-label {
@@ -407,7 +502,7 @@ main {
   display: none;
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.85);
+  background: var(--voile);
   z-index: 200;
   padding: 16px;
   overflow-y: auto;
@@ -454,7 +549,7 @@ main {
   flex-shrink: 0;
   border-radius: 8px;
   object-fit: cover;
-  background: #2a2a30;
+  background: var(--surface-relief);
   cursor: pointer;
 }
 
@@ -479,16 +574,16 @@ main {
   font-size: 11px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #2a2a30;
+  background: var(--surface-relief);
   color: var(--text-sub);
   white-space: nowrap;
 }
 
 .pastille.statut::before { content: '● '; }
-.pastille.en-cours { color: #60a5fa; background: rgba(37, 99, 235, 0.15); }
-.pastille.terminee { color: #34d399; background: rgba(16, 185, 129, 0.15); }
-.pastille.en-pause { color: #fbbf24; background: rgba(245, 158, 11, 0.15); }
-.pastille.abandonnee { color: #9ca3af; }
+.pastille.en-cours { color: var(--accent-texte); background: var(--accent-doux); }
+.pastille.terminee { color: var(--ok); background: var(--ok-doux); }
+.pastille.en-pause { color: var(--alerte); background: var(--alerte-doux); }
+.pastille.abandonnee { color: var(--text-sub); }
 
 .fiche-boutons-haut { display: flex; gap: 2px; margin: -6px -6px 0 0; }
 
@@ -504,7 +599,7 @@ main {
 }
 
 .fiche-progression {
-  background: #141418;
+  background: var(--surface-creuse);
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 16px;
@@ -515,8 +610,8 @@ main {
 
 /* Frise : un segment par tome, les trous montrent les tomes manquants */
 .fiche-frise { display: flex; gap: 2px; height: 8px; }
-.fiche-frise i { flex: 1; border-radius: 2px; background: #2a2a30; }
-.fiche-frise i.possede { background: rgba(37, 99, 235, 0.55); }
+.fiche-frise i { flex: 1; border-radius: 2px; background: var(--surface-relief); }
+.fiche-frise i.possede { background: var(--accent-moyen); }
 .fiche-frise i.lu { background: var(--accent); }
 
 /* Longue série : segments collés en une barre continue */
@@ -539,7 +634,7 @@ main {
 .pt { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
 .pt.lu { background: var(--accent); }
 .pt.possede { border: 1.5px solid var(--accent); }
-.pt.manquant { border: 1.5px dashed #4b4b55; }
+.pt.manquant { border: 1.5px dashed var(--texte-faible); }
 
 .volumes-grid {
   display: grid;
@@ -550,8 +645,8 @@ main {
 .tome-box {
   height: 36px;
   border-radius: 8px;
-  border: 1.5px dashed #3a3a42;
-  color: #6b6b75;
+  border: 1.5px dashed var(--texte-faible);
+  color: var(--texte-faible);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -565,14 +660,14 @@ main {
 
 .tome-box.owned {
   border: 1.5px solid var(--accent);
-  background: rgba(37, 99, 235, 0.12);
-  color: #93b4f5;
+  background: var(--accent-doux);
+  color: var(--accent-texte);
 }
 
 .tome-box.read {
   border: 1.5px solid var(--accent);
   background: var(--accent);
-  color: #ffffff;
+  color: var(--texte-sur-accent);
 }
 
 /* Tranches de 10 tomes pour les longues séries */
@@ -596,9 +691,9 @@ main {
 .tranche-fleche { width: 12px; color: var(--text-sub); transition: transform 0.15s ease; }
 .tranche.ouverte .tranche-fleche { transform: rotate(90deg); }
 .tranche-nom { width: 92px; }
-.tranche-barre { flex: 1; height: 6px; display: flex; border-radius: 3px; overflow: hidden; background: #2a2a30; }
+.tranche-barre { flex: 1; height: 6px; display: flex; border-radius: 3px; overflow: hidden; background: var(--surface-relief); }
 .tranche-barre i { flex: 1; }
-.tranche-barre i.possede { background: rgba(37, 99, 235, 0.55); }
+.tranche-barre i.possede { background: var(--accent-moyen); }
 .tranche-barre i.lu { background: var(--accent); }
 .tranche-compte { width: 52px; text-align: right; color: var(--text-sub); font-size: 12px; }
 .tranche-compte.complete { color: var(--success); }
@@ -665,7 +760,7 @@ main {
   display: none;
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(15, 15, 18, 0.9);
+  background: var(--fond-entete);
   z-index: 300;
   flex-direction: column;
   align-items: center;
@@ -689,12 +784,12 @@ main {
 /* Paramètres : état de la sauvegarde et liste des versions */
 .settings-titre { font-size: 12px; font-weight: 600; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 8px; }
 .etat-sauvegarde { font-size: 13px; line-height: 1.4; padding: 10px 12px; border-radius: 10px; background: var(--card-bg); border: 1px solid var(--card-border); }
-.etat-sauvegarde.alerte { border-color: #b45309; }
+.etat-sauvegarde.alerte { border-color: var(--alerte); }
 .etat-sauvegarde small { display: block; color: var(--text-sub); font-size: 12px; margin-top: 2px; }
 .versions-liste { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
 .version-item { text-align: left; padding: 10px 12px; border-radius: 10px; background: var(--card-bg); border: 1px solid var(--card-border); color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
 .version-item small { display: block; color: var(--text-sub); font-size: 12px; margin-top: 2px; }
-.version-item.actuelle { border-color: var(--accent, #6366f1); }
+.version-item.actuelle { border-color: var(--accent); }
 
 /* Inventaire */
 .modal-content.inventaire { max-width: 420px; max-height: 90vh; overflow-y: auto; }
@@ -708,7 +803,7 @@ main {
 .inventaire-detail { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
 .inventaire-marque { font-size: 18px; color: var(--text-sub); }
 .inventaire-ligne.verifiee { opacity: 0.6; }
-.inventaire-ligne.verifiee .inventaire-marque { color: #22c55e; }
+.inventaire-ligne.verifiee .inventaire-marque { color: var(--ok); }
 .inventaire-bravo { font-size: 14px; padding: 12px; border-radius: 10px; background: var(--card-bg); text-align: center; line-height: 1.4; }
 .bandeau-inventaire { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px 14px; margin-bottom: 12px; border-radius: 12px; border: 1px solid var(--accent); background: var(--card-bg); color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
 .bandeau-inventaire span:last-child { color: var(--accent); font-weight: 600; }
@@ -722,10 +817,10 @@ main {
 .jaquette-choix:active { border-color: var(--accent); }
 
 /* Paramètres : listes compactes regroupées */
-.settings-groupe { display: flex; flex-direction: column; background: #141418; border: 1px solid var(--card-border); border-radius: 12px; overflow: hidden; }
+.settings-groupe { display: flex; flex-direction: column; background: var(--surface-creuse); border: 1px solid var(--card-border); border-radius: 12px; overflow: hidden; }
 .settings-groupe button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; background: none; border: none; border-top: 1px solid var(--card-border); color: var(--text-main); font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
 .settings-groupe button:first-child { border-top: none; }
-.settings-groupe button:active { background: #2a2a30; }
+.settings-groupe button:active { background: var(--surface-relief); }
 .settings-groupe button span { width: 22px; text-align: center; flex-shrink: 0; }
 .settings-groupe button i { margin-left: auto; font-style: normal; color: var(--text-sub); font-size: 18px; }
 #settings-modal .settings-titre { margin: 18px 4px 6px; }
@@ -736,14 +831,28 @@ main {
 .settings-avance[open] summary::before { transform: rotate(90deg); }
 .settings-avance .settings-groupe { margin-top: 8px; }
 .settings-credits { font-size: 11px; color: var(--text-sub); margin-top: 16px; line-height: 1.4; }
-button.etat-sauvegarde { width: 100%; background: #141418; text-align: left; color: var(--text-main); font: inherit; font-size: 13px; cursor: pointer; }
+button.etat-sauvegarde { width: 100%; background: var(--surface-creuse); text-align: left; color: var(--text-main); font: inherit; font-size: 13px; cursor: pointer; }
 #settings-modal .modal-content { max-height: 90vh; overflow-y: auto; }
 
 /* Badge « hors ligne » dans l'en-tête */
-.badge-hors-ligne { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 8px; background: #3f2d0c; color: #fbbf24; font-size: 11px; font-weight: 600; }
+.badge-hors-ligne { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 8px; background: var(--alerte-doux); color: var(--alerte); font-size: 11px; font-weight: 600; }
 .badge-hors-ligne[hidden] { display: none; }
 
 /* Nouveautés : état d'achat d'une sortie */
 .nouveaute-etat { font-size: 12px; margin-top: 2px; }
-.nouveaute-etat.a-acheter { color: #fbbf24; }
-.nouveaute-etat.complete { color: #22c55e; }
+.nouveaute-etat.a-acheter { color: var(--alerte); }
+.nouveaute-etat.complete { color: var(--ok); }
+
+.btn-secondary, .btn-fab-secondary, .btn-read-action, .toast { color: var(--text-main); }
+
+/* Titres : Bangers (le texte courant garde la police de l'iPhone, plus lisible) */
+.app-title { font-family: var(--police-titre); font-weight: 400; font-size: 30px; letter-spacing: 1px; color: var(--titre-app);
+  background: linear-gradient(transparent 62%, var(--surligneur) 62%, var(--surligneur) 92%, transparent 92%); padding: 0 2px; }
+.fiche-titre { font-family: var(--police-titre); font-weight: 400; font-size: 26px; letter-spacing: 0.5px; line-height: 1.05; }
+.fiche-titre.long { font-size: 21px; }
+.modal-content h2, .modal-content h3 { font-family: var(--police-titre); font-weight: 400; letter-spacing: 0.5px; }
+.modal-content h2 { font-size: 24px !important; }
+.modal-content h3 { font-size: 21px !important; }
+
+/* Paramètres : choix du thème */
+.choix-theme { margin: 0; }

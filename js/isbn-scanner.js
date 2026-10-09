@@ -166,7 +166,7 @@ async function afficherLivreIsbn(isbn) {
   ligneInfo(zone, 'Description', livre.description);
   ligneInfo(zone, 'ISBN', isbn);
   const detecte = document.createElement('div');
-  detecte.style.cssText = 'clear: both; font-size: 13px; margin-top: 10px; padding: 8px; border-radius: 8px; background: #2a2a30;';
+  detecte.style.cssText = 'clear: both; font-size: 13px; margin-top: 10px; padding: 8px; border-radius: 8px; background: var(--surface-relief);';
   detecte.textContent = `Détecté → série : ${analyse.serie} · tome : ${analyse.tome || '?'} · édition : ${analyse.edition || 'standard'}`;
   zone.appendChild(detecte);
 
