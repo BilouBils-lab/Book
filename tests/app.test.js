@@ -126,6 +126,19 @@ test('Le numéro de version est le même partout', async () => {
   verifier(icone && fs.existsSync(path.join(RACINE, icone)), "l'icône de l'écran d'accueil est un fichier du dépôt : " + icone);
 });
 
+test('Configuration du déploiement du Worker cohérente', async () => {
+  const toml = fs.readFileSync(path.join(RACINE, 'worker', 'wrangler.toml'), 'utf8');
+  const nom = (toml.match(/^name = "([^"]+)"/m) || [])[1];
+  const urlApp = (fs.readFileSync(path.join(RACINE, 'js', 'outils.js'), 'utf8').match(/WORKER_URL = '([^']+)'/) || [])[1];
+  verifier(nom && urlApp && urlApp.startsWith(`https://${nom}.`), `le Worker déployé (${nom}) doit être celui appelé par l'app (${urlApp})`);
+  egal((toml.match(/^main = "([^"]+)"/m) || [])[1], 'worker.js', 'fichier du Worker');
+  verifier(/^keep_vars = true/m.test(toml), 'les variables du tableau de bord Cloudflare sont conservées');
+  // Chaque env.X du Worker est soit un stockage déclaré ici, soit un secret / une variable gardés dans Cloudflare
+  const utilises = [...new Set([...fs.readFileSync(path.join(RACINE, 'worker', 'worker.js'), 'utf8').matchAll(/env\.([A-Z_]+)/g)].map(m => m[1]))].sort();
+  const kv = [...toml.matchAll(/binding = "([A-Z_]+)"/g)].map(m => m[1]);
+  egal(utilises.filter(n => !kv.includes(n)), ['BACKUP_TOKEN', 'GEMINI_API_KEY', 'GEMINI_MODELES'], 'secrets et variables attendus dans Cloudflare (sinon : les déclarer)');
+});
+
 test("L'app démarre sans erreur, avec ses trois onglets", async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   egal(await page.$$eval('.tab-btn', b => b.map(x => x.textContent.replace(/\s*\(\d+\)/, ''))), ['Pile à lire', 'Collection', 'À venir'], 'onglets');
