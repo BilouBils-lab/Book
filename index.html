@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.40">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.40">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.41">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.41">
 
-  <link rel="stylesheet" href="css/style.css?v=3.40">
+  <link rel="stylesheet" href="css/style.css?v=3.41">
 </head>
 <body>
 
@@ -22,6 +22,7 @@
       <div class="app-title-group">
         <div class="app-title">Ma MangaThèque</div>
         <div style="font-size: 12px; color: var(--text-sub);" id="total-count">0 tomes</div>
+        <span id="badge-hors-ligne" class="badge-hors-ligne" hidden>📴 hors ligne</span>
       </div>
       <button class="settings-btn" onclick="ouvrirParametres()" aria-label="Réglages">⚙️</button>
     </div>
@@ -59,7 +60,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.40</div>
+  <div class="version-tag">v3.41</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -326,17 +327,17 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.40"></script>
-  <script src="js/recherche-infos.js?v=3.40"></script>
-  <script src="js/isbn-scanner.js?v=3.40"></script>
-  <script src="js/mise-a-jour.js?v=3.40"></script>
-  <script src="js/stockage.js?v=3.40"></script>
-  <script src="js/jaquettes.js?v=3.40"></script>
-  <script src="js/import-export.js?v=3.40"></script>
-  <script src="js/vues.js?v=3.40"></script>
-  <script src="js/fiche.js?v=3.40"></script>
-  <script src="js/maj-serie.js?v=3.40"></script>
-  <script src="js/inventaire.js?v=3.40"></script>
-  <script src="js/demarrage.js?v=3.40"></script>
+  <script src="js/outils.js?v=3.41"></script>
+  <script src="js/recherche-infos.js?v=3.41"></script>
+  <script src="js/isbn-scanner.js?v=3.41"></script>
+  <script src="js/mise-a-jour.js?v=3.41"></script>
+  <script src="js/stockage.js?v=3.41"></script>
+  <script src="js/jaquettes.js?v=3.41"></script>
+  <script src="js/import-export.js?v=3.41"></script>
+  <script src="js/vues.js?v=3.41"></script>
+  <script src="js/fiche.js?v=3.41"></script>
+  <script src="js/maj-serie.js?v=3.41"></script>
+  <script src="js/inventaire.js?v=3.41"></script>
+  <script src="js/demarrage.js?v=3.41"></script>
 </body>
 </html>
