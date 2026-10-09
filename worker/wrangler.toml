@@ -13,4 +13,4 @@ keep_vars = true
 # Stockage des sauvegardes. L'identifiant se trouve dans Cloudflare : Storage & Databases → KV → MANGA_KV
 [[kv_namespaces]]
 binding = "MANGA_KV"
-id = "A_REMPLACER_PAR_L_ID_DU_KV"
+id = "13be37510f86416f816f1c585d26b098"
