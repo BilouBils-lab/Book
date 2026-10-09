@@ -4,7 +4,7 @@
 
 name = "manga-gemini-proxy"
 main = "worker.js"
-compatibility_date = "2025-01-01"
+compatibility_date = "2026-09-18"
 workers_dev = true
 
 # Garde les variables saisies dans le tableau de bord Cloudflare (ex. GEMINI_MODELES)
