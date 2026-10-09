@@ -7,7 +7,7 @@
 //
 // À chaque nouvelle version de l'app, changer VERSION : le téléphone installe alors la nouvelle copie.
 
-const VERSION = '3.42';
+const VERSION = '3.43';
 const CACHE = 'mangatheque-' + VERSION;
 const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.23.0/umd/index.min.js';
 const DELAI_RESEAU_MS = 4000; // réseau trop lent (fond de magasin) : on ouvre la copie locale

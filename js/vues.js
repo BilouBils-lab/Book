@@ -165,6 +165,15 @@ function rendreAVenir() {
   intro.textContent = "Estimations d'après le rythme de parution des tomes en France (Manga Insight). Un éditeur peut toujours décaler une sortie.";
   container.appendChild(intro);
 
+  const recentes = sortiesRecentes();
+  if (recentes.length) {
+    const entete = document.createElement('div');
+    entete.className = 'pal-section';
+    entete.innerHTML = '🆕 Sorties récentes <small>30 derniers jours</small>';
+    container.appendChild(entete);
+    for (const item of recentes) container.appendChild(ligneSortieRecente(item));
+  }
+
   if (!imminents.length && !parMois.size) {
     const vide = document.createElement('div');
     vide.className = 'empty-state';

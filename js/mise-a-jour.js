@@ -293,6 +293,8 @@ function appliquerMangaInsight(serie) {
   const mi = infosMangaInsight(serie);
   if (!mi) return false;
   const avant = JSON.stringify([serie.tomesParus, serie.editeur, serie.parution, serie.tomes]);
+  const avantNouveaute = serie.tomesParusSource === 'Manga Insight' && serie.parution ? { nom: serie.parution.nom, tomesParus: serie.tomesParus } : null;
+  noterNouveaute(serie, avantNouveaute, mi);
   serie.tomesParus = mi.tomesParus;
   serie.tomesParusSource = 'Manga Insight';
   serie.tomesParusMaj = Date.now();

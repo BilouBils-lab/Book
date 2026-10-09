@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.42">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.42">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.43">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.43">
 
-  <link rel="stylesheet" href="css/style.css?v=3.42">
+  <link rel="stylesheet" href="css/style.css?v=3.43">
 </head>
 <body>
 
@@ -60,7 +60,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.42</div>
+  <div class="version-tag">v3.43</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -114,6 +114,20 @@
       <div class="progress-bar-bg"><div class="progress-bar-fill" id="inventaire-barre" style="width: 0%;"></div></div>
       <div id="inventaire-liste" class="inventaire-liste"></div>
       <button class="btn btn-secondary" style="margin-top: 14px;" onclick="terminerInventaire()">Terminer l'inventaire</button>
+    </div>
+  </div>
+
+  <!-- Nouveautés : au lancement, seulement s'il y a du nouveau (sous la fiche, qui s'ouvre par-dessus) -->
+  <div id="nouveautes-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 420px;">
+      <button class="close-modal" onclick="fermerNouveautes()">×</button>
+      <h2 style="font-size: 18px; margin-bottom: 4px;">Quoi de neuf ?</h2>
+      <div class="avenir-intro">Sorties en France (Manga Insight) et estimations d'après le rythme de chaque série.</div>
+      <div id="nouveautes-contenu"></div>
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button class="btn btn-secondary" style="flex: 1;" onclick="voirAVenir()">Voir « À venir »</button>
+        <button class="btn" style="flex: 1;" onclick="fermerNouveautes()">OK</button>
+      </div>
     </div>
   </div>
 
@@ -327,17 +341,18 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.42"></script>
-  <script src="js/recherche-infos.js?v=3.42"></script>
-  <script src="js/isbn-scanner.js?v=3.42"></script>
-  <script src="js/mise-a-jour.js?v=3.42"></script>
-  <script src="js/stockage.js?v=3.42"></script>
-  <script src="js/jaquettes.js?v=3.42"></script>
-  <script src="js/import-export.js?v=3.42"></script>
-  <script src="js/vues.js?v=3.42"></script>
-  <script src="js/fiche.js?v=3.42"></script>
-  <script src="js/maj-serie.js?v=3.42"></script>
-  <script src="js/inventaire.js?v=3.42"></script>
-  <script src="js/demarrage.js?v=3.42"></script>
+  <script src="js/outils.js?v=3.43"></script>
+  <script src="js/recherche-infos.js?v=3.43"></script>
+  <script src="js/isbn-scanner.js?v=3.43"></script>
+  <script src="js/mise-a-jour.js?v=3.43"></script>
+  <script src="js/stockage.js?v=3.43"></script>
+  <script src="js/jaquettes.js?v=3.43"></script>
+  <script src="js/import-export.js?v=3.43"></script>
+  <script src="js/vues.js?v=3.43"></script>
+  <script src="js/fiche.js?v=3.43"></script>
+  <script src="js/maj-serie.js?v=3.43"></script>
+  <script src="js/inventaire.js?v=3.43"></script>
+  <script src="js/nouveautes.js?v=3.43"></script>
+  <script src="js/demarrage.js?v=3.43"></script>
 </body>
 </html>
