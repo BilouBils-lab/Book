@@ -625,6 +625,43 @@ test('Mode hors-ligne : l\u2019app s\u2019ouvre sans réseau, la sauvegarde part
   await fermer();
 });
 
+test('Toucher le fond autour d\u2019une fenêtre la ferme', async ({ navigateur, base }) => {
+  const html = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf8');
+  const demarrage = fs.readFileSync(path.join(RACINE, 'js', 'demarrage.js'), 'utf8');
+  const fenetres = [...html.matchAll(/<div[^>]*class="modal-overlay"[^>]*>/g)].map(m => (m[0].match(/id="([^"]+)"/) || [])[1]);
+  egal(fenetres.filter(id => !demarrage.includes(`'${id}':`)), [], 'chaque fenêtre sait se fermer par le fond');
+
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  const toucherFond = (id) => page.click('#' + id, { position: { x: 4, y: 4 } });
+  const ouverte = (id) => page.evaluate((i) => document.getElementById(i).classList.contains('active'), id);
+  await definirBibliotheque(page, [{ titre: 'Ao Ashi', tomes: tomes(3) }]);
+
+  // Fiche d'une série
+  await page.evaluate(() => ouvrirModalSerie(0));
+  await page.click('#modal-volumes-grid .tome-box >> nth=0'); // un appui dans la fiche ne la ferme pas
+  egal(await ouverte('detail-modal'), true, 'appui dans la fiche : reste ouverte');
+  await toucherFond('detail-modal');
+  egal([await ouverte('detail-modal'), await page.evaluate(() => serieIndexActive)], [false, null], 'fiche fermée par le fond');
+
+  // Question oui / non : le fond vaut « Annuler »
+  const reponse = page.evaluate(() => confirmerAction('Supprimer ?'));
+  await page.waitForSelector('#confirm-modal.active');
+  await toucherFond('confirm-modal');
+  egal(await reponse, false, 'question annulée par le fond');
+
+  // Paramètres
+  await page.evaluate(() => ouvrirParametres());
+  await toucherFond('settings-modal');
+  egal(await ouverte('settings-modal'), false, 'Paramètres fermés par le fond');
+
+  // Bilan d'une mise à jour : pas de fermeture tant que le traitement n'est pas fini
+  await page.evaluate(() => { document.getElementById('completion-bouton').textContent = 'Arrêter'; document.getElementById('completion-modal').classList.add('active'); });
+  await toucherFond('completion-modal');
+  egal(await ouverte('completion-modal'), true, 'bilan en cours : reste ouvert');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Recherche par ISBN (BnF) puis ajout du tome', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
     worker: (req) => req.url().includes('/isbn') ? { body: { trouve: true, source: 'BnF', titre: 'Berserk. 1 (Éd. prestige)', auteurs: ['Kentarō Miura'], editeur: 'Glénat (Grenoble)', date: '2025' } } : null
