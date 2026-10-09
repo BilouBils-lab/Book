@@ -1,0 +1,16 @@
+# Configuration du déploiement automatique du Worker (GitHub Actions → Cloudflare).
+# Les secrets (BACKUP_TOKEN, GEMINI_API_KEY) ne sont PAS ici : ils restent dans Cloudflare
+# et ne sont pas modifiés par le déploiement.
+
+name = "manga-gemini-proxy"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+# Garde les variables saisies dans le tableau de bord Cloudflare (ex. GEMINI_MODELES)
+keep_vars = true
+
+# Stockage des sauvegardes. L'identifiant se trouve dans Cloudflare : Storage & Databases → KV → MANGA_KV
+[[kv_namespaces]]
+binding = "MANGA_KV"
+id = "A_REMPLACER_PAR_L_ID_DU_KV"

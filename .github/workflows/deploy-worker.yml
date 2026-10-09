@@ -1,0 +1,58 @@
+# Déploie le Worker Cloudflare (worker/) automatiquement quand une modification arrive sur main.
+# Les tests sont relancés d'abord : un Worker qui casse un test n'est jamais publié.
+#
+# Secrets nécessaires (GitHub → Settings → Secrets and variables → Actions) :
+#   CLOUDFLARE_API_TOKEN  : jeton Cloudflare (modèle « Edit Cloudflare Workers »)
+#   CLOUDFLARE_ACCOUNT_ID : identifiant du compte Cloudflare
+name: Déploiement du Worker
+
+on:
+  push:
+    branches: [main]
+    paths: ['worker/**']
+  workflow_dispatch: # bouton « Run workflow » dans l'onglet Actions, pour relancer à la main
+
+# Deux déploiements ne se marchent jamais dessus
+concurrency:
+  group: deploiement-worker
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+
+  deploiement:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier la configuration
+        run: |
+          if grep -q 'A_REMPLACER' worker/wrangler.toml; then
+            echo "::error::Renseigne l'identifiant du KV MANGA_KV dans worker/wrangler.toml"
+            exit 1
+          fi
+
+      - name: Déployer sur Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          wranglerVersion: '4.149.0'

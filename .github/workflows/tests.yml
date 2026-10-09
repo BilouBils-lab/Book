@@ -33,3 +33,22 @@ jobs:
 
       - name: Lancer les tests
         run: npm test
+
+  # Vérifie que le Worker se construit avec sa configuration (sans rien publier)
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Construire le Worker (essai à blanc)
+        run: npx --yes wrangler@4.149.0 deploy --dry-run --outdir /tmp/worker-build
