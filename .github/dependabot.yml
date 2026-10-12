@@ -1,0 +1,26 @@
+# Dependabot : GitHub propose lui-même, par pull request, les mises à jour des outils du projet.
+# Chaque PR passe par les tests automatiques : on ne fusionne que si tout est ✅.
+version: 2
+updates:
+  # Outils des tests (Playwright)
+  - package-ecosystem: npm
+    directory: /tests
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "Tests"
+    open-pull-requests-limit: 2
+    ignore:
+      # Même version que celle chargée par l'app (js/isbn-scanner.js et sw.js) : à changer ensemble, à la main
+      - dependency-name: "@zxing/library"
+
+  # Actions utilisées par les workflows GitHub (checkout, setup-node, wrangler-action…)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "GitHub Actions"
+    groups:
+      actions:
+        patterns: ["*"]
