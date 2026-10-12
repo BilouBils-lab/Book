@@ -10,6 +10,8 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { chromium } = require('playwright');
+// Pour que les tests puissent simuler aussi les demandes faites par le service worker (jaquettes)
+process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = '1';
 
 const RACINE = path.join(__dirname, '..');
 const DONNEES = path.join(__dirname, 'donnees');
@@ -244,6 +246,14 @@ test('Pile à lire : en cours, encore un effort, à commencer', async ({ navigat
   await page.click('.pal-item:has-text("Berserk of Gluttony") .btn-read-action');
   egal(await page.textContent('#toast span'), '🎉 Berserk of Gluttony : plus rien à lire, bravo !', 'série terminée');
   egal(await page.evaluate(() => document.getElementById('detail-modal').classList.contains('active')), false, '« Lu ✓ » n’ouvre pas la fiche');
+
+  // Appui par erreur : « Annuler » remet le tome dans la pile
+  await page.click('#toast button');
+  egal(await page.evaluate(() => { const t = bibliotheque.find(s => s.titre === 'Berserk of Gluttony').tomes[12]; return [t.lu, t.luLe ?? null]; }), [false, null], '« Annuler » : tome de nouveau à lire');
+  egal((await cartes())[0], 'Berserk of Gluttony — Tome 13 · le dernier, courage !', 'la série revient dans « Effort »');
+  await page.click('#view-pal .selecteur-vue button >> text=En cours');
+  await page.click('.pal-item:has-text("Ao Ashi") .btn-read-action');
+  egal([await page.textContent('#toast span'), await page.isVisible('#toast button')], ['✓ Ao Ashi — tome 31 lu', true], 'message et « Annuler » même sans changement de groupe');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });
@@ -740,6 +750,35 @@ test('Plus de couleurs écrites en dur hors des thèmes', async () => {
   // Seules exceptions : le fond noir de la caméra et quelques ombres noires
   const couleurs = [...apresThemes.matchAll(/#[0-9a-fA-F]{3,6}\b|rgba?\([^)]*\)/g)].map(m => m[0]).filter(c => !/^#000$|rgba\(0, ?0, ?0/.test(c));
   egal(couleurs, [], 'couleurs à remplacer par des variables de thème');
+});
+
+test('Jaquettes gardées pour le mode hors-ligne', async ({ navigateur, base }) => {
+  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'allow' });
+  const demandes = [];
+  // Les demandes du service worker passent par le contexte : jaquette factice, autorisée en CORS
+  await contexte.route('https://images.test/**', route => {
+    demandes.push(route.request().url());
+    route.fulfill({ path: path.join(DONNEES, 'codebarre-berserk-prestige-1.png'), contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' } });
+  });
+  const page = await contexte.newPage();
+  const erreurs = [];
+  page.on('pageerror', e => erreurs.push(e.message));
+  await page.goto(base + '/index.html');
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await page.evaluate(() => { bibliotheque = [{ titre: 'Ao Ashi', couverture: 'https://images.test/ao-ashi.png', tomes: [{ numero: 1, possede: true, lu: false }] }]; sauvegarderLocal(); });
+  const jaquette = () => page.$eval('.cover-thumb', img => [img.src, img.complete && img.naturalWidth > 20]);
+  await page.waitForFunction(() => { const i = document.querySelector('.cover-thumb'); return i && i.complete; });
+  egal(await jaquette(), ['https://images.test/ao-ashi.png', true], 'jaquette affichée en ligne');
+  egal(await page.evaluate(async () => (await (await caches.open('mangatheque-jaquettes')).keys()).map(r => r.url)), ['https://images.test/ao-ashi.png'], 'jaquette gardée');
+
+  await contexte.setOffline(true);
+  await page.reload();
+  await page.waitForFunction(() => { const i = document.querySelector('.cover-thumb'); return i && i.complete; });
+  egal(await jaquette(), ['https://images.test/ao-ashi.png', true], 'jaquette affichée hors ligne');
+  egal(demandes.length, 1, 'une seule demande au site : ensuite la copie locale');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await contexte.close();
 });
 
 test('Recherche par ISBN (BnF) puis ajout du tome', async ({ navigateur, base }) => {
