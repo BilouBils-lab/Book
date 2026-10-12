@@ -3,13 +3,17 @@
 // - La page (index.html) : réseau d'abord (pour avoir la dernière version), copie locale si pas de réseau.
 // - Les fichiers de l'app (js/, css/, icones/, polices/) et la bibliothèque du scanner : copie locale d'abord.
 //   Leur nom contient ?v=…, donc une nouvelle version de l'app demande de nouveaux fichiers.
-// - Tout le reste (Worker, AniList, BnF, jaquettes…) passe normalement par le réseau.
+// - Les jaquettes (images d'autres sites) : copie locale d'abord, gardée d'une version à l'autre,
+//   pour les voir aussi hors ligne. Seulement les sites qui l'autorisent (CORS), dans la limite de MAX_JAQUETTES.
+// - Tout le reste (Worker, AniList, BnF…) passe normalement par le réseau.
 //
 // À chaque nouvelle version de l'app, changer VERSION : le téléphone installe alors la nouvelle copie.
 
-const VERSION = '3.44';
+const VERSION = '3.45';
 const CACHE = 'mangatheque-' + VERSION;
 const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.23.0/umd/index.min.js';
+const CACHE_JAQUETTES = 'mangatheque-jaquettes';
+const MAX_JAQUETTES = 400;
 const DELAI_RESEAU_MS = 4000; // réseau trop lent (fond de magasin) : on ouvre la copie locale
 
 // Installation : on lit index.html pour connaître la liste exacte des fichiers à garder
@@ -31,7 +35,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     for (const nom of await caches.keys()) {
-      if (nom.startsWith('mangatheque-') && nom !== CACHE) await caches.delete(nom);
+      if (nom.startsWith('mangatheque-') && nom !== CACHE && nom !== CACHE_JAQUETTES) await caches.delete(nom);
     }
     await self.clients.claim();
   })());
@@ -60,6 +64,26 @@ async function copiePuisReseau(requete) {
   return reponse;
 }
 
+async function jaquette(requete) {
+  const cache = await caches.open(CACHE_JAQUETTES);
+  const copie = await cache.match(requete.url);
+  if (copie) return copie;
+  let reponse;
+  try {
+    // Demande « CORS » : une image ainsi reçue peut être gardée sans gonfler le stockage
+    reponse = await fetch(requete.url, { mode: 'cors', credentials: 'omit' });
+  } catch (e) {
+    return fetch(requete); // site sans CORS (ou hors ligne) : affichage normal, pas de copie
+  }
+  if (reponse.ok) {
+    await cache.put(requete.url, reponse.clone());
+    // Au-delà de la limite, on oublie les plus anciennes
+    const cles = await cache.keys();
+    for (const cle of cles.slice(0, Math.max(0, cles.length - MAX_JAQUETTES))) await cache.delete(cle);
+  }
+  return reponse;
+}
+
 self.addEventListener('fetch', (event) => {
   const requete = event.request;
   if (requete.method !== 'GET') return;
@@ -70,5 +94,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(copiePuisReseau(requete));
   } else if (url.href === ZXING_URL) {
     event.respondWith(copiePuisReseau(requete));
+  } else if (requete.destination === 'image' && url.protocol === 'https:' && url.origin !== self.location.origin) {
+    event.respondWith(jaquette(requete));
   }
 });

@@ -362,12 +362,14 @@ function onTriChange(valeur) {
 function marquerCommeLu(sIndex, tIndex) {
   const serie = bibliotheque[sIndex];
   const avant = groupePile(serie);
-  serie.tomes[tIndex].lu = true;
-  serie.tomes[tIndex].luLe = Date.now();
+  const tome = serie.tomes[tIndex];
+  tome.lu = true;
+  tome.luLe = Date.now();
   sauvegarder();
-  // La série change de sous-onglet : on le signale, puisqu'elle disparaît de l'écran
+  // Toujours un « Annuler » en cas d'appui par erreur ; si la série change de sous-onglet, on le signale
   const apres = groupePile(serie);
-  if (apres === avant) return;
-  if (!apres) afficherToast(`🎉 ${serie.titre} : plus rien à lire, bravo !`);
-  else afficherToast(`${serie.titre} passe dans « ${GROUPES_PILE.find(g => g.cle === apres).onglet} »`);
+  const annuler = () => { tome.lu = false; delete tome.luLe; sauvegarder(); };
+  if (!apres) afficherToast(`🎉 ${serie.titre} : plus rien à lire, bravo !`, annuler);
+  else if (apres !== avant) afficherToast(`${serie.titre} passe dans « ${GROUPES_PILE.find(g => g.cle === apres).onglet} »`, annuler);
+  else afficherToast(`✓ ${serie.titre} — tome ${tome.numero} lu`, annuler);
 }
