@@ -173,7 +173,8 @@ const ARCS_CONNUS = {
   onepiece: [ // coffrets Glénat
     ['East Blue', 1, 12], ['Alabasta', 13, 23], ['Skypiea', 24, 32], ['Water Seven', 33, 45],
     ['Thriller Bark', 46, 53], ['Marine Ford', 54, 61], ['Île des hommes-poissons', 62, 70], ['Dressrosa', 71, 80],
-    ['Tougato', 81, 90] // l'arc Whole Cake Island, nommé « Tougato » par Glénat
+    ['Tougato', 81, 90], // l'arc Whole Cake Island, nommé « Tougato » par Glénat
+    ['Pays des Wa', 91, 104]
   ]
 };
 
