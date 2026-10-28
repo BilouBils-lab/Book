@@ -192,8 +192,8 @@ test('Fiche : progression, prochain tome, tranches et ajout d’un tome manquant
   // One Piece : regroupé par arcs (coffrets Glénat), puis par tranches de 10 après le dernier coffret
   egal(await page.$$eval('.tranche-nom', t => t.map(x => x.textContent)), [
     'East Blue1–12', 'Alabasta13–23', 'Skypiea24–32', 'Water Seven33–45', 'Thriller Bark46–53', 'Marine Ford54–61',
-    'Île des hommes-poissons62–70', 'Dressrosa71–80', 'Tomes 81–90', 'Tomes 91–100', 'Tomes 101–110'
-  ], '110 tomes → 8 arcs puis 3 tranches');
+    'Île des hommes-poissons62–70', 'Dressrosa71–80', 'Tougato81–90', 'Tomes 91–100', 'Tomes 101–110'
+  ], '110 tomes → 9 arcs puis 2 tranches');
   egal(await page.$$eval('.tranche.ouverte .tranche-nom', t => t.map(x => x.textContent)), ['Alabasta13–23'], 'arc du prochain tome déplié');
   await page.click('.tranche-entete >> text=Water Seven');
   egal(await page.$$eval('.tranche.ouverte', t => t.length), 2, 'dépliage d’un arc');
