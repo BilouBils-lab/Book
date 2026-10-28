@@ -856,3 +856,9 @@ button.etat-sauvegarde { width: 100%; background: var(--surface-creuse); text-al
 
 /* Paramètres : choix du thème */
 .choix-theme { margin: 0; }
+
+/* Arcs (ex. coffrets One Piece) */
+.tranche-nom.arc { width: 140px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tranche-nom.arc small { display: block; font-size: 11px; color: var(--text-sub); font-weight: 400; }
+.tranche-tout { display: none; margin: -4px 0 12px auto; padding: 6px 10px; border-radius: 8px; border: 1px dashed var(--card-border); background: none; color: var(--text-sub); font: inherit; font-size: 12px; cursor: pointer; }
+.tranche.ouverte .tranche-tout { display: block; }

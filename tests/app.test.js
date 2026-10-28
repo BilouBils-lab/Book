@@ -189,10 +189,25 @@ test('Fiche : progression, prochain tome, tranches et ajout d’un tome manquant
   egal(await page.textContent('#fiche-prochain'), 'Prochain à acheter : tome 9', 'après appui sur le tome 6');
 
   await page.evaluate(() => ouvrirModalSerie(1));
-  egal(await page.$$eval('.tranche', t => t.length), 11, '110 tomes → 11 tranches');
-  egal(await page.$$eval('.tranche.ouverte .tranche-nom', t => t.map(x => x.textContent)), ['Tomes 11–20'], 'tranche du prochain tome dépliée');
-  await page.click('.tranche-entete >> text=Tomes 1–10');
-  egal(await page.$$eval('.tranche.ouverte', t => t.length), 2, 'dépliage d’une tranche');
+  // One Piece : regroupé par arcs (coffrets Glénat), puis par tranches de 10 après le dernier coffret
+  egal(await page.$$eval('.tranche-nom', t => t.map(x => x.textContent)), [
+    'East Blue1–12', 'Alabasta13–23', 'Skypiea24–32', 'Water Seven33–45', 'Thriller Bark46–53', 'Marine Ford54–61',
+    'Île des hommes-poissons62–70', 'Dressrosa71–80', 'Tomes 81–90', 'Tomes 91–100', 'Tomes 101–110'
+  ], '110 tomes → 8 arcs puis 3 tranches');
+  egal(await page.$$eval('.tranche.ouverte .tranche-nom', t => t.map(x => x.textContent)), ['Alabasta13–23'], 'arc du prochain tome déplié');
+  await page.click('.tranche-entete >> text=Water Seven');
+  egal(await page.$$eval('.tranche.ouverte', t => t.length), 2, 'dépliage d’un arc');
+
+  // Un coffret acheté : tout l'arc d'un coup, avec « Annuler »
+  await page.click('.tranche.ouverte .tranche-tout >> text=Alabasta');
+  egal(await page.textContent('#toast span'), '✓ Arc Alabasta : 11 tomes ajoutés', 'message');
+  egal(await page.textContent('#fiche-compteur'), '23 / 110 possédés · 4 lus', 'tomes 13 à 23 possédés');
+  egal(await page.$$eval('.tranche-tout', b => b.some(x => x.textContent.includes('Alabasta'))), false, 'plus de bouton pour un arc complet');
+  await page.click('#toast button');
+  egal(await page.textContent('#fiche-compteur'), '12 / 110 possédés · 4 lus', '« Annuler » retire le coffret');
+  // Édition spéciale : pas d'arcs (le découpage est celui de l'édition standard)
+  await page.evaluate(() => { bibliotheque[1].titre = 'One Piece (Collector)'; remplirModalSerie(1); });
+  egal(await page.$eval('.tranche-nom', t => t.textContent), 'Tomes 1–10', 'tranches de 10 pour une autre édition');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });
