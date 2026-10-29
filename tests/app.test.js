@@ -1021,6 +1021,105 @@ test('Notifications : activer puis désactiver (abonnement de l’appareil aupr�
   await fermer();
 });
 
+test('Worker : IA Gemini, Manga Insight, BnF en erreur, CORS et requêtes invalides', async () => {
+  const worker = (await import(pathToFileURL(path.join(RACINE, 'worker', 'worker.js')).href)).default;
+  const nodeCrypto = require('crypto');
+  if (!crypto.subtle.timingSafeEqual) crypto.subtle.timingSafeEqual = (a, b) => nodeCrypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const fetchOriginal = globalThis.fetch;
+  // Faux Internet : chaque test choisit la réponse ; les appels sont notés
+  let appels = [], repondre = () => new Response('', { status: 404 });
+  globalThis.fetch = async (url, init = {}) => { appels.push({ url: String(url), init }); return repondre(String(url), init); };
+  const env = { GEMINI_API_KEY: 'cle-gemini', BACKUP_TOKEN: 'secret', MANGA_KV: { get: async () => null, getWithMetadata: async () => ({ value: null, metadata: null }), put: async () => {} } };
+  const appel = (chemin, init, e = env) => worker.fetch(new Request('https://w.dev' + chemin, init), e);
+  const gemini = (texte) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: texte }] } }] }));
+  const modeleAppele = () => appels.map(a => (a.url.match(/models\/([^:]+):generateContent/) || [])[1]);
+  try {
+    // CORS : seule l'app publiée peut appeler le Worker depuis un navigateur
+    let rep = await appel('/infos', { method: 'OPTIONS' });
+    egal([rep.status, rep.headers.get('access-control-allow-origin')], [200, 'https://biloubils-lab.github.io'], 'pré-requête CORS');
+    verifier(rep.headers.get('access-control-allow-headers').includes('X-Backup-Token'), 'en-tête du code de sauvegarde autorisé');
+
+    // Infos d'une série : premier modèle en panne, le second répond (avec des ```json``` autour)
+    repondre = (url) => url.includes('gemini-flash-latest:') ? new Response('{"error":{"message":"surchargé"}}', { status: 503 })
+      : gemini('```json\n{"auteur":"Masashi Kishimoto","genre":"Shōnen","editeur":"Kana","titre_original":"Naruto"}\n```');
+    rep = await appel('/infos', { method: 'POST', body: JSON.stringify({ titre: 'Naruto' }) });
+    egal([rep.status, await rep.json()], [200, { auteur: 'Masashi Kishimoto', genre: 'Shōnen', editeur: 'Kana', titre_original: 'Naruto' }], 'infos lues malgré le premier modèle en panne');
+    egal(modeleAppele(), ['gemini-flash-latest', 'gemini-flash-lite-latest'], 'modèle de secours essayé');
+    egal(appels[0].init.headers['x-goog-api-key'], 'cle-gemini', 'clé Gemini envoyée dans un en-tête (pas dans l’adresse)');
+    verifier(!appels[0].url.includes('cle-gemini'), 'clé absente de l’adresse');
+
+    // Liste de modèles choisie dans Cloudflare (GEMINI_MODELES) ; clé refusée : on n'insiste pas
+    appels = [];
+    repondre = () => new Response('{"error":{"message":"API key not valid"}}', { status: 403 });
+    rep = await appel('/infos?titre=Naruto', {}, { ...env, GEMINI_MODELES: ' modele-a , modele-b ' });
+    const erreur = await rep.json();
+    egal([rep.status, modeleAppele()], [502, ['modele-a']], 'clé refusée : un seul essai');
+    verifier(erreur.erreur.includes('modele-a HTTP 403 : API key not valid'), 'raison du refus transmise : ' + erreur.erreur);
+
+    // Réponses de l'IA inutilisables
+    repondre = () => gemini('je ne sais pas');
+    egal(await (await appel('/infos?titre=X')).json(), { erreur: 'Réponse IA illisible' }, 'réponse qui n’est pas du JSON');
+    repondre = () => new Response(JSON.stringify({ candidates: [] }));
+    egal(await (await appel('/infos?titre=X')).json(), { erreur: 'Réponse IA vide' }, 'réponse vide');
+    egal((await appel('/infos')).status, 400, 'titre manquant');
+    egal((await appel('/infos', { method: 'PUT', body: '{}' })).status, 405, 'méthode refusée');
+
+    // Scan de jaquette par l'IA (POST /)
+    appels = [];
+    repondre = () => gemini('{"titre":"Berserk","tome":5}');
+    rep = await appel('/', { method: 'POST', body: JSON.stringify({ mimeType: 'image/png', data: 'AAAA' }) });
+    egal(rep.status, 200, 'jaquette analysée');
+    const envoye = JSON.parse(appels[0].init.body).contents[0].parts[1].inline_data;
+    egal(envoye, { mime_type: 'image/png', data: 'AAAA' }, 'image transmise à Gemini');
+    egal((await appel('/', { method: 'POST', body: JSON.stringify({}) })).status, 400, 'image manquante');
+    egal((await appel('/inconnu')).status, 405, 'adresse inconnue');
+
+    // Modèles disponibles (diagnostic de la surveillance)
+    repondre = () => new Response(JSON.stringify({ models: [
+      { name: 'models/gemini-flash-latest', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/text-embedding', supportedGenerationMethods: ['embedContent'] }] }));
+    egal(await (await appel('/modeles')).json(), { utilises: ['gemini-flash-latest', 'gemini-flash-lite-latest'], disponibles: ['gemini-flash-latest'] }, 'modèles utilisés et disponibles');
+    repondre = () => new Response('panne', { status: 500 });
+    egal((await appel('/modeles')).status, 502, 'Gemini injoignable');
+
+    // Manga Insight : relayé tel quel, avec CORS et 24 h de cache
+    appels = [];
+    repondre = () => new Response('{"n":3}');
+    rep = await appel('/mangainsight/rows');
+    egal([await rep.text(), rep.headers.get('access-control-allow-origin'), rep.headers.get('cache-control')],
+      ['{"n":3}', 'https://biloubils-lab.github.io', 'public, max-age=86400'], 'données relayées');
+    egal(appels[0].url, 'https://mangainsight.fr/data/dashboard/rows.json', 'bon fichier demandé');
+    repondre = () => new Response('', { status: 503 });
+    rep = await appel('/mangainsight/core');
+    egal([rep.status, await rep.json()], [502, { erreur: 'Manga Insight HTTP 503' }], 'Manga Insight en panne');
+
+    // BnF : on se présente (User-Agent), et un refus est expliqué
+    appels = [];
+    repondre = () => new Response('<html><body><h1>Accès refusé</h1> trop de requêtes</body></html>', { status: 403 });
+    rep = await appel('/isbn?isbn=9782723467698');
+    egal([rep.status, await rep.json()], [502, { erreur: 'BnF HTTP 403 : Accès refusé trop de requêtes' }], 'refus de la BnF expliqué');
+    verifier(/MaMangatheque/.test(appels[0].init.headers['User-Agent']), 'User-Agent envoyé à la BnF');
+    repondre = () => new Response('<srw:numberOfRecords>0</srw:numberOfRecords>');
+    egal(await (await appel('/isbn?isbn=9782723467698')).json(), { trouve: false }, 'ISBN inconnu de la BnF');
+    repondre = () => { throw new Error('réseau coupé'); };
+    egal(await (await appel('/edition?mots=Berserk')).json(), { erreur: 'BnF : réseau coupé' }, 'BnF injoignable');
+    egal((await appel('/edition')).status, 400, 'mots manquants');
+
+    // Sauvegarde : contenus invalides et Worker mal configuré
+    const avecCode = { 'X-Backup-Token': 'secret' };
+    egal((await appel('/backup', { method: 'POST', headers: avecCode, body: '{"pas":"une liste"}' })).status, 400, 'sauvegarde invalide refusée');
+    egal((await appel('/backup', { method: 'POST', headers: { 'X-Backup-Token': 'faux' }, body: '[]' })).status, 401, 'mauvais code refusé');
+    rep = await appel('/backup', { headers: avecCode }, { BACKUP_TOKEN: 'secret' });
+    egal(rep.status, 500, 'KV absent');
+    verifier((await rep.json()).error.includes("Binding KV 'MANGA_KV' introuvable"), 'message clair si le KV manque');
+    rep = await appel('/backup', { headers: avecCode }, { MANGA_KV: env.MANGA_KV });
+    verifier((await rep.json()).error.includes("Secret 'BACKUP_TOKEN' manquant"), 'message clair si le code manque');
+    egal(await (await appel('/backup', { headers: avecCode })).json(), null, 'pas encore de sauvegarde');
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
+});
+
 test('Worker : notifications (clés VAPID créées une fois, appareils abonnés protégés)', async () => {
   const worker = (await import(pathToFileURL(path.join(RACINE, 'worker', 'worker.js')).href)).default;
   const nodeCrypto = require('crypto');
