@@ -17,7 +17,7 @@ Application web pour gérer sa collection de mangas : tomes possédés et lus, p
 | **Fiche d'une série** | Tomes (lus, possédés, manquants), prochain à acheter, prochaine sortie. Menu ⋯ : édition / tomes / jaquette, renommer, infos, mettre de côté, supprimer. |
 | **Paramètres ⚙️** | Mise à jour des séries, complétion des infos, inventaire, recherche ISBN, sauvegarde en ligne, apparence (clair / sombre / automatique). |
 
-Autres fonctions : scan du code-barres (ISBN) avec vérification de l'édition, **scan en rafale** (plusieurs tomes à la suite après un achat, puis un résumé à valider), inventaire série par série, import CSV / JSON, export.
+Autres fonctions : ajout d'une série guidé (« ➕ Saisie » propose les éditions françaises avec éditeur, nombre de tomes et jaquette), scan du code-barres (ISBN) avec vérification de l'édition, **scan en rafale** (plusieurs tomes à la suite après un achat, puis un résumé à valider), inventaire série par série, import CSV / JSON, export.
 
 ---
 
@@ -57,6 +57,7 @@ js/                   Code de l'app, découpé par thème (chargé dans l'ordre 
   vues.js               Onglets Pile à lire, Collection, À venir
   fiche.js              Fiche d'une série
   maj-serie.js          Édition, nombre de tomes et jaquette d'une série
+  ajout-serie.js        Ajouter une série : éditions proposées pendant la saisie du titre
   mise-a-jour.js        Compléter la collection, BnF, Manga Insight (sorties, estimations)
   nouveautes.js         Page « Quoi de neuf ? »
   recherche-infos.js    Infos d'une série (AniList, Jikan, Google Books, Gemini)

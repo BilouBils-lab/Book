@@ -475,7 +475,8 @@ async function enregistrerSerie(titre, tomeNum) {
 }
 
 async function ajouterManuel() {
-  const saisie = await demanderSerieEtTome('', 1, 'Ajouter une série');
+  const saisie = await demanderSerieEtTome('', 1, 'Ajouter une série', true);
   if (!saisie) return;
   await enregistrerSerie(saisie.titre, saisie.tome);
+  if (saisie.edition) appliquerEditionChoisie(saisie.titre, saisie.edition);
 }

@@ -39,14 +39,30 @@ function confirmerAction(message, options = {}) {
   });
 }
 
-function demanderSerieEtTome(titreParDefaut, tomeParDefaut, entete) {
+// avecSuggestions : propose les éditions connues pendant la saisie du titre (ajout d'une nouvelle série).
+// Renvoie { titre, tome, edition } (edition : l'édition touchée dans les suggestions, sinon null), ou null.
+function demanderSerieEtTome(titreParDefaut, tomeParDefaut, entete, avecSuggestions) {
   return new Promise((resolve) => {
     const modal = document.getElementById('form-serie-modal');
     const champTitre = document.getElementById('form-serie-titre');
     const champTome = document.getElementById('form-serie-tome');
+    const zoneSuggestions = document.getElementById('form-serie-suggestions');
     document.getElementById('form-serie-heading').textContent = entete || 'Ajouter une série';
     champTitre.value = titreParDefaut || '';
     champTome.value = tomeParDefaut || 1;
+    zoneSuggestions.innerHTML = '';
+    let edition = null;
+    afficherEditionChoisie(null);
+    champTitre.oninput = null;
+    if (avecSuggestions) {
+      brancherSuggestions(champTitre, (e) => {
+        edition = e;
+        afficherEditionChoisie(e);
+        if (!e) return;
+        champTitre.value = titreDeEdition(e);
+        zoneSuggestions.innerHTML = '';
+      });
+    }
     modal.classList.add('active');
     setTimeout(() => champTitre.focus(), 50);
 
@@ -55,6 +71,8 @@ function demanderSerieEtTome(titreParDefaut, tomeParDefaut, entete) {
 
     function nettoyer(resultat) {
       modal.classList.remove('active');
+      champTitre.oninput = null;
+      zoneSuggestions.innerHTML = '';
       btnOk.removeEventListener('click', onOk);
       btnCancel.removeEventListener('click', onCancel);
       resolve(resultat);
@@ -63,7 +81,7 @@ function demanderSerieEtTome(titreParDefaut, tomeParDefaut, entete) {
       const titre = champTitre.value.trim();
       if (!titre) { champTitre.focus(); return; }
       const tome = parseInt(champTome.value, 10) || 1;
-      nettoyer({ titre, tome });
+      nettoyer({ titre, tome, edition });
     }
     function onCancel() { nettoyer(null); }
 
