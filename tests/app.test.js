@@ -891,6 +891,48 @@ test('Scan du code-barres depuis une photo', async ({ navigateur, base }) => {
   await fermer();
 });
 
+test('Scan en rafale : plusieurs tomes à la suite, résumé puis ajout (et annuler)', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => req.url().includes('/isbn') ? { body: { trouve: false } } : null
+  });
+  const tomes = (n, possedes) => Array.from({ length: n }, (_, i) => ({ numero: i + 1, possede: i + 1 <= possedes, lu: false }));
+  await avecMangaInsight(page, [
+    { titre: 'One Piece', editeur: 'Glénat', tomes: tomes(110, 109) },
+    { titre: 'Berserk', editeur: 'Glénat', tomes: tomes(2, 2) }
+  ]);
+  await page.evaluate(() => { serieAVerifier = null; scanTermine = false; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); });
+  await page.click('#scanner-rafale');
+  egal(await page.textContent('#scanner-titre'), '📚 Scan en rafale', 'mode rafale');
+  for (const isbn of ['9782344062814', '9782344061343', '9782344062814', '9782505133797', '9782344067826', '9782090000009']) {
+    await page.evaluate((i) => codeBarresLu(i), isbn);
+  }
+  await page.waitForFunction(() => !rafale.some(e => e.etat === 'recherche'));
+  egal(await page.textContent('#scanner-statut'), '5 livres scannés · vise le suivant', 'le doublon n’est compté qu’une fois');
+  egal(await page.textContent('#rafale-terminer'), '✓ Terminer (2 à ajouter)', 'compteur');
+  verifier(await page.evaluate(() => document.getElementById('scanner-modal').classList.contains('active')), 'la caméra reste ouverte entre deux livres');
+
+  await page.click('#rafale-terminer');
+  await page.waitForSelector('#rafale-modal.active');
+  const resume = await page.$$eval('#rafale-resume .rafale-ligne', l => l.map(x => x.textContent.trim()));
+  egal(resume, [
+    'One Piece · tome 110',
+    '☑️ One Piece · tome 109 · déjà dans ta collection',
+    'Kagurabachi · tome 3 · nouvelle sérieLes tomes d’avant seront à cocher dans sa fiche.',
+    '⚠️ Berserk (Prestige) · tome 3 : édition Prestige, ta série « Berserk » est en édition standard : ajoute-le seul avec 📷 Scanner',
+    '⚠️ ISBN 9782090000009 : livre introuvable, ajoute-le avec ➕ Saisie'
+  ], 'résumé');
+  egal(await page.textContent('#rafale-valider'), '📚 Ajouter 2 tomes', 'bouton de validation');
+  await page.click('#rafale-valider');
+  const etat = () => page.evaluate(() => bibliotheque.map(s => [s.titre, s.tomes.filter(t => t.possede).slice(-2).map(t => t.numero + (t.isbnAuto === false ? '#' : '')).join(' '), s.tomes.length]));
+  egal(await etat(), [['One Piece', '109 110#', 110], ['Berserk', '1 2', 2], ['Kagurabachi', '3#', 3]], 'tome 110 coché, série Kagurabachi créée');
+  egal(await page.evaluate(() => bibliotheque[2].miNom), 'Kagurabachi', 'édition Manga Insight retenue pour la nouvelle série');
+  egal(await page.textContent('#toast span'), '📚 2 tomes ajoutés à ta collection', 'message');
+  await page.click('#toast button');
+  egal(await etat(), [['One Piece', '108 109', 110], ['Berserk', '1 2', 2]], 'annuler remet la collection comme avant');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Renommer une série et fusionner avec une série du même nom', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await definirBibliotheque(page, [

@@ -17,7 +17,7 @@ Application web pour gérer sa collection de mangas : tomes possédés et lus, p
 | **Fiche d'une série** | Tomes (lus, possédés, manquants), prochain à acheter, prochaine sortie. Menu ⋯ : édition / tomes / jaquette, renommer, infos, mettre de côté, supprimer. |
 | **Paramètres ⚙️** | Mise à jour des séries, complétion des infos, inventaire, recherche ISBN, sauvegarde en ligne, apparence (clair / sombre / automatique). |
 
-Autres fonctions : scan du code-barres (ISBN) avec vérification de l'édition, inventaire série par série, import CSV / JSON, export.
+Autres fonctions : scan du code-barres (ISBN) avec vérification de l'édition, **scan en rafale** (plusieurs tomes à la suite après un achat, puis un résumé à valider), inventaire série par série, import CSV / JSON, export.
 
 ---
 
@@ -62,6 +62,7 @@ js/                   Code de l'app, découpé par thème (chargé dans l'ordre 
   recherche-infos.js    Infos d'une série (AniList, Jikan, Google Books, Gemini)
   isbn-scanner.js       Recherche ISBN et scan du code-barres
   inventaire.js         Mode inventaire
+  rafale.js             Scan en rafale (plusieurs tomes à la suite)
   jaquettes.js          Jaquettes
   import-export.js      Import CSV, import / export JSON
   demarrage.js          Lancement, service worker, fermeture des fenêtres par le fond

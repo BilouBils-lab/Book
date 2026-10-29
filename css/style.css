@@ -752,6 +752,25 @@ main {
   box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35);
 }
 
+/* Scan en rafale : livres scannés sous la caméra, puis résumé à valider */
+.rafale-liste {
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+.rafale-liste:empty { display: none; }
+.rafale-resume { max-height: 50vh; }
+.rafale-ligne {
+  display: block;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--card-border);
+}
+.rafale-ligne input { accent-color: var(--accent); margin-right: 4px; }
+.rafale-info { color: var(--text-sub); }
+.rafale-note { font-size: 11px; color: var(--text-sub); margin-left: 22px; }
+
 .settings-list {
   display: flex;
   flex-direction: column;

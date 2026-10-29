@@ -237,6 +237,7 @@ function statutScanner(texte) {
 
 async function ouvrirScanner() {
   scanTermine = false;
+  quitterModeRafale();
   document.getElementById('scanner-modal').classList.add('active');
   statutScanner('Ouverture de la caméra…');
   try {
@@ -248,7 +249,7 @@ async function ouvrirScanner() {
       document.getElementById('scanner-video'),
       (resultat) => { if (resultat) codeBarresLu(resultat.getText()); }
     );
-    if (!scanTermine) statutScanner('Vise le code-barres au dos du livre');
+    if (!scanTermine) statutScanner(modeRafale ? texteRafale() : 'Vise le code-barres au dos du livre');
   } catch (e) {
     const refus = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
     statutScanner(refus
@@ -262,10 +263,13 @@ function arreterCamera() {
 }
 
 function fermerScanner() {
+  // Fond touché pendant une rafale : on ne perd pas les livres scannés, on passe au résumé
+  if (modeRafale && rafale.length) { terminerRafale(); return; }
   scanTermine = true;
   serieAVerifier = null;
   arreterCamera();
   document.getElementById('scanner-modal').classList.remove('active');
+  quitterModeRafale();
 }
 
 async function codeBarresLu(texte) {
@@ -276,6 +280,7 @@ async function codeBarresLu(texte) {
     statutScanner('Code ' + texte + " lu, mais ce n'est pas un ISBN : vise le code-barres du livre.");
     return;
   }
+  if (modeRafale) { ajouterALaRafale(isbn); return; }
   if (navigator.vibrate) navigator.vibrate(80);
   const sIndex = serieAVerifier;
   fermerScanner();
