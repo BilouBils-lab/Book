@@ -133,6 +133,10 @@ Des tests de bout en bout (Playwright) ouvrent l'app dans un vrai navigateur, av
 
 ---
 
+## Surveillance des sources
+
+Chaque lundi, le workflow **Surveillance des sources** (`tests/surveillance.js`) interroge les vrais services — Manga Insight, BnF et Gemini à travers le Worker, AniList et Jikan en direct — et vérifie que leurs réponses ont toujours la forme attendue. En cas d'échec, GitHub envoie un e-mail ; le détail (quelle source, quelle fonction de l'app est touchée) est dans l'onglet **Actions**. Lancement à la main : **Actions → Surveillance des sources → Run workflow**.
+
 ## En cas de problème
 
 | Symptôme | Que faire |

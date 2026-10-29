@@ -189,10 +189,25 @@ test('Fiche : progression, prochain tome, tranches et ajout d’un tome manquant
   egal(await page.textContent('#fiche-prochain'), 'Prochain à acheter : tome 9', 'après appui sur le tome 6');
 
   await page.evaluate(() => ouvrirModalSerie(1));
-  egal(await page.$$eval('.tranche', t => t.length), 11, '110 tomes → 11 tranches');
-  egal(await page.$$eval('.tranche.ouverte .tranche-nom', t => t.map(x => x.textContent)), ['Tomes 11–20'], 'tranche du prochain tome dépliée');
-  await page.click('.tranche-entete >> text=Tomes 1–10');
-  egal(await page.$$eval('.tranche.ouverte', t => t.length), 2, 'dépliage d’une tranche');
+  // One Piece : regroupé par arcs (coffrets Glénat), puis par tranches de 10 après le dernier coffret
+  egal(await page.$$eval('.tranche-nom', t => t.map(x => x.textContent)), [
+    'East Blue1–12', 'Alabasta13–23', 'Skypiea24–32', 'Water Seven33–45', 'Thriller Bark46–53', 'Marine Ford54–61',
+    'Île des hommes-poissons62–70', 'Dressrosa71–80', 'Tougato81–90', 'Pays des Wa91–104', 'Tomes 105–110'
+  ], '110 tomes → 10 arcs puis une tranche');
+  egal(await page.$$eval('.tranche.ouverte .tranche-nom', t => t.map(x => x.textContent)), ['Alabasta13–23'], 'arc du prochain tome déplié');
+  await page.click('.tranche-entete >> text=Water Seven');
+  egal(await page.$$eval('.tranche.ouverte', t => t.length), 2, 'dépliage d’un arc');
+
+  // Un coffret acheté : tout l'arc d'un coup, avec « Annuler »
+  await page.click('.tranche.ouverte .tranche-tout >> text=Alabasta');
+  egal(await page.textContent('#toast span'), '✓ Arc Alabasta : 11 tomes ajoutés', 'message');
+  egal(await page.textContent('#fiche-compteur'), '23 / 110 possédés · 4 lus', 'tomes 13 à 23 possédés');
+  egal(await page.$$eval('.tranche-tout', b => b.some(x => x.textContent.includes('Alabasta'))), false, 'plus de bouton pour un arc complet');
+  await page.click('#toast button');
+  egal(await page.textContent('#fiche-compteur'), '12 / 110 possédés · 4 lus', '« Annuler » retire le coffret');
+  // Édition spéciale : pas d'arcs (le découpage est celui de l'édition standard)
+  await page.evaluate(() => { bibliotheque[1].titre = 'One Piece (Collector)'; remplirModalSerie(1); });
+  egal(await page.$eval('.tranche-nom', t => t.textContent), 'Tomes 1–10', 'tranches de 10 pour une autre édition');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });
@@ -211,6 +226,37 @@ test('Collection : cartes et tri « À compléter »', async ({ navigateur, base
     'One Piece — 12 / 110 · 98 à acheter · 4 lus',
     'Dragon Ball — 42 / 42 · Complète ✓ · 42 lus'
   ], 'ordre et contenu des cartes');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Collection : filtres par statut et par éditeur', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  await definirBibliotheque(page, [
+    { titre: 'One Piece', editeur: 'Glénat', statut: 'En cours', tomesParus: 110, tomes: tomes(12) },
+    { titre: 'Berserk (Prestige)', editeur: 'Glénat', tomesParus: 6, tomes: tomes(6) },
+    { titre: 'Dragon Ball', editeur: 'Glénat', statut: 'Terminée', tomesParus: 42, tomes: tomes(42) },
+    { titre: 'Kagurabachi', editeur: 'Kana', tomesParus: 11, tomes: tomes(9) },
+    { titre: 'Blue Lock', editeur: 'Pika', misDeCote: true, tomesParus: 31, tomes: tomes(10) }]);
+  const filtres = () => page.$$eval('.filtres-collection .filtre[data-filtre]', b => b.map(x => (x.classList.contains('actif') ? '*' : '') + x.textContent));
+  const titres = () => page.$$eval('.series-card .series-title', t => t.map(x => x.textContent));
+  egal(await filtres(), ['*Toutes5', 'En cours3', 'À compléter2', 'Terminées1', 'Mises de côté1'], 'filtres avec leur nombre de séries');
+  await page.click('.filtre[data-filtre="a-completer"]');
+  egal(await titres(), ['Kagurabachi', 'One Piece'], 'à compléter (hors séries mises de côté)');
+  await page.click('.filtre[data-filtre="de-cote"]');
+  egal(await titres(), ['Blue Lock'], 'mises de côté');
+
+  // Éditeur, combiné au filtre de statut et à la recherche
+  await page.click('.filtre[data-filtre="toutes"]');
+  await page.selectOption('.filtres-collection select', 'Glénat');
+  egal(await titres(), ['Berserk (Prestige)', 'Dragon Ball', 'One Piece'], 'éditeur Glénat');
+  await page.click('.filtre[data-filtre="en-cours"]');
+  egal(await titres(), ['Berserk (Prestige)', 'One Piece'], 'Glénat et en cours');
+  await page.fill('#recherche-input', 'zzz');
+  verifier((await page.textContent('#view-collection')).includes('Aucune série ne correspond à « zzz » dans ce filtre.'), 'message sans résultat');
+  await page.click('#view-collection button:has-text("Tout afficher")');
+  await page.fill('#recherche-input', '');
+  egal((await titres()).length, 5, '« Tout afficher » retire les filtres');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });
@@ -254,6 +300,37 @@ test('Pile à lire : en cours, encore un effort, à commencer', async ({ navigat
   await page.click('#view-pal .selecteur-vue button >> text=En cours');
   await page.click('.pal-item:has-text("Ao Ashi") .btn-read-action');
   egal([await page.textContent('#toast span'), await page.isVisible('#toast button')], ['✓ Ao Ashi — tome 31 lu', true], 'message et « Annuler » même sans changement de groupe');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Pile à lire : glisser une carte vers la droite pour « Lu ✓ »', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  await definirBibliotheque(page, [{ titre: 'Ao Ashi', tomes: tomes(36, 30).map((t, i) => (i < 30 ? { ...t, luLe: 1000 } : t)) }]);
+  await page.evaluate(() => changerOnglet('pal'));
+  verifier(await page.isVisible('.astuce-glisser'), 'astuce affichée tant que le geste n\u2019a pas servi');
+  const glisser = async (distance) => {
+    const b = await page.locator('.pal-item').boundingBox();
+    await page.mouse.move(b.x + 30, b.y + b.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(b.x + 30 + distance * i / 10, b.y + b.height / 2 + i);
+    await page.mouse.up();
+    await page.waitForTimeout(350);
+  };
+  const lus = () => page.evaluate(() => bibliotheque[0].tomes.filter(t => t.lu).length);
+
+  // Petit glissement : la carte revient, rien ne change, la fiche ne s'ouvre pas
+  await glisser(60);
+  egal([await lus(), await page.evaluate(() => document.getElementById('detail-modal').classList.contains('active'))], [30, false], 'glissement trop court : rien');
+  // Grand glissement : tome lu, avec « Annuler »
+  await glisser(250);
+  egal(await lus(), 31, 'glissement vers la droite : tome 31 lu');
+  egal(await page.textContent('#toast span'), '✓ Ao Ashi — tome 31 lu', 'message avec « Annuler »');
+  egal(await page.textContent('.pal-item .pal-tome'), 'Tome 32 · encore 5 à lire', 'la carte passe au tome suivant');
+  egal(await page.isVisible('.astuce-glisser'), false, 'astuce masquée une fois le geste utilisé');
+  // Un simple appui ouvre toujours la fiche
+  await page.click('.pal-item .pal-title');
+  egal(await page.evaluate(() => document.getElementById('detail-modal').classList.contains('active')), true, 'appui : ouvre la fiche');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });

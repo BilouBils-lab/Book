@@ -39,6 +39,9 @@ function rendreVues() {
   containerCol.innerHTML = '';
 
   let listeAffichee = bibliotheque.map((serie, i) => ({ serie, indexReel: i }));
+  if (bibliotheque.length) containerCol.appendChild(construireFiltres());
+  const filtre = FILTRES_COLLECTION.find(f => f[0] === filtreActif) || FILTRES_COLLECTION[0];
+  listeAffichee = listeAffichee.filter(({ serie }) => filtre[2](serie) && (!editeurActif || editeurDe(serie) === editeurActif));
 
   if (rechercheTexte.trim()) {
     const recherche = normaliserTitre(rechercheTexte);
@@ -68,7 +71,19 @@ function rendreVues() {
   if (bibliotheque.length === 0) {
     containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Clique sur ➕ pour ajouter une série.<br><br>Tu avais déjà une collection (nouveau raccourci, autre appareil) ?<br>⚙️ → 🔑 Code de sauvegarde cloud pour la récupérer.</div>`;
   } else if (listeAffichee.length === 0) {
-    containerCol.innerHTML = `<div class="empty-state">Aucune série ne correspond à "${rechercheTexte}".</div>`;
+    const vide = document.createElement('div');
+    vide.className = 'empty-state';
+    const filtreEnCours = filtreActif !== 'toutes' || editeurActif;
+    vide.textContent = rechercheTexte.trim() ? `Aucune série ne correspond à « ${rechercheTexte.trim()} »` + (filtreEnCours ? ' dans ce filtre.' : '.') : 'Aucune série dans ce filtre.';
+    if (filtreEnCours) {
+      const tout = document.createElement('button');
+      tout.className = 'btn btn-secondary';
+      tout.style.margin = '12px auto 0';
+      tout.textContent = 'Tout afficher';
+      tout.onclick = () => { filtreActif = 'toutes'; editeurActif = ''; rendreVues(); };
+      vide.appendChild(tout);
+    }
+    containerCol.appendChild(vide);
   } else {
     listeAffichee.forEach(({ serie, indexReel }) => {
       const { total, possedes, lus, manquants } = statsSerie(serie);
@@ -325,6 +340,12 @@ function rendrePileALire() {
   intro.className = 'avenir-intro';
   intro.textContent = actif.intro;
   container.appendChild(intro);
+  if (!localStorage.getItem('astuce_glisser_vue')) {
+    const astuce = document.createElement('div');
+    astuce.className = 'avenir-intro astuce-glisser';
+    astuce.textContent = '👉 Astuce : glisse une carte vers la droite pour marquer le tome comme lu.';
+    container.appendChild(astuce);
+  }
   for (const item of items) container.appendChild(cartePileALire(item, actif.reste(item.aLire.length)));
 }
 
@@ -346,7 +367,119 @@ function cartePileALire(item, texteReste) {
     e.stopPropagation(); // ne pas ouvrir la fiche
     marquerCommeLu(item.sIndex, tIndex);
   };
-  return carte;
+  // Glisser la carte vers la droite = « Lu ✓ » (le fond vert apparaît derrière)
+  const conteneur = document.createElement('div');
+  conteneur.className = 'pal-glisse';
+  const fond = document.createElement('div');
+  fond.className = 'pal-fond';
+  fond.textContent = `✓ Tome ${prochain.numero} lu`;
+  conteneur.append(fond, carte);
+  activerGlissement(carte, fond, () => {
+    localStorage.setItem('astuce_glisser_vue', '1');
+    marquerCommeLu(item.sIndex, tIndex);
+  });
+  return conteneur;
+}
+
+// Glissement horizontal d'une carte : au-delà du seuil, l'action est lancée ; sinon la carte revient.
+// Le défilement vertical reste au navigateur (touch-action: pan-y dans le CSS).
+function activerGlissement(carte, fond, action) {
+  let depart = null;
+  let dx = 0;
+  let glisse = false;
+  const seuil = () => carte.offsetWidth * 0.35;
+  const remettre = () => {
+    depart = null;
+    carte.style.transition = '';
+    carte.style.transform = '';
+    fond.classList.remove('pret');
+  };
+  carte.addEventListener('pointerdown', (e) => {
+    if (e.button) return;
+    depart = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    dx = 0;
+    glisse = false;
+    carte.style.transition = 'none';
+  });
+  carte.addEventListener('pointermove', (e) => {
+    if (!depart || e.pointerId !== depart.id) return;
+    const ecartX = e.clientX - depart.x;
+    const ecartY = e.clientY - depart.y;
+    if (!glisse) {
+      if (Math.abs(ecartY) > 10 && Math.abs(ecartY) > Math.abs(ecartX)) { remettre(); return; } // défilement vertical
+      if (ecartX < 10 || Math.abs(ecartX) < Math.abs(ecartY)) return;
+      glisse = true;
+      carte.setPointerCapture(e.pointerId);
+    }
+    dx = Math.max(0, ecartX);
+    carte.style.transform = `translateX(${dx}px)`;
+    fond.classList.toggle('pret', dx > seuil());
+  });
+  carte.addEventListener('pointerup', () => {
+    if (!depart) return;
+    depart = null;
+    carte.style.transition = '';
+    if (glisse && dx > seuil()) {
+      carte.style.transform = 'translateX(110%)';
+      if (navigator.vibrate) navigator.vibrate(30);
+      setTimeout(action, 180);
+    } else {
+      carte.style.transform = '';
+      fond.classList.remove('pret');
+    }
+  });
+  carte.addEventListener('pointercancel', remettre);
+  // Après un glissement, le relâchement ne doit pas ouvrir la fiche
+  carte.addEventListener('click', (e) => {
+    if (glisse) { e.stopPropagation(); e.preventDefault(); glisse = false; }
+  }, true);
+}
+
+// --- Filtres de la collection ---
+const FILTRES_COLLECTION = [
+  ['toutes', 'Toutes', () => true],
+  ['en-cours', 'En cours', s => !s.misDeCote && (s.statut || 'En cours') === 'En cours'],
+  ['a-completer', 'À compléter', s => !s.misDeCote && !!s.tomesParus && statsSerie(s).manquants.length > 0],
+  ['terminees', 'Terminées', s => s.statut === 'Terminée'],
+  ['de-cote', 'Mises de côté', s => !!s.misDeCote]
+];
+let filtreActif = 'toutes';
+let editeurActif = '';
+
+function editeurDe(serie) {
+  return (editeurFrancais(serie.editeur) || serie.editeur || '').trim();
+}
+
+// Rangée de filtres (avec le nombre de séries de chacun) ; les filtres vides sont masqués
+function construireFiltres() {
+  const rangee = document.createElement('div');
+  rangee.className = 'filtres-collection';
+  for (const [cle, libelle, teste] of FILTRES_COLLECTION) {
+    const nombre = bibliotheque.filter(teste).length;
+    if (!nombre && cle !== 'toutes' && cle !== filtreActif) continue;
+    const bouton = document.createElement('button');
+    bouton.className = 'filtre' + (cle === filtreActif ? ' actif' : '');
+    bouton.dataset.filtre = cle;
+    bouton.textContent = libelle;
+    const compte = document.createElement('small');
+    compte.textContent = nombre;
+    bouton.appendChild(compte);
+    bouton.onclick = () => { filtreActif = cle; rendreVues(); };
+    rangee.appendChild(bouton);
+  }
+  // Éditeurs : seulement s'il y en a au moins deux
+  const editeurs = [...new Set(bibliotheque.map(editeurDe).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  if (editeurs.length > 1 || editeurActif) {
+    const choix = document.createElement('select');
+    choix.className = 'filtre' + (editeurActif ? ' actif' : '');
+    choix.setAttribute('aria-label', 'Filtrer par éditeur');
+    choix.add(new Option('Tous les éditeurs', ''));
+    for (const e of editeurs) choix.add(new Option(e, e));
+    choix.value = editeurActif;
+    choix.onchange = () => { editeurActif = choix.value; rendreVues(); };
+    rangee.appendChild(choix);
+  }
+  return rangee;
 }
 
 function onRechercheInput(valeur) {

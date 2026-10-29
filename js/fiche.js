@@ -100,7 +100,7 @@ function remplirModalSerie(index) {
     sortie.textContent = '';
   }
 
-  // Grille : chaque tome jusqu'au dernier paru ; au-delà de 30 tomes, regroupée par tranches de 10
+  // Grille : chaque tome jusqu'au dernier paru ; au-delà de 30 tomes, regroupée par arcs (si connus) ou tranches de 10
   const grid = document.getElementById('modal-volumes-grid');
   grid.innerHTML = '';
   const etatTome = (n) => parNumero.has(n) ? serie.tomes[parNumero.get(n)] : null;
@@ -111,14 +111,14 @@ function remplirModalSerie(index) {
   }
 
   grid.className = '';
+  const segments = decoupageSerie(serie, total);
   if (!tranchesOuvertes.has(serie)) {
     // Par défaut : la tranche du prochain tome à acheter (ou la dernière si tout est possédé)
     const cible = manquants.length ? manquants[0] : total;
-    tranchesOuvertes.set(serie, new Set([Math.floor((cible - 1) / 10) * 10 + 1]));
+    tranchesOuvertes.set(serie, new Set([segments.find(s => cible >= s.debut && cible <= s.fin).debut]));
   }
   const ouvertes = tranchesOuvertes.get(serie);
-  for (let debut = 1; debut <= total; debut += 10) {
-    const fin = Math.min(debut + 9, total);
+  for (const { nom, debut, fin } of segments) {
     const tranche = document.createElement('div');
     tranche.className = 'tranche' + (ouvertes.has(debut) ? ' ouverte' : '');
 
@@ -135,7 +135,12 @@ function remplirModalSerie(index) {
     }
     const taille = fin - debut + 1;
     const complete = possedesTranche === taille;
-    entete.innerHTML = `<span class="tranche-fleche">›</span><span class="tranche-nom">Tomes ${debut}–${fin}</span>`;
+    entete.innerHTML = `<span class="tranche-fleche">›</span>`;
+    const libelle = document.createElement('span');
+    libelle.className = 'tranche-nom' + (nom ? ' arc' : '');
+    libelle.textContent = nom || `Tomes ${debut}–${fin}`;
+    if (nom) { const plage = document.createElement('small'); plage.textContent = `${debut}–${fin}`; libelle.appendChild(plage); }
+    entete.appendChild(libelle);
     entete.appendChild(barre);
     const compte = document.createElement('span');
     compte.className = 'tranche-compte' + (complete ? ' complete' : '');
@@ -150,8 +155,60 @@ function remplirModalSerie(index) {
     cases.className = 'volumes-grid';
     for (let n = debut; n <= fin; n++) cases.appendChild(creerCaseTome(index, n, parNumero));
     tranche.append(entete, cases);
+    // Un coffret acheté : tous les tomes de l'arc d'un coup
+    if (!complete) {
+      const tout = document.createElement('button');
+      tout.className = 'tranche-tout';
+      tout.textContent = nom ? `✓ J'ai tout l'arc ${nom} (coffret)` : `✓ J'ai les tomes ${debut} à ${fin}`;
+      tout.onclick = () => marquerPlagePossedee(index, debut, fin, nom);
+      tranche.appendChild(tout);
+    }
     grid.appendChild(tranche);
   }
+}
+
+// Découpages en arcs connus, d'après les coffrets de l'éditeur (clé : titre sans espaces ni accents).
+// Seulement pour l'édition standard (titre sans parenthèses). Au-delà du dernier arc : tranches de 10.
+const ARCS_CONNUS = {
+  onepiece: [ // coffrets Glénat
+    ['East Blue', 1, 12], ['Alabasta', 13, 23], ['Skypiea', 24, 32], ['Water Seven', 33, 45],
+    ['Thriller Bark', 46, 53], ['Marine Ford', 54, 61], ['Île des hommes-poissons', 62, 70], ['Dressrosa', 71, 80],
+    ['Tougato', 81, 90], // l'arc Whole Cake Island, nommé « Tougato » par Glénat
+    ['Pays des Wa', 91, 104]
+  ]
+};
+
+function decoupageSerie(serie, total) {
+  const arcs = ARCS_CONNUS[cleTitre(serie.titre)] || [];
+  const segments = [];
+  let n = 1;
+  for (const [nom, debut, fin] of arcs) {
+    if (debut > total) break;
+    segments.push({ nom, debut, fin: Math.min(fin, total) });
+    n = fin + 1;
+  }
+  for (; n <= total; n += 10) segments.push({ nom: null, debut: n, fin: Math.min(n + 9, total) });
+  return segments;
+}
+
+// Marque possédés tous les tomes de debut à fin (coffret), avec « Annuler »
+function marquerPlagePossedee(sIndex, debut, fin, nom) {
+  const serie = bibliotheque[sIndex];
+  const avant = serie.tomes.map(t => ({ ...t }));
+  let ajoutes = 0;
+  for (let n = debut; n <= fin; n++) {
+    const tome = serie.tomes.find(t => t.numero === n);
+    if (tome && tome.possede) continue;
+    if (tome) tome.possede = true;
+    else serie.tomes.push({ numero: n, possede: true, lu: false });
+    ajoutes++;
+  }
+  serie.tomes.sort((a, b) => a.numero - b.numero);
+  sauvegarder();
+  afficherToast(`✓ ${nom ? 'Arc ' + nom : 'Tomes ' + debut + ' à ' + fin} : ${ajoutes} tome${ajoutes > 1 ? 's' : ''} ajouté${ajoutes > 1 ? 's' : ''}`, () => {
+    serie.tomes = avant;
+    sauvegarder();
+  });
 }
 
 const SEUIL_TRANCHES = 30;

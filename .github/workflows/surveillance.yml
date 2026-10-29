@@ -1,0 +1,25 @@
+# Surveillance des sources externes : chaque lundi matin, GitHub interroge les vrais services
+# (Manga Insight, BnF, Gemini via le Worker ; AniList, Jikan en direct) et vérifie leurs réponses.
+# En cas d'échec, GitHub envoie un e-mail : une source a changé ou est en panne (détail dans l'onglet Actions).
+name: Surveillance des sources
+
+on:
+  schedule:
+    - cron: '17 6 * * 1' # chaque lundi vers 7 h 17 (heure de Paris en hiver)
+  workflow_dispatch: # bouton « Run workflow » pour lancer une vérification à la main
+
+jobs:
+  sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Interroger les sources
+        run: node tests/surveillance.js
