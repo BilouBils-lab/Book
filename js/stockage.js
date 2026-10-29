@@ -54,7 +54,10 @@ async function initialiserBibliotheque() {
     bibliotheque = JSON.parse(localStorage.getItem('mangas_db')) || [];
   }
   rendreVues();
-  majMangaInsightAuDemarrage().finally(verifierNouveautes);
+  // Ouverte depuis une notification : on va droit à ce qu'elle annonce (pas de page « Quoi de neuf ? »)
+  const cible = cibleDeLancement();
+  ouvrirDepuisNotification(cible);
+  majMangaInsightAuDemarrage().finally(() => { if (!cible) verifierNouveautes(); });
 }
 
 const BACKUP_URL = 'https://manga-gemini-proxy.nabil-chilla.workers.dev/backup';

@@ -36,6 +36,8 @@ for (const [id, fermer] of Object.entries(FERMETURE_PAR_FOND)) {
 // Mode hors-ligne : le service worker garde une copie de l'app (uniquement sur un vrai site, pas en file://)
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(e => console.error('Mode hors-ligne indisponible', e));
+  // Notification touchée alors que l'app était déjà ouverte : le service worker dit quoi afficher
+  navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.ouvrir) ouvrirDepuisNotification(e.data.ouvrir); });
 }
 
 // Badge « hors ligne » et envoi de la sauvegarde en attente quand le réseau revient

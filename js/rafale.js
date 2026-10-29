@@ -12,17 +12,23 @@ function passerEnModeRafale() {
   statutScanner(texteRafale());
 }
 
+// Quitte aussi la vérification en magasin (magasin.js) : l'écran de scan revient à la normale
 function quitterModeRafale() {
   modeRafale = false;
+  modeVerification = false;
   rafale = [];
   afficherModeRafale();
 }
 
 function afficherModeRafale() {
-  document.getElementById('scanner-boutons').style.display = modeRafale ? 'none' : 'flex';
+  const special = modeRafale || modeVerification;
+  document.getElementById('scanner-boutons').style.display = special ? 'none' : 'flex';
   document.getElementById('rafale-boutons').style.display = modeRafale ? 'flex' : 'none';
-  document.getElementById('scanner-rafale').style.display = serieAVerifier === null ? '' : 'none';
-  document.getElementById('scanner-titre').textContent = modeRafale ? '📚 Scan en rafale' : '📷 Scanner le code-barres';
+  document.getElementById('magasin-boutons').style.display = modeVerification ? 'flex' : 'none';
+  // Pendant l'inventaire, le scan sert à vérifier une série : pas de rafale ni de magasin
+  for (const id of ['scanner-rafale', 'scanner-magasin']) document.getElementById(id).style.display = serieAVerifier === null ? '' : 'none';
+  document.getElementById('scanner-titre').textContent = modeRafale ? '📚 Scan en rafale' : modeVerification ? '🏪 Vérifier en magasin' : '📷 Scanner le code-barres';
+  if (!modeVerification) document.getElementById('verdict-magasin').innerHTML = '';
   afficherListeRafale();
 }
 
@@ -102,7 +108,7 @@ async function identifierPourRafale(isbn) {
   // Même série dans une autre édition : il faut choisir (corriger la série ou en créer une à part)
   const autre = bibliotheque.find(s => titreSansEdition(s.titre) === cleTitre(analyse.serie));
   if (autre) {
-    return { etat: 'inconnu', titre: `${titre} · tome ${analyse.tome}`,
+    return { etat: 'inconnu', titre: `${titre} · tome ${analyse.tome}`, autreEdition: { livre: analyse.edition, serie: autre.titre },
       message: `édition ${analyse.edition || 'standard'}, ta série « ${autre.titre} » est en édition ${editionDuTitre(autre.titre) || 'standard'} : ajoute-le seul avec 📷 Scanner` };
   }
   return { etat: 'nouvelle', titre, tome: analyse.tome, livreMI,

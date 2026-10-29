@@ -104,3 +104,25 @@ async function desactiverNotifications() {
   majBoutonNotifications();
   afficherToast('🔕 Notifications désactivées');
 }
+
+// --- Toucher une notification : ouvrir l'endroit qu'elle concerne ---
+// La notification porte { onglet, vue, serie } : l'onglet À venir (vue « achats » ou « sorties »),
+// et la fiche de la série quand il n'y en a qu'une.
+
+function ouvrirDepuisNotification(cible) {
+  if (!cible) return;
+  if (document.getElementById('scanner-modal').classList.contains('active')) fermerScanner(); // coupe aussi la caméra
+  for (const fenetre of document.querySelectorAll('.modal-overlay.active')) fenetre.classList.remove('active');
+  if (cible.vue) vueAVenir = cible.vue;
+  changerOnglet(cible.onglet || 'avenir');
+  const index = cible.serie ? bibliotheque.findIndex(s => s.titre === cible.serie) : -1;
+  if (index !== -1) ouvrirModalSerie(index);
+}
+
+// App lancée par une notification : l'endroit à ouvrir est dans l'adresse (?onglet=…&vue=…&serie=…)
+function cibleDeLancement() {
+  const p = new URLSearchParams(location.search);
+  if (!p.has('onglet')) return null;
+  history.replaceState(null, '', location.pathname); // un rechargement ne la rouvrira pas
+  return { onglet: p.get('onglet'), vue: p.get('vue'), serie: p.get('serie') };
+}

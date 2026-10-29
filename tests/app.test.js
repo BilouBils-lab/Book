@@ -933,6 +933,52 @@ test('Scan en rafale : plusieurs tomes à la suite, résumé puis ajout (et annu
   await fermer();
 });
 
+test('Vérifier en magasin : déjà possédé, manquant, nouvelle série, autre édition (sans rien modifier)', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => req.url().includes('/isbn') ? { body: { trouve: false } } : null
+  });
+  await avecMangaInsight(page, [
+    { titre: 'One Piece', editeur: 'Glénat', tomes: tomes(110, 0, [105, 107]) },
+    { titre: 'Berserk', editeur: 'Glénat', tomes: tomes(2) }
+  ]);
+  const avant = await page.evaluate(() => JSON.stringify(bibliotheque));
+  await page.evaluate(() => { serieAVerifier = null; scanTermine = false; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); });
+  await page.click('#scanner-magasin');
+  egal(await page.textContent('#scanner-titre'), '🏪 Vérifier en magasin', 'mode magasin');
+  const verdict = async (isbn) => {
+    await page.evaluate((i) => codeBarresLu(i), isbn);
+    await page.waitForFunction(() => !document.querySelector('#verdict-magasin .verdict-titre')?.textContent.startsWith('Recherche'));
+    return page.$eval('#verdict-magasin', z => [z.className, z.querySelector('.verdict-titre').textContent, z.querySelector('.verdict-detail').textContent]);
+  };
+  egal(await verdict('9782344062814'), ['verdict ok', 'Tu l’as déjà', 'One Piece · tome 110'], 'tome possédé');
+  egal(await verdict('9782344065662'), ['verdict manque', 'Il te manque', 'One Piece · tome 111. Il te manque aussi les tomes 105, 107.'], 'tome manquant, et les trous signalés');
+  egal(await verdict('9782505133797'), ['verdict manque', 'Pas dans ta collection', 'Kagurabachi · tome 3 : une série que tu n’as pas encore.'], 'nouvelle série');
+  egal(await verdict('9782344067826'), ['verdict alerte', 'Autre édition !', 'Berserk (Prestige) · tome 3 : édition Prestige. Ta série « Berserk » est en édition standard.'], 'autre édition');
+  egal(await verdict('9782090000009'), ['verdict alerte', 'Livre non reconnu', 'ISBN 9782090000009 : introuvable dans les catalogues. Vérifie à l’œil.'], 'livre inconnu');
+  egal(await page.evaluate(() => JSON.stringify(bibliotheque)), avant, 'collection inchangée');
+  await page.click('#magasin-boutons button');
+  verifier(!(await page.evaluate(() => document.getElementById('scanner-modal').classList.contains('active'))), 'écran fermé');
+  egal(await page.$eval('#verdict-magasin', z => z.innerHTML), '', 'verdict effacé pour la prochaine fois');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Notification touchée : l’app ouvre À venir et la fiche de la série', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  await definirBibliotheque(page, [{ titre: 'One Piece', tomes: tomes(3) }, { titre: 'Kagurabachi', tomes: tomes(2) }]);
+  // Lancement par la notification : l'endroit est dans l'adresse, qui est ensuite nettoyée
+  await page.evaluate(() => { history.replaceState(null, '', '?onglet=avenir&vue=achats&serie=Kagurabachi'); ouvrirDepuisNotification(cibleDeLancement()); });
+  egal(await page.evaluate(() => [ongletActif, vueAVenir, document.getElementById('modal-title').textContent, location.search]),
+    ['avenir', 'achats', 'Kagurabachi', ''], 'À venir › À acheter, fiche de Kagurabachi, adresse nettoyée');
+  verifier(await page.evaluate(() => document.getElementById('detail-modal').classList.contains('active')), 'fiche ouverte');
+  // App déjà ouverte : message du service worker, plusieurs séries → seulement l'onglet
+  await page.evaluate(() => ouvrirDepuisNotification({ onglet: 'avenir', vue: 'sorties' }));
+  egal(await page.evaluate(() => [ongletActif, vueAVenir, document.querySelectorAll('.modal-overlay.active').length]), ['avenir', 'sorties', 0], 'onglet seul, fiche refermée');
+  egal(await page.evaluate(() => cibleDeLancement()), null, 'lancement normal : rien à ouvrir');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Ajouter une série : éditions proposées pendant la saisie du titre', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: [{ numero: 1, possede: true, lu: false }] }]);

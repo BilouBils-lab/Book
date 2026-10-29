@@ -10,7 +10,7 @@
 //
 // À chaque nouvelle version de l'app, changer VERSION : le téléphone installe alors la nouvelle copie.
 
-const VERSION = '3.51';
+const VERSION = '3.52';
 const CACHE = 'mangatheque-' + VERSION;
 const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.23.0/umd/index.min.js';
 const CACHE_JAQUETTES = 'mangatheque-jaquettes';
@@ -100,20 +100,27 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-// Notification envoyée par GitHub Actions : { titre, corps, tag }
+// Notification envoyée par GitHub Actions : { titre, corps, tag, ouvrir: { onglet, vue, serie } }
 self.addEventListener('push', (event) => {
   let d = {};
   try { d = event.data ? event.data.json() : {}; } catch (e) { d = { corps: event.data.text() }; }
   event.waitUntil(self.registration.showNotification(d.titre || 'Ma MangaThèque', {
-    body: d.corps || '', icon: 'icones/icone-192.png', tag: d.tag
+    body: d.corps || '', icon: 'icones/icone-192.png', tag: d.tag, data: { ouvrir: d.ouvrir || null }
   }));
 });
 
+// Un appui ouvre l'endroit concerné : dans l'app déjà ouverte (message), sinon en la lançant (adresse)
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const ouvrir = event.notification.data && event.notification.data.ouvrir;
   event.waitUntil((async () => {
     const fenetres = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    if (fenetres.length) return fenetres[0].focus();
-    return self.clients.openWindow(self.registration.scope);
+    if (fenetres.length) {
+      if (ouvrir) fenetres[0].postMessage({ ouvrir });
+      return fenetres[0].focus();
+    }
+    const adresse = new URL(self.registration.scope);
+    if (ouvrir) for (const [cle, valeur] of Object.entries(ouvrir)) if (valeur) adresse.searchParams.set(cle, valeur);
+    return self.clients.openWindow(adresse.href);
   })());
 });
