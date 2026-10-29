@@ -42,7 +42,7 @@ flowchart LR
 ```
 
 - **L'app** est un site statique (aucun framework), publié par **GitHub Pages** depuis la branche `main`.
-- **Les données** sont sur le téléphone (IndexedDB), et copiées en ligne à chaque modification.
+- **Les données** sont sur le téléphone (IndexedDB), et copiées en ligne à chaque modification. Chaque lundi, une copie de sécurité est aussi rangée dans le dépôt privé `mangatheque-sauvegarde` (avec l'historique de toutes les versions).
 - **Le Worker Cloudflare** sert de relais : il garde les secrets (clé Gemini, code de sauvegarde), stocke les sauvegardes et interroge les services qui refusent les appels directs depuis un navigateur.
 - **Le service worker** (`sw.js`) garde une copie de l'app et des jaquettes : l'app s'ouvre en mode avion.
 
@@ -145,6 +145,7 @@ Chaque lundi, le workflow **Surveillance des sources** (`tests/surveillance.js`)
 | « Code de sauvegarde incorrect » | ⚙️ → Réglages avancés → 🔑 Code de sauvegarde : coller le même code que `BACKUP_TOKEN`. Code perdu : en choisir un nouveau, le mettre dans Cloudflare **et** dans l'app. |
 | Collection vide (nouveau téléphone, nouveau raccourci) | ⚙️ → 🔑 Code de sauvegarde → « Oui, j'ai un code » → l'app propose de récupérer la collection. |
 | Une erreur a abîmé la collection | ⚙️ → 🕘 Restaurer une sauvegarde : choisir une version de l'historique (l'état actuel y est gardé). |
+| Sauvegarde en ligne perdue (Cloudflare) | Dépôt privé `mangatheque-sauvegarde` : télécharger `bibliotheque.json` (ou une ancienne version via **History**), puis ⚙️ → Réglages avancés → 📤 Importer une sauvegarde. |
 | Le déploiement du Worker échoue | L'ancien Worker continue de tourner. Lire l'erreur dans Actions ; vérifier les secrets GitHub, puis **Run workflow**. |
 | Mauvais nombre de tomes / mauvaise jaquette | Fiche → ⋯ → 🔄 Édition, tomes et jaquette. |
 
