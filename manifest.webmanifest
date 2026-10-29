@@ -1,0 +1,15 @@
+{
+  "name": "Ma MangaThèque",
+  "short_name": "MangaThèque",
+  "description": "Ma collection de mangas : tomes possédés et lus, pile à lire, prochaines sorties.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f1e7",
+  "theme_color": "#26231e",
+  "icons": [
+    { "src": "icones/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

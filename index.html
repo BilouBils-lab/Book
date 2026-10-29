@@ -10,13 +10,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.50">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.50">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.51">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.51">
+  <!-- Manifeste : nécessaire aux notifications sur iPhone (app installée sur l'écran d'accueil) -->
+  <link rel="manifest" href="manifest.webmanifest">
 
   <!-- Thème choisi dans les Paramètres, appliqué avant l'affichage (pas de flash de la mauvaise couleur) -->
   <script>try { var t = localStorage.getItem('theme'); if (t === 'clair' || t === 'sombre') document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="preload" href="polices/bangers-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=3.50">
+  <link rel="stylesheet" href="css/style.css?v=3.51">
 </head>
 <body>
 
@@ -63,7 +65,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.50</div>
+  <div class="version-tag">v3.51</div>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -80,6 +82,11 @@
         <button onclick="completerCollection()"><span>✨</span>Compléter les infos manquantes<i>›</i></button>
         <button onclick="ouvrirInventaire()"><span>📋</span>Faire l'inventaire<i>›</i></button>
         <button onclick="rechercherIsbn()"><span>🔎</span>Rechercher par ISBN<i>›</i></button>
+      </div>
+
+      <div class="settings-titre">Notifications</div>
+      <div class="settings-groupe">
+        <button id="bouton-notifications" onclick="basculerNotifications()"></button>
       </div>
 
       <div class="settings-titre">Sauvegarde</div>
@@ -371,20 +378,21 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.50"></script>
-  <script src="js/recherche-infos.js?v=3.50"></script>
-  <script src="js/isbn-scanner.js?v=3.50"></script>
-  <script src="js/mise-a-jour.js?v=3.50"></script>
-  <script src="js/stockage.js?v=3.50"></script>
-  <script src="js/jaquettes.js?v=3.50"></script>
-  <script src="js/import-export.js?v=3.50"></script>
-  <script src="js/vues.js?v=3.50"></script>
-  <script src="js/fiche.js?v=3.50"></script>
-  <script src="js/maj-serie.js?v=3.50"></script>
-  <script src="js/ajout-serie.js?v=3.50"></script>
-  <script src="js/inventaire.js?v=3.50"></script>
-  <script src="js/rafale.js?v=3.50"></script>
-  <script src="js/nouveautes.js?v=3.50"></script>
-  <script src="js/demarrage.js?v=3.50"></script>
+  <script src="js/outils.js?v=3.51"></script>
+  <script src="js/recherche-infos.js?v=3.51"></script>
+  <script src="js/isbn-scanner.js?v=3.51"></script>
+  <script src="js/mise-a-jour.js?v=3.51"></script>
+  <script src="js/stockage.js?v=3.51"></script>
+  <script src="js/jaquettes.js?v=3.51"></script>
+  <script src="js/import-export.js?v=3.51"></script>
+  <script src="js/vues.js?v=3.51"></script>
+  <script src="js/fiche.js?v=3.51"></script>
+  <script src="js/maj-serie.js?v=3.51"></script>
+  <script src="js/ajout-serie.js?v=3.51"></script>
+  <script src="js/inventaire.js?v=3.51"></script>
+  <script src="js/rafale.js?v=3.51"></script>
+  <script src="js/nouveautes.js?v=3.51"></script>
+  <script src="js/notifications.js?v=3.51"></script>
+  <script src="js/demarrage.js?v=3.51"></script>
 </body>
 </html>

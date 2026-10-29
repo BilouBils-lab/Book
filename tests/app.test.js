@@ -975,6 +975,80 @@ test('Ajouter une série : éditions proposées pendant la saisie du titre', asy
   await fermer();
 });
 
+test('Notifications : activer puis désactiver (abonnement de l’appareil auprès du Worker)', async ({ navigateur, base }) => {
+  const appels = [];
+  const { page, erreurs, alertes, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => {
+      if (!req.url().includes('/push/')) return null;
+      appels.push([new URL(req.url()).pathname, req.headers()['x-backup-token'], req.postData() && JSON.parse(req.postData())]);
+      if (req.url().endsWith('/push/cle')) return { body: { publique: 'BAEC' } };
+      return { body: { ok: true, appareils: 1 } };
+    }
+  });
+  // iPhone simulé : autorisation accordée, abonnement Web Push factice
+  await page.evaluate(() => {
+    localStorage.setItem('cloud_backup_token', 'code');
+    let permission = 'default';
+    Object.defineProperty(Notification, 'permission', { get: () => permission });
+    Notification.requestPermission = async () => (permission = 'granted');
+    let abonnement = null;
+    window.notificationsMontrees = [];
+    const enregistrement = {
+      showNotification: async (titre) => { notificationsMontrees.push(titre); },
+      pushManager: {
+        getSubscription: async () => abonnement,
+        subscribe: async (options) => (abonnement = {
+          endpoint: 'https://web.push.apple.com/abc', options,
+          toJSON: () => ({ endpoint: 'https://web.push.apple.com/abc', keys: { p256dh: 'p', auth: 'a' } }),
+          unsubscribe: async () => { abonnement = null; return true; }
+        })
+      }
+    };
+    Object.defineProperty(navigator.serviceWorker, 'ready', { get: () => Promise.resolve(enregistrement) });
+  });
+  await page.evaluate(() => ouvrirParametres());
+  egal(await page.textContent('#bouton-notifications'), '🔔Activer les notifications des sorties›', 'bouton d’activation');
+  await page.click('#bouton-notifications');
+  await page.waitForFunction(() => localStorage.getItem('notifications') === '1');
+  egal(appels, [['/push/cle', 'code', null], ['/push/abonnement', 'code', { endpoint: 'https://web.push.apple.com/abc', keys: { p256dh: 'p', auth: 'a' } }]], 'clé lue puis appareil abonné');
+  egal(await page.evaluate(() => notificationsMontrees), ['🔔 Notifications activées'], 'notification de confirmation');
+  egal(await page.textContent('#bouton-notifications'), '🔕Désactiver les notifications›', 'bouton de désactivation');
+  await page.click('#bouton-notifications');
+  await page.waitForFunction(() => !localStorage.getItem('notifications'));
+  egal(appels[2], ['/push/desabonnement', 'code', { endpoint: 'https://web.push.apple.com/abc' }], 'appareil désabonné');
+  egal(alertes, [], 'aucune alerte');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Worker : notifications (clés VAPID créées une fois, appareils abonnés protégés)', async () => {
+  const worker = (await import(pathToFileURL(path.join(RACINE, 'worker', 'worker.js')).href)).default;
+  const nodeCrypto = require('crypto');
+  if (!crypto.subtle.timingSafeEqual) crypto.subtle.timingSafeEqual = (a, b) => nodeCrypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const kv = new Map();
+  const env = { BACKUP_TOKEN: 'secret', MANGA_KV: { get: async k => kv.get(k) ?? null, put: async (k, v) => { kv.set(k, v); } } };
+  const appel = (chemin, init = {}) => worker.fetch(new Request('https://w.dev' + chemin, { ...init, headers: { 'X-Backup-Token': 'secret', ...(init.headers || {}) } }), env);
+  egal((await worker.fetch(new Request('https://w.dev/push/envoi'), env)).status, 401, 'liste des appareils sans code refusée');
+  const { publique } = await (await appel('/push/cle')).json();
+  egal(Buffer.from(publique, 'base64url').length, 65, 'clé publique P-256 non compressée');
+  egal((await (await appel('/push/cle')).json()).publique, publique, 'la même clé ensuite');
+  const abonner = (endpoint) => appel('/push/abonnement', { method: 'POST', body: JSON.stringify({ endpoint, keys: { p256dh: 'p', auth: 'a' } }) });
+  egal((await abonner('http://pas-https')).status, 400, 'adresse non https refusée');
+  await abonner('https://push/1');
+  await abonner('https://push/2');
+  await abonner('https://push/1');
+  let envoi = await (await appel('/push/envoi')).json();
+  egal(envoi.abonnements.map(a => a.endpoint), ['https://push/2', 'https://push/1'], 'pas de doublon');
+  egal(envoi.vapid.publique, publique, 'clés pour l’envoi');
+  // La clé privée correspond bien à la clé publique : une signature se vérifie
+  const cle = nodeCrypto.createPrivateKey({ key: { kty: 'EC', crv: 'P-256', d: envoi.vapid.privee, x: Buffer.from(publique, 'base64url').subarray(1, 33).toString('base64url'), y: Buffer.from(publique, 'base64url').subarray(33).toString('base64url') }, format: 'jwk' });
+  const signature = nodeCrypto.sign('sha256', Buffer.from('test'), cle);
+  verifier(nodeCrypto.verify('sha256', Buffer.from('test'), nodeCrypto.createPublicKey(cle), signature), 'paire de clés cohérente');
+  await appel('/push/desabonnement', { method: 'POST', body: JSON.stringify({ endpoint: 'https://push/2' }) });
+  envoi = await (await appel('/push/envoi')).json();
+  egal(envoi.abonnements.map(a => a.endpoint), ['https://push/1'], 'appareil désabonné');
+});
+
 test('Renommer une série et fusionner avec une série du même nom', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await definirBibliotheque(page, [

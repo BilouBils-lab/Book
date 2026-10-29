@@ -6,10 +6,11 @@
 // - Les jaquettes (images d'autres sites) : copie locale d'abord, gardée d'une version à l'autre,
 //   pour les voir aussi hors ligne. Seulement les sites qui l'autorisent (CORS), dans la limite de MAX_JAQUETTES.
 // - Tout le reste (Worker, AniList, BnF…) passe normalement par le réseau.
+// - Notifications des sorties : reçues ici (push), même app fermée ; un appui ouvre l'app.
 //
 // À chaque nouvelle version de l'app, changer VERSION : le téléphone installe alors la nouvelle copie.
 
-const VERSION = '3.50';
+const VERSION = '3.51';
 const CACHE = 'mangatheque-' + VERSION;
 const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.23.0/umd/index.min.js';
 const CACHE_JAQUETTES = 'mangatheque-jaquettes';
@@ -97,4 +98,22 @@ self.addEventListener('fetch', (event) => {
   } else if (requete.destination === 'image' && url.protocol === 'https:' && url.origin !== self.location.origin) {
     event.respondWith(jaquette(requete));
   }
+});
+
+// Notification envoyée par GitHub Actions : { titre, corps, tag }
+self.addEventListener('push', (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = { corps: event.data.text() }; }
+  event.waitUntil(self.registration.showNotification(d.titre || 'Ma MangaThèque', {
+    body: d.corps || '', icon: 'icones/icone-192.png', tag: d.tag
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const fenetres = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (fenetres.length) return fenetres[0].focus();
+    return self.clients.openWindow(self.registration.scope);
+  })());
 });
