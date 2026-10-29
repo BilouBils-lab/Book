@@ -280,6 +280,7 @@ async function codeBarresLu(texte) {
     statutScanner('Code ' + texte + " lu, mais ce n'est pas un ISBN : vise le code-barres du livre.");
     return;
   }
+  if (modeVerification) { verifierEnMagasin(isbn); return; }
   if (modeRafale) { ajouterALaRafale(isbn); return; }
   if (navigator.vibrate) navigator.vibrate(80);
   const sIndex = serieAVerifier;
