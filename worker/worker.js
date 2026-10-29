@@ -142,8 +142,16 @@ function auteursBnf(xml) {
 
 async function interrogerBnf(requete, maximum) {
   const url = "https://catalogue.bnf.fr/api/SRU?version=1.2&operation=searchRetrieve&recordSchema=dublincore&maximumRecords=" + maximum + "&query=" + encodeURIComponent(requete);
-  const res = await fetch(url, { headers: { "Accept": "application/xml" } });
-  if (!res.ok) return { erreur: "BnF HTTP " + res.status };
+  // On s'identifie : la BnF refuse (403) les requêtes anonymes, sans User-Agent
+  const res = await fetch(url, { headers: {
+    "Accept": "application/xml, text/xml",
+    "User-Agent": "MaMangatheque/1.0 (+https://biloubils-lab.github.io/Book/)"
+  } });
+  if (!res.ok) {
+    // Début de la réponse dans l'erreur : il donne souvent la raison exacte du refus
+    const detail = (await res.text().catch(() => "")).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 150);
+    return { erreur: "BnF HTTP " + res.status + (detail ? " : " + detail : "") };
+  }
   const xml = await res.text();
   return { xml, total: Number((xml.match(/numberOfRecords>(\d+)</) || [])[1] || 0) };
 }
