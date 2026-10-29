@@ -1,6 +1,6 @@
 // Mettre à jour une série : choisir son édition (Manga Insight), le nombre de tomes, puis sa jaquette
 
-const HORS_SERIE_MI = /illustration|artbook|art ?book|guide|fanbook|roman|novel|coffret|anime ?comics|re:source|sketchbook|quiz|dictionnaire/i;
+const HORS_SERIE_MI = /illustration|artbook|art ?book|guide|fanbook|roman|novel|coffret|coffre|anime ?comics|re:source|sketchbook|quiz|dictionnaire|vivre card|magazine/i;
 
 // Éditions françaises connues pour la série (même titre de base), de la plus ancienne à la plus récente
 function editionsMangaInsight(serie) {
@@ -14,6 +14,7 @@ function editionsMangaInsight(serie) {
     const g = groupes.get(cle);
     g.vols.add(s.vol);
     if (s.ean) g.isbns.add(s.ean);
+    if (s.ean && s.vol === 1) g.isbn1 = s.ean;
     g.debut = Math.min(g.debut, s.k);
     g.fin = Math.max(g.fin, s.k);
   }
@@ -27,7 +28,9 @@ function editionsMangaInsight(serie) {
 
 function texteEdition(e) {
   const annees = Math.floor(e.debut / 12) === Math.floor(e.fin / 12) ? String(Math.floor(e.debut / 12)) : `${Math.floor(e.debut / 12)}–${Math.floor(e.fin / 12)}`;
-  return `${e.edition ? 'Édition ' + e.edition : 'Édition standard'} · ${e.tomes} tome${e.tomes > 1 ? 's' : ''} · ${e.editeur || '?'} · ${annees}`;
+  // « Édition 1re édition » ou « Édition Edition spéciale » : le mot « édition » n'est pas répété
+  const nom = !e.edition ? 'Édition standard' : /[ée]dition/i.test(e.edition) ? e.edition.replace(/^edition/i, 'Édition') : 'Édition ' + e.edition;
+  return `${nom} · ${e.tomes} tome${e.tomes > 1 ? 's' : ''} · ${e.editeur || '?'} · ${annees}`;
 }
 
 async function majSerieActuelle() {

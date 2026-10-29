@@ -933,6 +933,48 @@ test('Scan en rafale : plusieurs tomes à la suite, résumé puis ajout (et annu
   await fermer();
 });
 
+test('Ajouter une série : éditions proposées pendant la saisie du titre', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: [{ numero: 1, possede: true, lu: false }] }]);
+  await page.click('button:has-text("➕ Saisie")');
+  await page.fill('#form-serie-titre', 'one pi');
+  await page.waitForSelector('#form-serie-suggestions .suggestion');
+  const suggestions = () => page.$$eval('#form-serie-suggestions .suggestion', l => l.map(x => x.querySelector('.suggestion-titre').textContent + ' | ' + x.querySelector('.suggestion-detail').textContent));
+  const op = await suggestions();
+  egal(op[0], 'One Piece | Édition standard · 113 tomes · Glénat · 2013–2026 · déjà dans ta collection', 'la série la plus longue en premier, déjà possédée signalée');
+  verifier(op.includes('One Piece (1re édition) | 1re édition · 60 tomes · Glénat · 2000–2012'), 'le mot « édition » n’est pas répété');
+  verifier(!op.some(t => /Vivre Cards|Magazine|Coffre/.test(t)), 'pas de produits dérivés');
+
+  await page.fill('#form-serie-titre', 'kagura');
+  await page.waitForFunction(() => document.querySelector('#form-serie-suggestions .suggestion-titre')?.textContent === 'Kagurabachi');
+  egal(await suggestions(), [
+    'Kagurabachi | Édition standard · 10 tomes · Kana · 2025–2026',
+    'Kagurabachi (Collector) | Édition Collector · 10 tomes · Kana · 2026',
+    'Kagurabachi (Edition spéciale) | Édition spéciale · 3 tomes · Kana · 2025'
+  ], 'éditions de Kagurabachi');
+  await page.click('#form-serie-suggestions .suggestion >> nth=0');
+  egal(await page.inputValue('#form-serie-titre'), 'Kagurabachi', 'titre rempli');
+  egal(await page.textContent('#form-serie-edition'), '✓ Édition standard · 10 tomes · Kana · 2025–2026', 'édition choisie affichée');
+  await page.click('#form-serie-ok');
+  await page.waitForFunction(() => bibliotheque.length === 2 && bibliotheque[1].miNom);
+  egal(await page.evaluate(() => { const s = bibliotheque[1]; return [s.titre, s.editeur, s.miNom, s.tomesParus, s.tomes.length]; }),
+    ['Kagurabachi', 'Kana', 'Kagurabachi', 10, 1], 'série créée avec son éditeur et ses tomes parus');
+  egal(await page.textContent('#toast span'), '✓ Kagurabachi ajoutée · Édition standard · 10 tomes · Kana · 2025–2026', 'message');
+
+  // Titre modifié après le choix : l'édition est oubliée, saisie libre comme avant
+  await page.click('button:has-text("➕ Saisie")');
+  await page.fill('#form-serie-titre', 'kagura');
+  await page.waitForSelector('#form-serie-suggestions .suggestion');
+  await page.click('#form-serie-suggestions .suggestion >> nth=1');
+  await page.fill('#form-serie-titre', 'Ma série perso');
+  egal(await page.textContent('#form-serie-edition'), '', 'édition oubliée');
+  await page.click('#form-serie-ok');
+  await page.waitForFunction(() => bibliotheque.length === 3);
+  egal(await page.evaluate(() => [bibliotheque[2].titre, bibliotheque[2].miNom ?? null]), ['Ma série perso', null], 'série libre sans édition');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Renommer une série et fusionner avec une série du même nom', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await definirBibliotheque(page, [
