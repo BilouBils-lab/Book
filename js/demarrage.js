@@ -9,6 +9,7 @@ const FERMETURE_PAR_FOND = {
   'menu-serie-modal': () => fermerMenuSerie(),
   'versions-modal': () => fermerVersions(),
   'scanner-modal': () => fermerScanner(),
+  'rafale-modal': '#rafale-annuler',
   'isbn-modal': '#isbn-fermer',
   'jaquettes-modal': '#jaquettes-garder',
   'cover-choice-modal': '#cover-choice-cancel',
