@@ -77,30 +77,35 @@ const verifications = [
     return media.title.romaji;
   }],
 
-  ['Jikan / MyAnimeList (secours d\'AniList)', 'Compléter les infos manquantes', async () => {
+  // Facultatif : Jikan ne répond pas aux serveurs de GitHub (ETIMEDOUT), alors qu'il répond aux téléphones ;
+  // c'est seulement le secours d'AniList. Un échec donne un avertissement, sans e-mail d'alerte.
+  ['Jikan / MyAnimeList (secours d\'AniList)', 'Compléter les infos manquantes (secours seulement)', async () => {
     const d = await lireJson(JIKAN + '/manga?q=naruto&limit=1');
     exiger(Array.isArray(d.data) && d.data[0] && d.data[0].title, 'aucun résultat : ' + JSON.stringify(d).slice(0, 200));
     return d.data[0].title;
-  }]
+  }, { facultatif: true }]
 ];
 
 (async () => {
   const echecs = [];
-  for (const [nom, fonction, verifier] of verifications) {
+  const avertissements = [];
+  for (const [nom, fonction, verifier, options = {}] of verifications) {
     try {
       const detail = await verifier();
       console.log(`✅ ${nom} — ${detail}`);
     } catch (e) {
-      echecs.push(nom);
-      console.log(`❌ ${nom}\n   Fonction touchée : ${fonction}\n   ${e.message}`);
+      (options.facultatif ? avertissements : echecs).push(nom);
+      console.log(`${options.facultatif ? '⚠️' : '❌'} ${nom}\n   Fonction touchée : ${fonction}\n   ${e.message}`);
     }
   }
-  console.log(echecs.length ? `\n❌ ${echecs.length} source(s) en panne ou modifiée(s) : ${echecs.join(' · ')}` : '\n✅ Toutes les sources répondent normalement');
+  console.log(echecs.length ? `\n❌ ${echecs.length} source(s) en panne ou modifiée(s) : ${echecs.join(' · ')}` : '\n✅ Les sources essentielles répondent normalement');
   // Résumé affiché sur la page du lancement dans GitHub Actions
+  if (avertissements.length) console.log(`⚠️ Source(s) facultative(s) injoignable(s) depuis GitHub : ${avertissements.join(' · ')}`);
   if (process.env.GITHUB_STEP_SUMMARY) {
-    require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, echecs.length
+    require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, (echecs.length
       ? `## ❌ ${echecs.length} source(s) à vérifier\n\n${echecs.map(n => '- ' + n).join('\n')}\n`
-      : '## ✅ Toutes les sources répondent normalement\n');
+      : '## ✅ Les sources essentielles répondent normalement\n')
+      + (avertissements.length ? `\n⚠️ Facultatif, injoignable depuis GitHub : ${avertissements.join(' · ')}\n` : ''));
   }
   process.exit(echecs.length ? 1 : 0);
 })();
