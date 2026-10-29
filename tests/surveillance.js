@@ -7,8 +7,17 @@ const WORKER = process.env.SURVEILLANCE_WORKER || 'https://manga-gemini-proxy.na
 const ANILIST = process.env.SURVEILLANCE_ANILIST || 'https://graphql.anilist.co';
 const JIKAN = process.env.SURVEILLANCE_JIKAN || 'https://api.jikan.moe/v4';
 
-async function lireJson(url, options = {}) {
-  const r = await fetch(url, { ...options, signal: AbortSignal.timeout(60000) });
+// Une source peut avoir un raté passager : un second essai 5 secondes plus tard avant de la déclarer en panne
+async function lireJson(url, options = {}, essai = 1) {
+  let r;
+  try {
+    r = await fetch(url, { ...options, signal: AbortSignal.timeout(60000) });
+  } catch (e) {
+    if (essai < 2) { await new Promise(ok => setTimeout(ok, 5000)); return lireJson(url, options, essai + 1); }
+    // « fetch failed » seul ne dit rien : la cause (DNS, connexion refusée, délai…) est dans e.cause
+    throw new Error('connexion impossible : ' + ((e.cause && (e.cause.code || e.cause.message)) || e.message));
+  }
+  if (r.status >= 500 && essai < 2) { await new Promise(ok => setTimeout(ok, 5000)); return lireJson(url, options, essai + 1); }
   const texte = await r.text();
   let corps = null;
   try { corps = JSON.parse(texte); } catch (e) { /* pas du JSON */ }
