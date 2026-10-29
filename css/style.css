@@ -862,3 +862,11 @@ button.etat-sauvegarde { width: 100%; background: var(--surface-creuse); text-al
 .tranche-nom.arc small { display: block; font-size: 11px; color: var(--text-sub); font-weight: 400; }
 .tranche-tout { display: none; margin: -4px 0 12px auto; padding: 6px 10px; border-radius: 8px; border: 1px dashed var(--card-border); background: none; color: var(--text-sub); font: inherit; font-size: 12px; cursor: pointer; }
 .tranche.ouverte .tranche-tout { display: block; }
+
+/* Filtres de la collection */
+.filtres-collection { display: flex; gap: 6px; overflow-x: auto; margin: -2px -16px 12px; padding: 0 16px 2px; scrollbar-width: none; }
+.filtres-collection::-webkit-scrollbar { display: none; }
+.filtre { flex-shrink: 0; padding: 6px 12px; border-radius: 16px; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-sub); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.filtre small { margin-left: 5px; font-size: 11px; font-weight: 500; opacity: 0.75; }
+.filtre.actif { background: var(--accent); border-color: var(--accent); color: var(--texte-sur-accent); }
+select.filtre { appearance: none; -webkit-appearance: none; max-width: 170px; text-overflow: ellipsis; }

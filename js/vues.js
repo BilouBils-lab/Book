@@ -39,6 +39,9 @@ function rendreVues() {
   containerCol.innerHTML = '';
 
   let listeAffichee = bibliotheque.map((serie, i) => ({ serie, indexReel: i }));
+  if (bibliotheque.length) containerCol.appendChild(construireFiltres());
+  const filtre = FILTRES_COLLECTION.find(f => f[0] === filtreActif) || FILTRES_COLLECTION[0];
+  listeAffichee = listeAffichee.filter(({ serie }) => filtre[2](serie) && (!editeurActif || editeurDe(serie) === editeurActif));
 
   if (rechercheTexte.trim()) {
     const recherche = normaliserTitre(rechercheTexte);
@@ -68,7 +71,19 @@ function rendreVues() {
   if (bibliotheque.length === 0) {
     containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Clique sur ➕ pour ajouter une série.<br><br>Tu avais déjà une collection (nouveau raccourci, autre appareil) ?<br>⚙️ → 🔑 Code de sauvegarde cloud pour la récupérer.</div>`;
   } else if (listeAffichee.length === 0) {
-    containerCol.innerHTML = `<div class="empty-state">Aucune série ne correspond à "${rechercheTexte}".</div>`;
+    const vide = document.createElement('div');
+    vide.className = 'empty-state';
+    const filtreEnCours = filtreActif !== 'toutes' || editeurActif;
+    vide.textContent = rechercheTexte.trim() ? `Aucune série ne correspond à « ${rechercheTexte.trim()} »` + (filtreEnCours ? ' dans ce filtre.' : '.') : 'Aucune série dans ce filtre.';
+    if (filtreEnCours) {
+      const tout = document.createElement('button');
+      tout.className = 'btn btn-secondary';
+      tout.style.margin = '12px auto 0';
+      tout.textContent = 'Tout afficher';
+      tout.onclick = () => { filtreActif = 'toutes'; editeurActif = ''; rendreVues(); };
+      vide.appendChild(tout);
+    }
+    containerCol.appendChild(vide);
   } else {
     listeAffichee.forEach(({ serie, indexReel }) => {
       const { total, possedes, lus, manquants } = statsSerie(serie);
@@ -347,6 +362,53 @@ function cartePileALire(item, texteReste) {
     marquerCommeLu(item.sIndex, tIndex);
   };
   return carte;
+}
+
+// --- Filtres de la collection ---
+const FILTRES_COLLECTION = [
+  ['toutes', 'Toutes', () => true],
+  ['en-cours', 'En cours', s => !s.misDeCote && (s.statut || 'En cours') === 'En cours'],
+  ['a-completer', 'À compléter', s => !s.misDeCote && !!s.tomesParus && statsSerie(s).manquants.length > 0],
+  ['terminees', 'Terminées', s => s.statut === 'Terminée'],
+  ['de-cote', 'Mises de côté', s => !!s.misDeCote]
+];
+let filtreActif = 'toutes';
+let editeurActif = '';
+
+function editeurDe(serie) {
+  return (editeurFrancais(serie.editeur) || serie.editeur || '').trim();
+}
+
+// Rangée de filtres (avec le nombre de séries de chacun) ; les filtres vides sont masqués
+function construireFiltres() {
+  const rangee = document.createElement('div');
+  rangee.className = 'filtres-collection';
+  for (const [cle, libelle, teste] of FILTRES_COLLECTION) {
+    const nombre = bibliotheque.filter(teste).length;
+    if (!nombre && cle !== 'toutes' && cle !== filtreActif) continue;
+    const bouton = document.createElement('button');
+    bouton.className = 'filtre' + (cle === filtreActif ? ' actif' : '');
+    bouton.dataset.filtre = cle;
+    bouton.textContent = libelle;
+    const compte = document.createElement('small');
+    compte.textContent = nombre;
+    bouton.appendChild(compte);
+    bouton.onclick = () => { filtreActif = cle; rendreVues(); };
+    rangee.appendChild(bouton);
+  }
+  // Éditeurs : seulement s'il y en a au moins deux
+  const editeurs = [...new Set(bibliotheque.map(editeurDe).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  if (editeurs.length > 1 || editeurActif) {
+    const choix = document.createElement('select');
+    choix.className = 'filtre' + (editeurActif ? ' actif' : '');
+    choix.setAttribute('aria-label', 'Filtrer par éditeur');
+    choix.add(new Option('Tous les éditeurs', ''));
+    for (const e of editeurs) choix.add(new Option(e, e));
+    choix.value = editeurActif;
+    choix.onchange = () => { editeurActif = choix.value; rendreVues(); };
+    rangee.appendChild(choix);
+  }
+  return rangee;
 }
 
 function onRechercheInput(valeur) {

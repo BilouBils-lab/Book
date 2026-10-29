@@ -230,6 +230,37 @@ test('Collection : cartes et tri « À compléter »', async ({ navigateur, base
   await fermer();
 });
 
+test('Collection : filtres par statut et par éditeur', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  await definirBibliotheque(page, [
+    { titre: 'One Piece', editeur: 'Glénat', statut: 'En cours', tomesParus: 110, tomes: tomes(12) },
+    { titre: 'Berserk (Prestige)', editeur: 'Glénat', tomesParus: 6, tomes: tomes(6) },
+    { titre: 'Dragon Ball', editeur: 'Glénat', statut: 'Terminée', tomesParus: 42, tomes: tomes(42) },
+    { titre: 'Kagurabachi', editeur: 'Kana', tomesParus: 11, tomes: tomes(9) },
+    { titre: 'Blue Lock', editeur: 'Pika', misDeCote: true, tomesParus: 31, tomes: tomes(10) }]);
+  const filtres = () => page.$$eval('.filtres-collection .filtre[data-filtre]', b => b.map(x => (x.classList.contains('actif') ? '*' : '') + x.textContent));
+  const titres = () => page.$$eval('.series-card .series-title', t => t.map(x => x.textContent));
+  egal(await filtres(), ['*Toutes5', 'En cours3', 'À compléter2', 'Terminées1', 'Mises de côté1'], 'filtres avec leur nombre de séries');
+  await page.click('.filtre[data-filtre="a-completer"]');
+  egal(await titres(), ['Kagurabachi', 'One Piece'], 'à compléter (hors séries mises de côté)');
+  await page.click('.filtre[data-filtre="de-cote"]');
+  egal(await titres(), ['Blue Lock'], 'mises de côté');
+
+  // Éditeur, combiné au filtre de statut et à la recherche
+  await page.click('.filtre[data-filtre="toutes"]');
+  await page.selectOption('.filtres-collection select', 'Glénat');
+  egal(await titres(), ['Berserk (Prestige)', 'Dragon Ball', 'One Piece'], 'éditeur Glénat');
+  await page.click('.filtre[data-filtre="en-cours"]');
+  egal(await titres(), ['Berserk (Prestige)', 'One Piece'], 'Glénat et en cours');
+  await page.fill('#recherche-input', 'zzz');
+  verifier((await page.textContent('#view-collection')).includes('Aucune série ne correspond à « zzz » dans ce filtre.'), 'message sans résultat');
+  await page.click('#view-collection button:has-text("Tout afficher")');
+  await page.fill('#recherche-input', '');
+  egal((await titres()).length, 5, '« Tout afficher » retire les filtres');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Pile à lire : en cours, encore un effort, à commencer', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   const t = (n, lus, luLe) => tomes(n, lus).map((x, i) => (i < lus && luLe ? { ...x, luLe } : x));
