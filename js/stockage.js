@@ -350,6 +350,7 @@ function majChoixTheme() {
 
 function ouvrirParametres() {
   majChoixTheme();
+  majBoutonNotifications();
   document.getElementById('settings-modal').classList.add('active');
   afficherEtatSauvegarde();
 }

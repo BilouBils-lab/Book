@@ -192,6 +192,32 @@ async function chercherEditionBnf(mots, editeur) {
   return { total, notices };
 }
 
+
+// --- Notifications (Web Push) ---
+// Les clés VAPID sont créées ici une seule fois puis gardées dans le KV : aucun réglage à faire.
+// L'envoi est fait par GitHub Actions (dépôt privé mangatheque-sauvegarde), qui lit les clés et les
+// appareils abonnés avec le code de sauvegarde (GET /push/envoi).
+const MAX_APPAREILS = 10;
+
+function base64url(octets) {
+  return btoa(String.fromCharCode(...octets)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function clesVapid(env) {
+  const gardees = await env.MANGA_KV.get("push:vapid");
+  if (gardees) return JSON.parse(gardees);
+  const paire = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const publique = new Uint8Array(await crypto.subtle.exportKey("raw", paire.publicKey));
+  const privee = await crypto.subtle.exportKey("jwk", paire.privateKey);
+  const cles = { publique: base64url(publique), privee: privee.d };
+  await env.MANGA_KV.put("push:vapid", JSON.stringify(cles));
+  return cles;
+}
+
+async function lireAbonnements(env) {
+  return JSON.parse((await env.MANGA_KV.get("push:abonnements")) || "[]");
+}
+
 export default {
   async fetch(request, env) {
     const corsHeaders = {
@@ -263,6 +289,33 @@ export default {
       } catch (e) {
         return json({ error: e.message }, 500);
       }
+    }
+
+    // --- Notifications : clé publique, appareils abonnés (protégé par le code de sauvegarde) ---
+    if (pathname.startsWith("/push/")) {
+      if (!env.MANGA_KV || !env.BACKUP_TOKEN) return json({ error: "Worker incomplet : KV ou BACKUP_TOKEN manquant" }, 500);
+      if (!(await codeValide(request.headers.get("X-Backup-Token"), env.BACKUP_TOKEN))) {
+        return json({ error: "Code de sauvegarde incorrect" }, 401);
+      }
+      if (pathname === "/push/cle" && request.method === "GET") {
+        return json({ publique: (await clesVapid(env)).publique });
+      }
+      if (pathname === "/push/envoi" && request.method === "GET") {
+        return json({ vapid: await clesVapid(env), abonnements: await lireAbonnements(env) });
+      }
+      if ((pathname === "/push/abonnement" || pathname === "/push/desabonnement") && request.method === "POST") {
+        const a = await request.json().catch(() => null);
+        if (!a || typeof a.endpoint !== "string" || !a.endpoint.startsWith("https://")) return json({ error: "Abonnement invalide" }, 400);
+        let liste = (await lireAbonnements(env)).filter(x => x.endpoint !== a.endpoint);
+        if (pathname === "/push/abonnement") {
+          if (!a.keys || typeof a.keys.p256dh !== "string" || typeof a.keys.auth !== "string") return json({ error: "Abonnement invalide" }, 400);
+          liste.push({ endpoint: a.endpoint, keys: { p256dh: a.keys.p256dh, auth: a.keys.auth }, depuis: new Date().toISOString() });
+          liste = liste.slice(-MAX_APPAREILS);
+        }
+        await env.MANGA_KV.put("push:abonnements", JSON.stringify(liste));
+        return json({ ok: true, appareils: liste.length });
+      }
+      return new Response("Method not allowed", { status: 405, headers: corsHeaders });
     }
 
     // --- Livre par ISBN (GET /isbn?isbn=978...) ---

@@ -15,6 +15,7 @@ Application web pour gérer sa collection de mangas : tomes possédés et lus, p
 | **À venir** | *Prochaines sorties* estimées mois par mois, et *À acheter* : les tomes sortis qui manquent, à cocher en magasin. |
 | **Quoi de neuf ?** | S'ouvre au lancement **seulement s'il y a du nouveau** : tomes sortis depuis la dernière visite, sorties attendues ce mois-ci. |
 | **Fiche d'une série** | Tomes (lus, possédés, manquants), prochain à acheter, prochaine sortie. Menu ⋯ : édition / tomes / jaquette, renommer, infos, mettre de côté, supprimer. |
+| **Notifications 🔔** | Sur l'iPhone, même app fermée : tome annoncé, nouveau tome en librairie. Calculées chaque jour par le dépôt privé `mangatheque-sauvegarde`, envoyées par Web Push. |
 | **Paramètres ⚙️** | Mise à jour des séries, complétion des infos, inventaire, recherche ISBN, sauvegarde en ligne, apparence (clair / sombre / automatique). |
 
 Autres fonctions : ajout d'une série guidé (« ➕ Saisie » propose les éditions françaises avec éditeur, nombre de tomes et jaquette), scan du code-barres (ISBN) avec vérification de l'édition, **scan en rafale** (plusieurs tomes à la suite après un achat, puis un résumé à valider), inventaire série par série, import CSV / JSON, export.
@@ -60,6 +61,7 @@ js/                   Code de l'app, découpé par thème (chargé dans l'ordre 
   ajout-serie.js        Ajouter une série : éditions proposées pendant la saisie du titre
   mise-a-jour.js        Compléter la collection, BnF, Manga Insight (sorties, estimations)
   nouveautes.js         Page « Quoi de neuf ? »
+  notifications.js      Activer / désactiver les notifications des sorties
   recherche-infos.js    Infos d'une série (AniList, Jikan, Google Books, Gemini)
   isbn-scanner.js       Recherche ISBN et scan du code-barres
   inventaire.js         Mode inventaire
@@ -67,7 +69,8 @@ js/                   Code de l'app, découpé par thème (chargé dans l'ordre 
   jaquettes.js          Jaquettes
   import-export.js      Import CSV, import / export JSON
   demarrage.js          Lancement, service worker, fermeture des fenêtres par le fond
-sw.js                 Service worker (mode hors ligne)
+sw.js                 Service worker (mode hors ligne, réception des notifications)
+manifest.webmanifest  Manifeste de l'app (nécessaire aux notifications sur iPhone)
 icones/               Icône de l'app (source : icone.svg)
 polices/              Police des titres (Bangers, licence SIL OFL)
 worker/               Worker Cloudflare (worker.js) et sa configuration de déploiement (wrangler.toml)
@@ -86,6 +89,8 @@ tests/                Tests automatiques (voir tests/README.md)
 | `GET /mangainsight/core`, `/mangainsight/rows` | Données de sorties Manga Insight, relayées |
 | `GET /infos?titre=…` | Infos d'une série par l'IA (Gemini) |
 | `GET /modeles` | Modèles Gemini disponibles (diagnostic) |
+| `GET /push/cle`, `POST /push/abonnement`, `POST /push/desabonnement` | Notifications : clé publique, abonner / désabonner un appareil (code de sauvegarde) |
+| `GET /push/envoi` | Clés et appareils abonnés, pour l'envoi quotidien depuis le dépôt privé (code de sauvegarde) |
 
 **Réglages gardés dans Cloudflare** (jamais dans le dépôt) :
 
