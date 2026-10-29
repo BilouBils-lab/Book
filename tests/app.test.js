@@ -304,6 +304,37 @@ test('Pile à lire : en cours, encore un effort, à commencer', async ({ navigat
   await fermer();
 });
 
+test('Pile à lire : glisser une carte vers la droite pour « Lu ✓ »', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  await definirBibliotheque(page, [{ titre: 'Ao Ashi', tomes: tomes(36, 30).map((t, i) => (i < 30 ? { ...t, luLe: 1000 } : t)) }]);
+  await page.evaluate(() => changerOnglet('pal'));
+  verifier(await page.isVisible('.astuce-glisser'), 'astuce affichée tant que le geste n\u2019a pas servi');
+  const glisser = async (distance) => {
+    const b = await page.locator('.pal-item').boundingBox();
+    await page.mouse.move(b.x + 30, b.y + b.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(b.x + 30 + distance * i / 10, b.y + b.height / 2 + i);
+    await page.mouse.up();
+    await page.waitForTimeout(350);
+  };
+  const lus = () => page.evaluate(() => bibliotheque[0].tomes.filter(t => t.lu).length);
+
+  // Petit glissement : la carte revient, rien ne change, la fiche ne s'ouvre pas
+  await glisser(60);
+  egal([await lus(), await page.evaluate(() => document.getElementById('detail-modal').classList.contains('active'))], [30, false], 'glissement trop court : rien');
+  // Grand glissement : tome lu, avec « Annuler »
+  await glisser(250);
+  egal(await lus(), 31, 'glissement vers la droite : tome 31 lu');
+  egal(await page.textContent('#toast span'), '✓ Ao Ashi — tome 31 lu', 'message avec « Annuler »');
+  egal(await page.textContent('.pal-item .pal-tome'), 'Tome 32 · encore 5 à lire', 'la carte passe au tome suivant');
+  egal(await page.isVisible('.astuce-glisser'), false, 'astuce masquée une fois le geste utilisé');
+  // Un simple appui ouvre toujours la fiche
+  await page.click('.pal-item .pal-title');
+  egal(await page.evaluate(() => document.getElementById('detail-modal').classList.contains('active')), true, 'appui : ouvre la fiche');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('À venir : sorties par mois, achats cochables, annuler, mise de côté', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await avecMangaInsight(page, [

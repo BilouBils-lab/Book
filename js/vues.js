@@ -340,6 +340,12 @@ function rendrePileALire() {
   intro.className = 'avenir-intro';
   intro.textContent = actif.intro;
   container.appendChild(intro);
+  if (!localStorage.getItem('astuce_glisser_vue')) {
+    const astuce = document.createElement('div');
+    astuce.className = 'avenir-intro astuce-glisser';
+    astuce.textContent = '👉 Astuce : glisse une carte vers la droite pour marquer le tome comme lu.';
+    container.appendChild(astuce);
+  }
   for (const item of items) container.appendChild(cartePileALire(item, actif.reste(item.aLire.length)));
 }
 
@@ -361,7 +367,72 @@ function cartePileALire(item, texteReste) {
     e.stopPropagation(); // ne pas ouvrir la fiche
     marquerCommeLu(item.sIndex, tIndex);
   };
-  return carte;
+  // Glisser la carte vers la droite = « Lu ✓ » (le fond vert apparaît derrière)
+  const conteneur = document.createElement('div');
+  conteneur.className = 'pal-glisse';
+  const fond = document.createElement('div');
+  fond.className = 'pal-fond';
+  fond.textContent = `✓ Tome ${prochain.numero} lu`;
+  conteneur.append(fond, carte);
+  activerGlissement(carte, fond, () => {
+    localStorage.setItem('astuce_glisser_vue', '1');
+    marquerCommeLu(item.sIndex, tIndex);
+  });
+  return conteneur;
+}
+
+// Glissement horizontal d'une carte : au-delà du seuil, l'action est lancée ; sinon la carte revient.
+// Le défilement vertical reste au navigateur (touch-action: pan-y dans le CSS).
+function activerGlissement(carte, fond, action) {
+  let depart = null;
+  let dx = 0;
+  let glisse = false;
+  const seuil = () => carte.offsetWidth * 0.35;
+  const remettre = () => {
+    depart = null;
+    carte.style.transition = '';
+    carte.style.transform = '';
+    fond.classList.remove('pret');
+  };
+  carte.addEventListener('pointerdown', (e) => {
+    if (e.button) return;
+    depart = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    dx = 0;
+    glisse = false;
+    carte.style.transition = 'none';
+  });
+  carte.addEventListener('pointermove', (e) => {
+    if (!depart || e.pointerId !== depart.id) return;
+    const ecartX = e.clientX - depart.x;
+    const ecartY = e.clientY - depart.y;
+    if (!glisse) {
+      if (Math.abs(ecartY) > 10 && Math.abs(ecartY) > Math.abs(ecartX)) { remettre(); return; } // défilement vertical
+      if (ecartX < 10 || Math.abs(ecartX) < Math.abs(ecartY)) return;
+      glisse = true;
+      carte.setPointerCapture(e.pointerId);
+    }
+    dx = Math.max(0, ecartX);
+    carte.style.transform = `translateX(${dx}px)`;
+    fond.classList.toggle('pret', dx > seuil());
+  });
+  carte.addEventListener('pointerup', () => {
+    if (!depart) return;
+    depart = null;
+    carte.style.transition = '';
+    if (glisse && dx > seuil()) {
+      carte.style.transform = 'translateX(110%)';
+      if (navigator.vibrate) navigator.vibrate(30);
+      setTimeout(action, 180);
+    } else {
+      carte.style.transform = '';
+      fond.classList.remove('pret');
+    }
+  });
+  carte.addEventListener('pointercancel', remettre);
+  // Après un glissement, le relâchement ne doit pas ouvrir la fiche
+  carte.addEventListener('click', (e) => {
+    if (glisse) { e.stopPropagation(); e.preventDefault(); glisse = false; }
+  }, true);
 }
 
 // --- Filtres de la collection ---
