@@ -181,7 +181,11 @@ async function verifierTomeScanne(isbn, sIndex) {
   // Manga Insight connaît l'édition exacte de chaque ISBN ; sinon, on interroge la BnF
   const livreMI = livreMangaInsight(isbn);
   let livre, analyse;
-  if (livreMI) {
+  if (livreMI && serie.parution && serie.parution.noms && serie.parution.noms.includes(livreMI.nom)) {
+    // Tome d'une suite numérotée à la suite (Solo Leveling Ragnarok 20) : c'est bien cette série
+    livre = { titre: `${livreMI.nom}, tome ${livreMI.tome}` };
+    analyse = { serie: decomposerTitreSerie(serie.titre).base, edition: editionDuTitre(serie.titre), tome: livreMI.tome };
+  } else if (livreMI) {
     livre = { titre: `${livreMI.nom}, tome ${livreMI.tome}` };
     analyse = { serie: livreMI.serie, edition: livreMI.edition, tome: livreMI.tome };
   } else {

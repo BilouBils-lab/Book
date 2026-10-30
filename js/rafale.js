@@ -98,20 +98,23 @@ async function identifierPourRafale(isbn) {
   const titre = titreAvecEdition(analyse);
   if (!analyse.tome) return { etat: 'inconnu', titre, message: 'numéro du tome introuvable, ajoute-le seul avec 📷 Scanner' };
 
-  let serie = livreMI && bibliotheque.find(s => s.miNom === livreMI.nom);
+  // Tome d'une suite numérotée à la suite (Solo Leveling Ragnarok 20) : il appartient à la série principale
+  let serie = livreMI && bibliotheque.find(s => s.miNom === livreMI.nom || (s.parution && s.parution.noms && s.parution.noms.includes(livreMI.nom)));
   if (!serie) serie = bibliotheque.find(s => normaliserTitre(s.titre) === normaliserTitre(titre));
   if (!serie) serie = bibliotheque.find(s => titreSansEdition(s.titre) === cleTitre(analyse.serie) && editionDuTitre(s.titre) === analyse.edition);
   if (serie) {
     const tome = serie.tomes.find(t => t.numero === analyse.tome);
     return { etat: tome && tome.possede ? 'deja' : 'ajout', titre: serie.titre, tome: analyse.tome };
   }
+  // Nouvelle partie d'une saga (Sword Art Online - Alicization) : une nouvelle série, qui rejoindra la saga
+  const saga = bibliotheque.find(s => s.saga && normaliserRecherche(s.saga) === normaliserRecherche(analyse.serie.split(' - ')[0]));
   // Même série dans une autre édition : il faut choisir (corriger la série ou en créer une à part)
-  const autre = bibliotheque.find(s => titreSansEdition(s.titre) === cleTitre(analyse.serie));
+  const autre = !saga && bibliotheque.find(s => titreSansEdition(s.titre) === cleTitre(analyse.serie));
   if (autre) {
     return { etat: 'inconnu', titre: `${titre} · tome ${analyse.tome}`, autreEdition: { livre: analyse.edition, serie: autre.titre },
       message: `édition ${analyse.edition || 'standard'}, ta série « ${autre.titre} » est en édition ${editionDuTitre(autre.titre) || 'standard'} : ajoute-le seul avec 📷 Scanner` };
   }
-  return { etat: 'nouvelle', titre, tome: analyse.tome, livreMI,
+  return { etat: 'nouvelle', titre, tome: analyse.tome, livreMI, saga: saga ? saga.saga : null,
     editeur: livreMI ? livreMI.editeur : livre.editeur, couverture: livre && livre.couverture };
 }
 
@@ -202,7 +205,7 @@ function validerRafale() {
     Object.assign(serie.tomes.find(t => t.numero === e.tome), { possede: true, isbn: e.isbn, isbnAuto: false });
     serie.tomes.sort((a, b) => a.numero - b.numero);
   }
-  for (const [serie, livreMI] of nouvelles) epinglerEditionMI(serie, livreMI);
+  for (const [serie, livreMI] of nouvelles) { rattacherSagaAuto(serie); epinglerEditionMI(serie, livreMI); }
   document.getElementById('rafale-modal').classList.remove('active');
   quitterModeRafale();
   sauvegarder();

@@ -95,6 +95,20 @@ async function definirBibliotheque(page, series) {
   await page.evaluate((s) => { bibliotheque = s; rendreVues(); }, series);
 }
 
+// Données Manga Insight de test, avec des sorties en plus : [titre « Série Vol.N », année, mois, éditeur, EAN]
+async function avecSortiesEnPlus(page, lignes) {
+  const core = JSON.parse(fs.readFileSync(path.join(DONNEES, 'mangainsight-core.json'), 'utf8'));
+  const rows = JSON.parse(fs.readFileSync(path.join(DONNEES, 'mangainsight-rows.json'), 'utf8'));
+  for (const [titre, annee, mois, editeur, ean] of lignes) {
+    if (!core.dict.editor.includes(editeur)) core.dict.editor.push(editeur);
+    core.col.year.push(annee); core.col.month.push(mois); core.col.editor.push(core.dict.editor.indexOf(editeur));
+    rows.title.push(titre); rows.ean.push(ean || '');
+  }
+  core.n = rows.n = rows.title.length;
+  await page.route(WORKER + '/mangainsight/*', route => route.fulfill({ body: JSON.stringify(route.request().url().endsWith('core') ? core : rows), contentType: 'application/json' }));
+  await page.evaluate(() => chargerMangaInsight(true));
+}
+
 // Charge les données Manga Insight de test et met les séries à jour
 async function avecMangaInsight(page, series) {
   await page.evaluate(async (s) => { bibliotheque = s; await majMangaInsightAuDemarrage(); rendreVues(); }, series);
@@ -1077,6 +1091,79 @@ test('Trouver les jaquettes manquantes (et annuler)', async ({ navigateur, base 
   page.evaluate(() => trouverJaquettesManquantes());
   await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Toutes tes séries'), null, { timeout: 20000 });
   egal(alertes, [], 'aucune alerte');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Suite qui continue la numérotation : Solo Leveling 1–19 puis Ragnarok 20–…', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, { worker: (req) => req.url().includes('/isbn') ? { body: { trouve: false } } : null });
+  const lignes = [];
+  for (let v = 1; v <= 19; v++) lignes.push([`Solo Leveling Vol.${v}`, 2021 + Math.floor(v / 4), 1 + (v % 12), 'Kbooks', '97823828800' + String(v).padStart(2, '0')]);
+  lignes.push(['Solo Leveling - Collector Vol.20', 2026, 3, 'Kbooks', '9782382889990']);
+  for (const [v, mois] of [[20, 4], [21, 7], [22, 11]]) lignes.push([`Solo Leveling Ragnarok Vol.${v}`, 2026, mois, 'Kbooks', '97823828845' + v]);
+  await avecSortiesEnPlus(page, lignes);
+  await page.evaluate(() => { bibliotheque = [{ titre: 'Solo Leveling', editeur: 'Kbooks', tomes: Array.from({ length: 21 }, (_, i) => ({ numero: i + 1, possede: true, lu: i < 19 })) }]; majMangaInsightAuDemarrage(); });
+  await page.waitForFunction(() => bibliotheque[0].parution);
+  egal(await page.evaluate(() => [bibliotheque[0].tomesParus, bibliotheque[0].parution.parties, bibliotheque[0].parution.noms]),
+    [22, [{ nom: 'Solo Leveling', debut: 1, fin: 19 }, { nom: 'Ragnarok', debut: 20, fin: 22 }], ['Solo Leveling', 'Solo Leveling Ragnarok']],
+    'Ragnarok reconnu comme la suite (pas le collector) : 22 tomes en deux parties');
+  await page.evaluate(() => ouvrirModalSerie(0));
+  const parties = await page.$$eval('#modal-volumes-grid .tranche-nom', l => l.map(x => x.textContent));
+  egal(parties, ['Solo Leveling1–19', 'Ragnarok20–22'], 'la fiche montre les deux parties');
+  egal(await page.textContent('#fiche-prochain'), 'Prochain à acheter : tome 22', 'tome 22 à acheter');
+  // En magasin : le tome 22 de Ragnarok est bien le tome manquant de Solo Leveling
+  await page.evaluate(() => { fermerModal(); serieAVerifier = null; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); passerEnModeMagasin(); codeBarresLu('9782382884522'); });
+  await page.waitForFunction(() => document.querySelector('#verdict-magasin .verdict-titre')?.textContent === 'Il te manque');
+  egal(await page.textContent('#verdict-magasin .verdict-detail'), 'Solo Leveling · tome 22.', 'verdict en magasin');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Saga : parties qui repartent au tome 1 regroupées (SAO), saison 2 séparée (Jungle Juice)', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  await definirBibliotheque(page, [
+    { titre: 'Sword Art Online - Aincrad', tomes: tomes(2, 2) },
+    { titre: 'Jungle Juice', tomesParus: 6, tomesParusSource: 'manuel', tomes: tomes(7, 7) },
+    { titre: 'Sword Art Online (Fairy Dance)', tomes: tomes(3, 1) }
+  ]);
+  // SAO : créer la saga depuis Aincrad, Fairy Dance est proposée d'office
+  await page.evaluate(() => { ouvrirModalSerie(0); gererSaga(); });
+  await page.waitForSelector('#choix-modal.active');
+  await page.click('#choix-boutons button >> text=Créer la saga « Sword Art Online »');
+  await page.waitForSelector('#confirm-modal.active');
+  verifier((await page.textContent('#confirm-message')).includes('• Sword Art Online (Fairy Dance)'), 'Fairy Dance proposée');
+  await page.click('#confirm-ok');
+  await page.waitForFunction(() => bibliotheque[2].saga === 'Sword Art Online');
+  egal(await page.$$eval('#fiche-parties button', l => l.map(b => b.textContent + (b.className ? ' *' : ''))), ['Aincrad *', 'Fairy Dance'], 'parties en onglets dans la fiche');
+  await page.click('#fiche-parties button >> text=Fairy Dance');
+  egal(await page.textContent('#modal-title'), 'Sword Art Online (Fairy Dance)', 'onglet : fiche de la partie');
+  await page.evaluate(() => { fermerModal(); changerOnglet('collection'); });
+  const cartes = () => page.$$eval('#view-collection .series-card', l => l.map(c => c.querySelector('.series-title').textContent + ' | ' + c.querySelector('.series-meta').textContent));
+  egal(await cartes(), ['Jungle Juice | 7 / 7 · À jour ✓ · 7 lus', '📚 Sword Art Online | 2 parties · 5 / 5 · À jour ✓ · 3 lus'], 'une seule carte pour la saga');
+  await page.fill('#recherche-input', 'fairy');
+  egal((await cartes()).length, 1, 'recherche par partie : la saga');
+  await page.fill('#recherche-input', '');
+
+  // Jungle Juice : le « tome 7 » est en réalité la saison 2, tome 1
+  await page.evaluate(() => { ouvrirModalSerie(1); nouvellePartieSaga(); });
+  await page.waitForSelector('#form-text-modal.active');
+  egal(await page.inputValue('#form-text-input'), '7', 'premier tome de la nouvelle partie proposé (après les 6 parus)');
+  await page.click('#form-text-ok');
+  await page.waitForFunction(() => document.getElementById('form-text-input').value === 'Jungle Juice (Saison 2)');
+  await page.click('#form-text-ok');
+  await page.waitForFunction(() => document.getElementById('form-text-input').value === 'Jungle Juice (Saison 1)');
+  await page.click('#form-text-ok');
+  await page.waitForFunction(() => bibliotheque.length === 4);
+  egal(await page.evaluate(() => bibliotheque.map(s => [s.titre, s.saga || null, s.tomes.map(t => t.numero + (t.lu ? 'L' : '')).join(' ')])), [
+    ['Sword Art Online - Aincrad', 'Sword Art Online', '1L 2L'],
+    ['Jungle Juice (Saison 1)', 'Jungle Juice', '1L 2L 3L 4L 5L 6L'],
+    ['Jungle Juice (Saison 2)', 'Jungle Juice', '1L'],
+    ['Sword Art Online (Fairy Dance)', 'Sword Art Online', '1L 2 3']
+  ], 'saison 2 séparée et renumérotée, lectures gardées');
+  egal(await page.textContent('#modal-title'), 'Jungle Juice (Saison 2)', 'la nouvelle partie s’ouvre');
+  egal(await page.$$eval('#fiche-parties button', l => l.map(b => b.textContent)), ['Saison 1', 'Saison 2'], 'onglets des saisons');
+  await page.click('#toast button');
+  egal(await page.evaluate(() => bibliotheque.map(s => s.titre)), ['Sword Art Online - Aincrad', 'Jungle Juice', 'Sword Art Online (Fairy Dance)'], 'annuler remet comme avant');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });

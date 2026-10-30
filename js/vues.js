@@ -45,7 +45,7 @@ function rendreVues() {
 
   if (rechercheTexte.trim()) {
     const recherche = normaliserTitre(rechercheTexte);
-    listeAffichee = listeAffichee.filter(item => normaliserTitre(item.serie.titre).includes(recherche));
+    listeAffichee = listeAffichee.filter(item => normaliserTitre(item.serie.titre).includes(recherche) || normaliserTitre(item.serie.saga || '').includes(recherche));
   }
 
   if (triActif === 'alpha') {
@@ -68,6 +68,15 @@ function rendreVues() {
   }
   // 'ajout' : on garde l'ordre naturel du tableau (ordre d'ajout), rien à trier
 
+  // Sagas : une seule carte, à la place de la première de ses parties dans la liste
+  const sagasVues = new Set();
+  listeAffichee = listeAffichee.filter(({ serie }) => {
+    if (!estDansUneSaga(serie)) return true;
+    if (sagasVues.has(serie.saga)) return false;
+    sagasVues.add(serie.saga);
+    return true;
+  });
+
   if (bibliotheque.length === 0) {
     containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Clique sur ➕ pour ajouter une série.<br><br>Tu avais déjà une collection (nouveau raccourci, autre appareil) ?<br>⚙️ → 🔑 Code de sauvegarde cloud pour la récupérer.</div>`;
   } else if (listeAffichee.length === 0) {
@@ -86,6 +95,7 @@ function rendreVues() {
     containerCol.appendChild(vide);
   } else {
     listeAffichee.forEach(({ serie, indexReel }) => {
+      if (estDansUneSaga(serie)) { containerCol.appendChild(carteSaga(serie.saga)); return; }
       const { total, possedes, lus, manquants } = statsSerie(serie);
       const pctPossedes = total ? Math.round(possedes / total * 100) : 0;
       const pctLus = total ? Math.round(lus / total * 100) : 0;

@@ -264,9 +264,13 @@ function infosMangaInsight(serie) {
   const nbTomes = (g) => new Set(g.map(s => s.vol)).size;
   liste.sort((a, b) => nbTomes(b) - nbTomes(a));
 
+  // Suite qui continue la numérotation sous un autre nom (Solo Leveling 1–19, puis « Solo Leveling Ragnarok » 20–…) :
+  // une seule série, découpée en parties
+  const parties = [liste[0], ...suitesMangaInsight(liste[0])];
+
   // Une sortie par numéro (la plus ancienne en cas de réédition)
   const parVol = new Map();
-  for (const s of liste[0]) if (!parVol.has(s.vol) || s.k < parVol.get(s.vol).k) parVol.set(s.vol, s);
+  for (const s of parties.flat()) if (!parVol.has(s.vol) || s.k < parVol.get(s.vol).k) parVol.set(s.vol, s);
   const volumes = [...parVol.values()].sort((a, b) => a.vol - b.vol);
   const dernier = volumes.reduce((a, b) => (b.k > a.k || (b.k === a.k && b.vol > a.vol) ? b : a));
 
@@ -283,8 +287,49 @@ function infosMangaInsight(serie) {
     tomesParus: volumes[volumes.length - 1].vol,
     isbnParTome: Object.fromEntries(volumes.filter(v => v.ean).map(v => [v.vol, v.ean])),
     dernier: { vol: dernier.vol, k: dernier.k },
-    rythme
+    rythme,
+    ...(parties.length > 1 ? {
+      noms: parties.map(g => g[0].nom),
+      parties: parties.map((g, i) => ({
+        nom: i ? nomDeSuite(g[0].nom, liste[0][0].nom) : liste[0][0].nom,
+        debut: Math.min(...g.map(s => s.vol)),
+        fin: Math.max(...g.map(s => s.vol))
+      }))
+    } : {})
   };
+}
+
+// Suites d'une édition : même éditeur, nom qui commence pareil, et premier tome juste après le dernier
+// de la partie précédente. Les variantes (collector, coffret…) ne sont pas des suites.
+function suitesMangaInsight(groupe) {
+  const principal = groupe[0];
+  const cleBase = normaliserRecherche(principal.base);
+  const debutNom = normaliserRecherche(principal.nom);
+  const candidats = new Map();
+  for (const [cle, entrees] of indexMI) {
+    if (cle !== cleBase && !cle.startsWith(cleBase + ' ')) continue;
+    for (const s of entrees) {
+      const nomN = normaliserRecherche(s.nom);
+      if (s.nom === principal.nom || s.editeur !== principal.editeur || !nomN.startsWith(debutNom + ' ')) continue;
+      if (VARIANTES_MI.test(nomDeSuite(s.nom, principal.nom))) continue;
+      if (!candidats.has(s.nom)) candidats.set(s.nom, []);
+      candidats.get(s.nom).push(s);
+    }
+  }
+  const suites = [];
+  let fin = Math.max(...groupe.map(s => s.vol));
+  for (;;) {
+    const suite = [...candidats.values()].find(g => Math.min(...g.map(s => s.vol)) === fin + 1);
+    if (!suite) return suites;
+    suites.push(suite);
+    candidats.delete(suite[0].nom);
+    fin = Math.max(...suite.map(s => s.vol));
+  }
+}
+
+// « Solo Leveling Ragnarok » ou « Solo Leveling - Ragnarok » → « Ragnarok »
+function nomDeSuite(nom, nomPrincipal) {
+  return nom.slice(nomPrincipal.length).replace(/^[\s\-–:.,]+/, '').trim() || nom;
 }
 
 // Met à jour une série avec Manga Insight. Renvoie true si quelque chose a changé.
@@ -298,7 +343,7 @@ function appliquerMangaInsight(serie) {
   serie.tomesParus = mi.tomesParus;
   serie.tomesParusSource = 'Manga Insight';
   serie.tomesParusMaj = Date.now();
-  serie.parution = { nom: mi.nom, dernier: mi.dernier, rythme: mi.rythme };
+  serie.parution = { nom: mi.nom, dernier: mi.dernier, rythme: mi.rythme, ...(mi.parties ? { noms: mi.noms, parties: mi.parties } : {}) };
   if (!serie.editeur && mi.editeur) serie.editeur = editeurFrancais(mi.editeur) || mi.editeur;
   // ISBN déduits de l'édition supposée : marqués « auto » pour ne pas les confondre avec des tomes scannés
   for (const tome of serie.tomes) {
