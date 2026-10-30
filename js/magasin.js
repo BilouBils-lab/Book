@@ -52,7 +52,8 @@ function verdictMagasin(r, isbn) {
     return { icone: '🛒', titre: 'Il te manque', detail: livre + '.' + (serie ? autresManquants(serie, r.tome) : ''), classe: 'manque' };
   }
   if (r.etat === 'nouvelle') {
-    return { icone: '🆕', titre: 'Pas dans ta collection', detail: livre + ' : une série que tu n’as pas encore.', classe: 'manque' };
+    return { icone: '🆕', titre: 'Pas dans ta collection', classe: 'manque',
+      detail: livre + (r.saga ? ` : une nouvelle partie de ta saga « ${r.saga} ».` : ' : une série que tu n’as pas encore.') };
   }
   if (r.autreEdition) {
     return { icone: '⚠️', titre: 'Autre édition !', classe: 'alerte',

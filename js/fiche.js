@@ -49,6 +49,7 @@ function remplirModalSerie(index) {
   pastilles.appendChild(creerPastille(statut, 'statut ' + (CLASSES_STATUT[statut] || '')));
   (serie.genre || '').split(/\s*,\s*/).filter(Boolean).slice(0, 3).forEach(g => pastilles.appendChild(creerPastille(g)));
   remplirBarreInventaire(serie);
+  afficherPartiesSaga(serie, index);
 
   // Vérification discrète à la BnF si l'info manque ou date de plus d'une semaine
   if (serie.tomesParusSource !== 'Manga Insight' && serie.tomesParusSource !== 'manuel' && (!serie.tomesParusMaj || Date.now() - serie.tomesParusMaj > DELAI_MAJ_TOMES_PARUS)) {
@@ -104,7 +105,7 @@ function remplirModalSerie(index) {
   const grid = document.getElementById('modal-volumes-grid');
   grid.innerHTML = '';
   const etatTome = (n) => parNumero.has(n) ? serie.tomes[parNumero.get(n)] : null;
-  if (total <= SEUIL_TRANCHES) {
+  if (total <= SEUIL_TRANCHES && !partiesNumerotees(serie)) {
     grid.className = 'volumes-grid';
     for (let n = 1; n <= total; n++) grid.appendChild(creerCaseTome(index, n, parNumero));
     return;
@@ -178,8 +179,17 @@ const ARCS_CONNUS = {
   ]
 };
 
+// Parties d'une série qui continue sa numérotation sous un autre nom (Manga Insight) : Solo Leveling 1–19, Ragnarok 20–…
+function partiesNumerotees(serie) {
+  const parties = serie.parution && serie.parution.parties;
+  return parties && parties.length > 1 ? parties : null;
+}
+
 function decoupageSerie(serie, total) {
-  const arcs = ARCS_CONNUS[cleTitre(serie.titre)] || [];
+  const parties = partiesNumerotees(serie);
+  // La dernière partie reçoit aussi les tomes à venir
+  const arcs = parties ? parties.map((p, i) => [p.nom, p.debut, i === parties.length - 1 ? Math.max(p.fin, total) : p.fin])
+    : ARCS_CONNUS[cleTitre(serie.titre)] || [];
   const segments = [];
   let n = 1;
   for (const [nom, debut, fin] of arcs) {

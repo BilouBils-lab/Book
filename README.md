@@ -14,6 +14,7 @@ Application web pour gérer sa collection de mangas : tomes possédés et lus, p
 | **Collection** | Toutes les séries, avec progression, tri et recherche. Un appui ouvre la **fiche** de la série. |
 | **À venir** | *Prochaines sorties* estimées mois par mois, et *À acheter* : les tomes sortis qui manquent, à cocher en magasin. |
 | **Quoi de neuf ?** | S'ouvre au lancement **seulement s'il y a du nouveau** : tomes sortis depuis la dernière visite, sorties attendues ce mois-ci. |
+| **Sagas et suites** | Une histoire en plusieurs parties qui repartent au tome 1 (SAO, Jungle Juice saisons 1 et 2) : une **saga**, une seule carte dans la Collection et les parties en onglets dans la fiche (⋯ → 📚 Saga, ✂️ Séparer une nouvelle partie). Une suite qui continue la numérotation (Solo Leveling Ragnarok à partir du tome 20) est reconnue automatiquement dans les sorties et affichée en parties, comme les arcs de One Piece. |
 | **Fiche d'une série** | Tomes (lus, possédés, manquants), prochain à acheter, prochaine sortie. Menu ⋯ : édition / tomes / jaquette, renommer, infos, mettre de côté, supprimer. |
 | **Notifications 🔔** | Sur l'iPhone, même app fermée : tome annoncé, nouveau tome en librairie. Calculées chaque jour par le dépôt privé `mangatheque-sauvegarde`, envoyées par Web Push. Un appui ouvre *À venir* (et la fiche s'il n'y a qu'une série). |
 | **Paramètres ⚙️** | Mise à jour des séries, complétion des infos, jaquettes manquantes (d'après l'ISBN de l'édition), inventaire, recherche ISBN, sauvegarde en ligne, apparence (clair / sombre / automatique). |
@@ -59,6 +60,7 @@ js/                   Code de l'app, découpé par thème (chargé dans l'ordre 
   fiche.js              Fiche d'une série
   maj-serie.js          Édition, nombre de tomes et jaquette d'une série
   ajout-serie.js        Ajouter une série : éditions proposées pendant la saisie du titre
+  sagas.js              Sagas : parties d'une même histoire regroupées
   mise-a-jour.js        Compléter la collection, BnF, Manga Insight (sorties, estimations)
   nouveautes.js         Page « Quoi de neuf ? »
   notifications.js      Activer / désactiver les notifications des sorties

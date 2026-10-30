@@ -93,6 +93,7 @@ function appliquerEditionChoisie(titre, e) {
   serie.miEditeur = e.editeur;
   if (!serie.editeur && e.editeur) serie.editeur = editeurFrancais(e.editeur) || e.editeur;
   if (!serie.couverture && e.couverture) serie.couverture = e.couverture;
+  rattacherSagaAuto(serie);
   appliquerMangaInsight(serie);
   sauvegarder();
   afficherToast(`✓ ${serie.titre} ajoutée · ${texteEdition(e)}`);

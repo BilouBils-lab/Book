@@ -10,15 +10,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.54">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.54">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.55">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.55">
   <!-- Manifeste : nécessaire aux notifications sur iPhone (app installée sur l'écran d'accueil) -->
   <link rel="manifest" href="manifest.webmanifest">
 
   <!-- Thème choisi dans les Paramètres, appliqué avant l'affichage (pas de flash de la mauvaise couleur) -->
   <script>try { var t = localStorage.getItem('theme'); if (t === 'clair' || t === 'sombre') document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="preload" href="polices/bangers-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=3.54">
+  <link rel="stylesheet" href="css/style.css?v=3.55">
 </head>
 <body>
 
@@ -65,7 +65,7 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <footer class="version-tag">v3.54</footer>
+  <footer class="version-tag">v3.55</footer>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -165,6 +165,8 @@
         </div>
       </div>
 
+      <div id="fiche-parties" class="fiche-parties"></div>
+
       <div class="fiche-progression">
         <div id="fiche-compteur" class="fiche-compteur"></div>
         <div id="fiche-frise" class="fiche-frise"></div>
@@ -204,6 +206,8 @@
         <button class="btn btn-secondary" onclick="actionMenuSerie(renommerSerieActuelle)">✏️ Renommer la série</button>
         <button class="btn btn-secondary" onclick="actionMenuSerie(ouvrirInfosSerie)">ℹ️ Modifier les infos</button>
         <button class="btn btn-secondary" onclick="actionMenuSerie(ouvrirMenuImage)">🖼️ Changer la jaquette</button>
+        <button class="btn btn-secondary" onclick="actionMenuSerie(gererSaga)">📚 Saga (histoire en plusieurs parties)</button>
+        <button class="btn btn-secondary" onclick="actionMenuSerie(nouvellePartieSaga)">✂️ Séparer une nouvelle partie (saison 2…)</button>
         <button class="btn btn-secondary" id="menu-mise-de-cote" onclick="actionMenuSerie(basculerMiseDeCote)">⏸ Mettre de côté</button>
         <button class="btn btn-secondary texte-danger" onclick="actionMenuSerie(supprimerSerieActuelle)">🗑️ Supprimer la série</button>
         <button class="btn btn-secondary" style="background: transparent;" onclick="fermerMenuSerie()">Annuler</button>
@@ -384,22 +388,23 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.54"></script>
-  <script src="js/recherche-infos.js?v=3.54"></script>
-  <script src="js/isbn-scanner.js?v=3.54"></script>
-  <script src="js/mise-a-jour.js?v=3.54"></script>
-  <script src="js/stockage.js?v=3.54"></script>
-  <script src="js/jaquettes.js?v=3.54"></script>
-  <script src="js/import-export.js?v=3.54"></script>
-  <script src="js/vues.js?v=3.54"></script>
-  <script src="js/fiche.js?v=3.54"></script>
-  <script src="js/maj-serie.js?v=3.54"></script>
-  <script src="js/ajout-serie.js?v=3.54"></script>
-  <script src="js/inventaire.js?v=3.54"></script>
-  <script src="js/rafale.js?v=3.54"></script>
-  <script src="js/magasin.js?v=3.54"></script>
-  <script src="js/nouveautes.js?v=3.54"></script>
-  <script src="js/notifications.js?v=3.54"></script>
-  <script src="js/demarrage.js?v=3.54"></script>
+  <script src="js/outils.js?v=3.55"></script>
+  <script src="js/recherche-infos.js?v=3.55"></script>
+  <script src="js/isbn-scanner.js?v=3.55"></script>
+  <script src="js/mise-a-jour.js?v=3.55"></script>
+  <script src="js/stockage.js?v=3.55"></script>
+  <script src="js/jaquettes.js?v=3.55"></script>
+  <script src="js/import-export.js?v=3.55"></script>
+  <script src="js/vues.js?v=3.55"></script>
+  <script src="js/fiche.js?v=3.55"></script>
+  <script src="js/maj-serie.js?v=3.55"></script>
+  <script src="js/sagas.js?v=3.55"></script>
+  <script src="js/ajout-serie.js?v=3.55"></script>
+  <script src="js/inventaire.js?v=3.55"></script>
+  <script src="js/rafale.js?v=3.55"></script>
+  <script src="js/magasin.js?v=3.55"></script>
+  <script src="js/nouveautes.js?v=3.55"></script>
+  <script src="js/notifications.js?v=3.55"></script>
+  <script src="js/demarrage.js?v=3.55"></script>
 </body>
 </html>

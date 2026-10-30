@@ -794,6 +794,12 @@ main {
 .btn.danger { background: var(--danger); color: var(--texte-sur-accent); }
 .btn.btn-secondary.texte-danger { color: var(--danger); }
 
+/* Saga : les parties en onglets en haut de la fiche */
+.fiche-parties:empty { display: none; }
+.fiche-parties { margin: 4px 0 12px; }
+.fiche-parties-titre { font-size: 12px; color: var(--text-sub); margin-bottom: 6px; }
+.fiche-parties .selecteur-vue { flex-wrap: wrap; }
+
 /* Vérification en magasin : verdict en grand sous la caméra */
 .verdict:empty { display: none; }
 .verdict {
