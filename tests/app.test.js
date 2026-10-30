@@ -1168,6 +1168,33 @@ test('Saga : parties qui repartent au tome 1 regroupées (SAO), saison 2 sépar�
   await fermer();
 });
 
+test('Au lancement : saison 2 rangée par erreur dans la saison 1, proposée au rangement (Jungle Juice)', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  const jj = () => ({ titre: 'Jungle Juice', editeur: 'Kbooks', tomesParus: 6, tomesParusSource: 'Manga Insight',
+    parution: { nom: 'Jungle Juice - Saison 1', dernier: { vol: 6, k: 24300 }, rythme: 3 }, tomes: tomes(7, 7) });
+  await definirBibliotheque(page, [jj(), { titre: 'One Piece', tomes: tomes(3) }]);
+  page.evaluate(() => proposerRangementSaisons());
+  await page.waitForSelector('#choix-modal.active');
+  egal(await page.textContent('#choix-message'), 'Jungle Juice : d’après les sorties, la saison 1 compte 6 tomes. Ton tome 7 appartient sans doute à la saison 2, qui repart au tome 1.\n\nRanger en deux saisons, dans une saga « Jungle Juice » ? Tes lectures sont gardées.'.replace('’', "'"), 'proposition');
+  await page.click('#choix-boutons button >> text=Ranger');
+  await page.waitForFunction(() => bibliotheque.length === 3);
+  egal(await page.evaluate(() => bibliotheque.map(s => [s.titre, s.saga || null, s.tomes.map(t => t.numero + (t.lu ? 'L' : '')).join(' ')])), [
+    ['Jungle Juice (Saison 1)', 'Jungle Juice', '1L 2L 3L 4L 5L 6L'],
+    ['Jungle Juice (Saison 2)', 'Jungle Juice', '1L'],
+    ['One Piece', null, '1 2 3']
+  ], 'saisons rangées, lectures gardées');
+  egal(await page.evaluate(() => saisonARanger()), null, 'plus rien à ranger ensuite');
+  // « Non » : la question n'est plus posée
+  await page.evaluate((s) => { bibliotheque = [s]; fermerModal(); }, jj());
+  page.evaluate(() => proposerRangementSaisons());
+  await page.waitForSelector('#choix-modal.active');
+  await page.click('#choix-boutons button >> text=Non');
+  await page.waitForFunction(() => bibliotheque[0].saisonsVerifiees === true);
+  egal(await page.evaluate(() => [saisonARanger(), bibliotheque.length]), [null, 1], 'refus retenu, rien de modifié');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('ISBN inconnu des catalogues (tome tout juste paru) : l’app demande sa série et le retient', async ({ navigateur, base }) => {
   let recherches = 0;
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {

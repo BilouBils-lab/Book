@@ -57,7 +57,7 @@ async function initialiserBibliotheque() {
   // Ouverte depuis une notification : on va droit à ce qu'elle annonce (pas de page « Quoi de neuf ? »)
   const cible = cibleDeLancement();
   ouvrirDepuisNotification(cible);
-  majMangaInsightAuDemarrage().finally(() => { if (!cible) verifierNouveautes(); });
+  majMangaInsightAuDemarrage().finally(async () => { if (!cible && !(await proposerRangementSaisons())) verifierNouveautes(); });
 }
 
 const BACKUP_URL = 'https://manga-gemini-proxy.nabil-chilla.workers.dev/backup';
