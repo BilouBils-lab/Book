@@ -30,7 +30,8 @@
   --fond-entete: rgba(246, 241, 231, 0.94);
   --barre-etat: #26231e;
   --voile: rgba(38, 35, 30, 0.45);
-  --alerte: #b7791f;
+  --alerte: #8a5a12;
+  --danger: #b42318;
   --alerte-doux: rgba(183, 121, 31, 0.12);
   --ok: #2f7d4f;
   --ok-doux: rgba(47, 125, 79, 0.12);
@@ -63,6 +64,7 @@
   --barre-etat: rgba(28, 26, 23, 0.94);
   --voile: rgba(0, 0, 0, 0.6);
   --alerte: #e9a23b;
+  --danger: #f87171;
   --alerte-doux: rgba(233, 162, 59, 0.14);
   --ok: #7fb685;
   --ok-doux: rgba(127, 182, 133, 0.14);
@@ -94,6 +96,7 @@
   --barre-etat: rgba(28, 26, 23, 0.94);
   --voile: rgba(0, 0, 0, 0.6);
   --alerte: #e9a23b;
+  --danger: #f87171;
   --alerte-doux: rgba(233, 162, 59, 0.14);
   --ok: #7fb685;
   --ok-doux: rgba(127, 182, 133, 0.14);
@@ -143,6 +146,7 @@ header {
 }
 
 .app-title {
+  margin: 0;
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.5px;
@@ -491,7 +495,7 @@ main {
   border: 1px solid var(--card-border);
   background: var(--bg-color);
   color: var(--text-main);
-  font-size: 15px;
+  font-size: 16px; /* 16 px : l'iPhone ne zoome pas tout seul à la saisie */
   margin-bottom: 16px;
 }
 
@@ -684,7 +688,7 @@ main {
   height: 36px;
   border-radius: 8px;
   border: 1.5px dashed var(--texte-faible);
-  color: var(--texte-faible);
+  color: var(--text-sub);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -755,7 +759,6 @@ main {
   right: calc(10px + env(safe-area-inset-right));
   font-size: 10px;
   color: var(--text-sub);
-  opacity: 0.5;
   font-family: monospace;
   pointer-events: none;
 }
@@ -786,6 +789,10 @@ main {
   border-radius: 8px;
   box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35);
 }
+
+/* Actions irréversibles (supprimer, confirmer) : en rouge, lisible dans les deux thèmes */
+.btn.danger { background: var(--danger); color: var(--texte-sur-accent); }
+.btn.btn-secondary.texte-danger { color: var(--danger); }
 
 /* Vérification en magasin : verdict en grand sous la caméra */
 .verdict:empty { display: none; }
@@ -928,7 +935,7 @@ button.etat-sauvegarde { width: 100%; background: var(--surface-creuse); text-al
 .fiche-titre.long { font-size: 21px; }
 .modal-content h2, .modal-content h3 { font-family: var(--police-titre); font-weight: 400; letter-spacing: 0.5px; }
 .modal-content h2 { font-size: 24px !important; }
-.modal-content h3 { font-size: 21px !important; }
+.modal-content h3, .modal-content h2.petit-titre { font-size: 21px !important; }
 
 /* Paramètres : choix du thème */
 .choix-theme { margin: 0; }

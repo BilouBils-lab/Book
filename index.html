@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Ma MangaThèque</title>
 
   <!-- Configuration iOS PWA -->
@@ -10,22 +10,22 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.53">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.53">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.54">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.54">
   <!-- Manifeste : nécessaire aux notifications sur iPhone (app installée sur l'écran d'accueil) -->
   <link rel="manifest" href="manifest.webmanifest">
 
   <!-- Thème choisi dans les Paramètres, appliqué avant l'affichage (pas de flash de la mauvaise couleur) -->
   <script>try { var t = localStorage.getItem('theme'); if (t === 'clair' || t === 'sombre') document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="preload" href="polices/bangers-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=3.53">
+  <link rel="stylesheet" href="css/style.css?v=3.54">
 </head>
 <body>
 
   <header>
     <div class="top-bars">
       <div class="app-title-group">
-        <div class="app-title">Ma MangaThèque</div>
+        <h1 class="app-title">Ma MangaThèque</h1>
         <div style="font-size: 12px; color: var(--text-sub);" id="total-count">0 tomes</div>
         <span id="badge-hors-ligne" class="badge-hors-ligne" hidden>📴 hors ligne</span>
       </div>
@@ -41,8 +41,8 @@
   <main>
     <div id="view-pal" style="display: none;"></div>
     <div id="collection-toolbar" style="display: flex; gap: 8px; margin-bottom: 12px;">
-      <input type="text" id="recherche-input" class="modal-input" style="margin-bottom: 0; flex: 1;" placeholder="Rechercher une série..." oninput="onRechercheInput(this.value)">
-      <select id="tri-select" class="modal-input" style="margin-bottom: 0; width: auto; flex-shrink: 0;" onchange="onTriChange(this.value)">
+      <input type="text" id="recherche-input" class="modal-input" style="margin-bottom: 0; flex: 1;" placeholder="Rechercher une série..." aria-label="Rechercher une série" oninput="onRechercheInput(this.value)">
+      <select id="tri-select" class="modal-input" aria-label="Trier les séries" style="margin-bottom: 0; width: auto; flex-shrink: 0;" onchange="onTriChange(this.value)">
         <option value="alpha" selected>A → Z</option>
         <option value="progression">Progression</option>
         <option value="completer">À compléter</option>
@@ -65,13 +65,13 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <div class="version-tag">v3.53</div>
+  <footer class="version-tag">v3.54</footer>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
-    <div class="modal-content">
+    <div role="dialog" aria-modal="true" aria-labelledby="titre-parametres" class="modal-content">
       <button class="close-modal" onclick="fermerParametres()">×</button>
-      <h2 style="font-size: 18px; margin-bottom: 14px;">Paramètres</h2>
+      <h2 style="font-size: 18px; margin-bottom: 14px;" id="titre-parametres">Paramètres</h2>
 
       <!-- État de la sauvegarde : un appui ouvre l'historique -->
       <button id="etat-sauvegarde" class="etat-sauvegarde" onclick="ouvrirVersions()"></button>
@@ -124,9 +124,9 @@
 
   <!-- Inventaire : liste des séries à vérifier (sous la fiche, qui s'ouvre par-dessus) -->
   <div id="inventaire-modal" class="modal-overlay">
-    <div class="modal-content inventaire">
+    <div role="dialog" aria-modal="true" aria-labelledby="titre-inventaire" class="modal-content inventaire">
       <button class="close-modal" onclick="fermerInventaire()">×</button>
-      <h2 style="font-size: 18px; margin-bottom: 6px;">📋 Inventaire</h2>
+      <h2 style="font-size: 18px; margin-bottom: 6px;" id="titre-inventaire">📋 Inventaire</h2>
       <div class="inventaire-intro">Ouvre chaque série et compare avec ton étagère : touche un tome pour le corriger, scanne un tome pour vérifier son édition, puis valide.</div>
       <div id="inventaire-compteur" class="inventaire-compteur"></div>
       <div class="progress-bar-bg"><div class="progress-bar-fill" id="inventaire-barre" style="width: 0%;"></div></div>
@@ -137,9 +137,9 @@
 
   <!-- Nouveautés : au lancement, seulement s'il y a du nouveau (sous la fiche, qui s'ouvre par-dessus) -->
   <div id="nouveautes-modal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 420px;">
+    <div role="dialog" aria-modal="true" aria-labelledby="titre-nouveautes" class="modal-content" style="max-width: 420px;">
       <button class="close-modal" onclick="fermerNouveautes()">×</button>
-      <h2 style="font-size: 18px; margin-bottom: 4px;">Quoi de neuf ?</h2>
+      <h2 style="font-size: 18px; margin-bottom: 4px;" id="titre-nouveautes">Quoi de neuf ?</h2>
       <div class="avenir-intro">Sorties en France (Manga Insight) et estimations d'après le rythme de chaque série.</div>
       <div id="nouveautes-contenu"></div>
       <div style="display: flex; gap: 10px; margin-top: 16px;">
@@ -151,7 +151,7 @@
 
   <!-- Modal Détail Série -->
   <div id="detail-modal" class="modal-overlay">
-    <div class="modal-content fiche">
+    <div role="dialog" aria-modal="true" aria-labelledby="modal-title" class="modal-content fiche">
       <div class="fiche-entete">
         <img id="modal-cover" class="fiche-jaquette" src="" alt="Jaquette" onclick="ouvrirMenuImage()">
         <div class="fiche-infos">
@@ -198,14 +198,14 @@
 
   <!-- Menu « ⋯ » de la fiche : actions rares -->
   <div class="modal-overlay" id="menu-serie-modal">
-    <div class="modal-content" style="max-width: 340px;">
+    <div role="dialog" aria-modal="true" aria-label="Actions sur la série" class="modal-content" style="max-width: 340px;">
       <div style="display: flex; flex-direction: column; gap: 10px;">
         <button class="btn btn-secondary" onclick="actionMenuSerie(majSerieActuelle)">🔄 Édition, tomes et jaquette</button>
         <button class="btn btn-secondary" onclick="actionMenuSerie(renommerSerieActuelle)">✏️ Renommer la série</button>
         <button class="btn btn-secondary" onclick="actionMenuSerie(ouvrirInfosSerie)">ℹ️ Modifier les infos</button>
         <button class="btn btn-secondary" onclick="actionMenuSerie(ouvrirMenuImage)">🖼️ Changer la jaquette</button>
         <button class="btn btn-secondary" id="menu-mise-de-cote" onclick="actionMenuSerie(basculerMiseDeCote)">⏸ Mettre de côté</button>
-        <button class="btn btn-secondary" style="color: #ef4444;" onclick="actionMenuSerie(supprimerSerieActuelle)">🗑️ Supprimer la série</button>
+        <button class="btn btn-secondary texte-danger" onclick="actionMenuSerie(supprimerSerieActuelle)">🗑️ Supprimer la série</button>
         <button class="btn btn-secondary" style="background: transparent;" onclick="fermerMenuSerie()">Annuler</button>
       </div>
     </div>
@@ -213,8 +213,8 @@
 
   <!-- Écran de scan du code-barres -->
   <div class="modal-overlay" id="scanner-modal">
-    <div class="modal-content" style="max-width: 380px;">
-      <h3 id="scanner-titre" style="font-size: 16px; margin-bottom: 10px;">📷 Scanner le code-barres</h3>
+    <div role="dialog" aria-modal="true" aria-labelledby="scanner-titre" class="modal-content" style="max-width: 380px;">
+      <h2 class="petit-titre" id="scanner-titre" style="font-size: 16px; margin-bottom: 10px;">📷 Scanner le code-barres</h2>
       <div class="scanner-zone">
         <video id="scanner-video" autoplay muted playsinline></video>
         <div class="scanner-cadre"></div>
@@ -243,8 +243,8 @@
 
   <!-- Résumé d'un scan en rafale, à valider -->
   <div class="modal-overlay" id="rafale-modal">
-    <div class="modal-content" style="max-width: 380px;">
-      <h3 style="font-size: 16px; margin-bottom: 10px;">📚 Tes livres scannés</h3>
+    <div role="dialog" aria-modal="true" aria-labelledby="titre-rafale" class="modal-content" style="max-width: 380px;">
+      <h2 class="petit-titre" style="font-size: 16px; margin-bottom: 10px;" id="titre-rafale">📚 Tes livres scannés</h2>
       <div id="rafale-resume" class="rafale-liste rafale-resume"></div>
       <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
         <button class="btn" id="rafale-valider" onclick="validerRafale()">📚 Ajouter</button>
@@ -255,8 +255,8 @@
 
   <!-- Modal : résultat d'une recherche par ISBN -->
   <div class="modal-overlay" id="isbn-modal">
-    <div class="modal-content" style="max-width: 360px;">
-      <h3 style="font-size: 16px; margin-bottom: 12px;">🔎 Recherche par ISBN</h3>
+    <div role="dialog" aria-modal="true" aria-labelledby="titre-isbn" class="modal-content" style="max-width: 360px;">
+      <h2 class="petit-titre" style="font-size: 16px; margin-bottom: 12px;" id="titre-isbn">🔎 Recherche par ISBN</h2>
       <div id="isbn-resultat"></div>
       <div class="modal-btn-row" style="margin-top: 16px;">
         <button class="btn btn-secondary" id="isbn-fermer">Fermer</button>
@@ -267,8 +267,8 @@
 
   <!-- Modal : complétion de la collection -->
   <div class="modal-overlay" id="completion-modal">
-    <div class="modal-content" style="max-width: 340px;">
-      <h3 id="completion-titre" style="font-size: 16px; margin-bottom: 12px;">✨ Compléter ma collection</h3>
+    <div role="dialog" aria-modal="true" aria-labelledby="completion-titre" class="modal-content" style="max-width: 340px;">
+      <h2 class="petit-titre" id="completion-titre" style="font-size: 16px; margin-bottom: 12px;">✨ Compléter ma collection</h2>
       <div id="completion-etape" style="font-size: 13px; color: var(--text-sub); margin-bottom: 8px;"></div>
       <div class="progress-bar-bg"><div class="progress-bar-fill" id="completion-barre" style="width: 0%;"></div></div>
       <div id="completion-bilan" style="font-size: 13px; margin-top: 14px; white-space: pre-line; line-height: 1.4;"></div>
@@ -278,9 +278,9 @@
 
   <!-- Modal : choisir une sauvegarde en ligne à restaurer -->
   <div class="modal-overlay" id="versions-modal">
-    <div class="modal-content" style="max-width: 360px;">
+    <div role="dialog" aria-modal="true" aria-labelledby="titre-versions" class="modal-content" style="max-width: 360px;">
       <button class="close-modal" onclick="fermerVersions()">×</button>
-      <h3 style="font-size: 16px; margin-bottom: 6px;">🕘 Sauvegardes en ligne</h3>
+      <h2 class="petit-titre" style="font-size: 16px; margin-bottom: 6px;" id="titre-versions">🕘 Sauvegardes en ligne</h2>
       <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 12px; line-height: 1.4;">Une version est gardée par jour d'utilisation (les 30 dernières). Touche celle à remettre sur cet appareil.</div>
       <div id="versions-liste" class="versions-liste"></div>
     </div>
@@ -288,8 +288,8 @@
 
   <!-- Modal : jaquettes trouvées pour une édition -->
   <div class="modal-overlay" id="jaquettes-modal">
-    <div class="modal-content" style="max-width: 380px;">
-      <h3 style="font-size: 16px; margin-bottom: 8px;">🖼️ Jaquette de ton édition</h3>
+    <div role="dialog" aria-modal="true" aria-labelledby="titre-jaquettes" class="modal-content" style="max-width: 380px;">
+      <h2 class="petit-titre" style="font-size: 16px; margin-bottom: 8px;" id="titre-jaquettes">🖼️ Jaquette de ton édition</h2>
       <div id="jaquettes-statut" style="font-size: 13px; color: var(--text-sub); margin-bottom: 12px; line-height: 1.4;"></div>
       <div id="jaquettes-grille" class="jaquettes-grille"></div>
       <button class="btn btn-secondary" id="jaquettes-garder" style="margin-top: 14px;">Garder la jaquette actuelle</button>
@@ -298,7 +298,7 @@
 
   <!-- Modal générique : choix entre plusieurs actions -->
   <div class="modal-overlay" id="choix-modal">
-    <div class="modal-content" style="max-width: 360px;">
+    <div role="dialog" aria-modal="true" aria-labelledby="choix-message" class="modal-content" style="max-width: 360px;">
       <p id="choix-message" style="margin-bottom: 16px; white-space: pre-line; line-height: 1.4;"></p>
       <div id="choix-boutons" style="display: flex; flex-direction: column; gap: 8px;"></div>
     </div>
@@ -306,19 +306,19 @@
 
   <!-- Modal générique : confirmation -->
   <div class="modal-overlay" id="confirm-modal">
-    <div class="modal-content" style="max-width: 340px;">
+    <div role="dialog" aria-modal="true" aria-labelledby="confirm-message" class="modal-content" style="max-width: 340px;">
       <p id="confirm-message" style="margin-bottom: 20px; white-space: pre-line; line-height: 1.4;"></p>
       <div class="modal-btn-row">
         <button class="btn btn-secondary" id="confirm-cancel">Annuler</button>
-        <button class="btn" id="confirm-ok" style="background: #ef4444;">Confirmer</button>
+        <button class="btn danger" id="confirm-ok">Confirmer</button>
       </div>
     </div>
   </div>
 
   <!-- Modal générique : saisie série (titre + tome) -->
   <div class="modal-overlay" id="form-serie-modal">
-    <div class="modal-content" style="max-width: 340px;">
-      <h3 id="form-serie-heading" style="font-size: 16px; margin-bottom: 16px;">Ajouter une série</h3>
+    <div role="dialog" aria-modal="true" aria-labelledby="form-serie-heading" class="modal-content" style="max-width: 340px;">
+      <h2 class="petit-titre" id="form-serie-heading" style="font-size: 16px; margin-bottom: 16px;">Ajouter une série</h2>
       <label class="modal-field-label" for="form-serie-titre">Titre de la série</label>
       <input type="text" id="form-serie-titre" class="modal-input" autocomplete="off">
       <div id="form-serie-suggestions" class="suggestions"></div>
@@ -334,8 +334,8 @@
 
   <!-- Modal générique : saisie texte simple -->
   <div class="modal-overlay" id="form-text-modal">
-    <div class="modal-content" style="max-width: 340px;">
-      <h3 id="form-text-heading" style="font-size: 16px; margin-bottom: 16px;"></h3>
+    <div role="dialog" aria-modal="true" aria-labelledby="form-text-heading" class="modal-content" style="max-width: 340px;">
+      <h2 class="petit-titre" id="form-text-heading" style="font-size: 16px; margin-bottom: 16px;"></h2>
       <input type="text" id="form-text-input" class="modal-input" autocomplete="off">
       <div class="modal-btn-row">
         <button class="btn btn-secondary" id="form-text-cancel">Annuler</button>
@@ -346,8 +346,8 @@
 
   <!-- Modal : choix de la jaquette -->
   <div class="modal-overlay" id="cover-choice-modal">
-    <div class="modal-content" style="max-width: 340px;">
-      <h3 style="font-size: 16px; margin-bottom: 16px; text-align: center;">Changer la jaquette</h3>
+    <div role="dialog" aria-modal="true" aria-labelledby="titre-changer-jaquette" class="modal-content" style="max-width: 340px;">
+      <h2 class="petit-titre" style="font-size: 16px; margin-bottom: 16px; text-align: center;" id="titre-changer-jaquette">Changer la jaquette</h2>
       <div style="display: flex; flex-direction: column; gap: 10px;">
         <button class="btn btn-secondary" id="cover-choice-isbn">🔎 Chercher la jaquette de mon édition</button>
         <button class="btn btn-secondary" id="cover-choice-file">📁 Depuis mon téléphone</button>
@@ -359,8 +359,8 @@
 
   <!-- Modal : informations enrichies de la série -->
   <div class="modal-overlay" id="form-infos-modal">
-    <div class="modal-content" style="max-width: 340px;">
-      <h3 style="font-size: 16px; margin-bottom: 16px;">Informations sur la série</h3>
+    <div role="dialog" aria-modal="true" aria-labelledby="titre-infos" class="modal-content" style="max-width: 340px;">
+      <h2 class="petit-titre" style="font-size: 16px; margin-bottom: 16px;" id="titre-infos">Informations sur la série</h2>
       <label class="modal-field-label" for="infos-auteur">Auteur</label>
       <input type="text" id="infos-auteur" class="modal-input" autocomplete="off">
       <label class="modal-field-label" for="infos-genre">Genre</label>
@@ -384,22 +384,22 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.53"></script>
-  <script src="js/recherche-infos.js?v=3.53"></script>
-  <script src="js/isbn-scanner.js?v=3.53"></script>
-  <script src="js/mise-a-jour.js?v=3.53"></script>
-  <script src="js/stockage.js?v=3.53"></script>
-  <script src="js/jaquettes.js?v=3.53"></script>
-  <script src="js/import-export.js?v=3.53"></script>
-  <script src="js/vues.js?v=3.53"></script>
-  <script src="js/fiche.js?v=3.53"></script>
-  <script src="js/maj-serie.js?v=3.53"></script>
-  <script src="js/ajout-serie.js?v=3.53"></script>
-  <script src="js/inventaire.js?v=3.53"></script>
-  <script src="js/rafale.js?v=3.53"></script>
-  <script src="js/magasin.js?v=3.53"></script>
-  <script src="js/nouveautes.js?v=3.53"></script>
-  <script src="js/notifications.js?v=3.53"></script>
-  <script src="js/demarrage.js?v=3.53"></script>
+  <script src="js/outils.js?v=3.54"></script>
+  <script src="js/recherche-infos.js?v=3.54"></script>
+  <script src="js/isbn-scanner.js?v=3.54"></script>
+  <script src="js/mise-a-jour.js?v=3.54"></script>
+  <script src="js/stockage.js?v=3.54"></script>
+  <script src="js/jaquettes.js?v=3.54"></script>
+  <script src="js/import-export.js?v=3.54"></script>
+  <script src="js/vues.js?v=3.54"></script>
+  <script src="js/fiche.js?v=3.54"></script>
+  <script src="js/maj-serie.js?v=3.54"></script>
+  <script src="js/ajout-serie.js?v=3.54"></script>
+  <script src="js/inventaire.js?v=3.54"></script>
+  <script src="js/rafale.js?v=3.54"></script>
+  <script src="js/magasin.js?v=3.54"></script>
+  <script src="js/nouveautes.js?v=3.54"></script>
+  <script src="js/notifications.js?v=3.54"></script>
+  <script src="js/demarrage.js?v=3.54"></script>
 </body>
 </html>

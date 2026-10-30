@@ -821,6 +821,73 @@ test('Thème « Papier & encre » : clair, sombre automatique ou choisi', async 
   await contexte.close();
 });
 
+// Accessibilité : axe-core (la référence des audits d'accessibilité) sur chaque écran, en thème clair et sombre.
+// Toute anomalie fait échouer le test : contraste des couleurs, boutons et champs sans nom, titres, zoom bloqué…
+test('Accessibilité : aucun problème détecté sur les écrans principaux (thèmes clair et sombre)', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => req.url().includes('/isbn') ? { body: { trouve: false } } : null
+  });
+  const problemes = [];
+  for (const theme of ['clair', 'sombre']) {
+    await page.evaluate((t) => { document.documentElement.dataset.theme = t; }, theme);
+    await avecMangaInsight(page, [
+      { titre: 'One Piece', editeur: 'Glénat', tomes: tomes(110, 40, [105]) },
+      { titre: 'Kagurabachi', editeur: 'Kana', tomes: tomes(3, 1) },
+      { titre: 'Berserk', editeur: 'Glénat', misDeCote: true, tomes: tomes(2) }
+    ]);
+    await page.evaluate(() => { bibliotheque[0].nouveaute = { debut: 111, fin: 111, k: 24311, depuis: Date.now(), vu: false }; });
+    await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
+    await page.evaluate(() => { window.fermerToutesLesFenetres = () => document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active')); });
+    const ecrans = [
+      ['pile à lire', () => { fermerToutesLesFenetres(); changerOnglet('pal'); }],
+      ['collection', () => { fermerToutesLesFenetres(); changerOnglet('collection'); }],
+      ['à venir : sorties', () => { fermerToutesLesFenetres(); vueAVenir = 'sorties'; changerOnglet('avenir'); }],
+      ['à venir : à acheter', () => { fermerToutesLesFenetres(); vueAVenir = 'achats'; changerOnglet('avenir'); }],
+      ['fiche', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); }],
+      ['menu de la fiche', () => { document.getElementById('menu-serie-modal').classList.add('active'); }],
+      ['paramètres', () => { fermerToutesLesFenetres(); ouvrirParametres(); document.querySelector('.settings-avance').open = true; }],
+      ['quoi de neuf', () => { fermerToutesLesFenetres(); ouvrirNouveautes(); }],
+      ['inventaire', () => { fermerToutesLesFenetres(); ouvrirInventaire(); }],
+      ['ajout d’une série', () => { fermerToutesLesFenetres(); ajouterManuel(); const c = document.getElementById('form-serie-titre'); c.value = 'kagura'; c.oninput(); }],
+      ['scanner', () => { fermerToutesLesFenetres(); serieAVerifier = null; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); }],
+      ['vérification en magasin', () => { passerEnModeMagasin(); afficherVerdict(verdictMagasin({ etat: 'ajout', titre: 'One Piece', tome: 111 })); }],
+      ['scan en rafale', () => { quitterModeRafale(); passerEnModeRafale(); rafale = [{ isbn: '1', etat: 'ajout', titre: 'One Piece', tome: 111, coche: true }, { isbn: '2', etat: 'inconnu', message: 'livre introuvable' }]; afficherListeRafale(); }],
+      ['résumé de la rafale', () => { document.getElementById('scanner-modal').classList.remove('active'); ouvrirResumeRafale(); }],
+      ['question', () => { fermerToutesLesFenetres(); choisirAction('Quelle édition ?', [{ libelle: 'Standard', valeur: 's', principal: true }]); }]
+    ];
+    for (const [nom, ouvrir] of ecrans) {
+      await page.evaluate(`(${ouvrir.toString()})()`);
+      await page.waitForTimeout(250);
+      const violations = await page.evaluate(async () => (await axe.run(document, { resultTypes: ['violations'] })).violations
+        .map(v => `${v.id} (${v.impact}) : ${v.nodes.slice(0, 2).map(n => n.target.join(' ')).join(', ')}`));
+      for (const v of violations) problemes.push(`${theme} / ${nom} → ${v}`);
+    }
+  }
+  egal(problemes, [], 'problèmes d’accessibilité');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+// Rapidité : l'app reste légère à télécharger (réseau mobile) et fluide même avec une très grande collection
+test('Rapidité : poids de l’app et affichage d’une grande collection', async ({ navigateur, base }) => {
+  const html = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf8');
+  const fichiers = ['index.html', ...[...html.matchAll(/(?:src|href)="((?:js|css|polices)\/[^"?]+)/g)].map(m => m[1])];
+  const poids = fichiers.reduce((n, f) => n + fs.statSync(path.join(RACINE, f)).size, 0);
+  verifier(poids < 400 * 1024, `l'app pèse ${Math.round(poids / 1024)} Ko au démarrage (limite : 400 Ko)`);
+
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  const durees = await page.evaluate(() => {
+    bibliotheque = Array.from({ length: 300 }, (_, i) => ({ titre: 'Série ' + i, editeur: 'Glénat', tomes: Array.from({ length: 40 }, (_, j) => ({ numero: j + 1, possede: j < 30, lu: j < 20 })) }));
+    const d = {};
+    for (const onglet of ['pal', 'collection', 'avenir']) { const t = performance.now(); changerOnglet(onglet); d[onglet] = performance.now() - t; }
+    const t = performance.now(); ouvrirModalSerie(150); d.fiche = performance.now() - t;
+    return d;
+  });
+  for (const [ecran, ms] of Object.entries(durees)) verifier(ms < 500, `300 séries : « ${ecran} » s'affiche en ${Math.round(ms)} ms (limite : 500 ms)`);
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Plus de couleurs écrites en dur hors des thèmes', async () => {
   const css = fs.readFileSync(path.join(RACINE, 'css', 'style.css'), 'utf8');
   const apresThemes = css.slice(css.indexOf('}', css.indexOf(':root[data-theme="sombre"]')) + 1);
