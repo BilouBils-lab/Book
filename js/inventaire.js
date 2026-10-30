@@ -195,7 +195,7 @@ async function verifierTomeScanne(isbn, sIndex) {
     livre = await chercherLivreParIsbn(isbn);
     loader.style.display = 'none';
     if (!livre.trouve) {
-      alert(`Livre introuvable pour l'ISBN ${isbn} : vérifie ce tome à l'œil.`);
+      await associerIsbnInconnu(isbn, sIndex);
       return;
     }
     analyse = analyserTitreLivre(livre.titre, livre.sousTitre);

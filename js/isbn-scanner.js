@@ -127,17 +127,86 @@ async function rechercherIsbn(sIndex) {
   else await afficherLivreIsbn(isbn);
 }
 
-// Cherche le livre puis affiche sa fiche ; propose le scan de jaquette s'il est introuvable
+// Le tome de la collection qui porte cet ISBN (scanné, déduit ou appris), sinon null
+function tomeParIsbn(isbn) {
+  for (let index = 0; index < bibliotheque.length; index++) {
+    const tome = bibliotheque[index].tomes.find(t => t.isbn === isbn);
+    if (tome) return { index, serie: bibliotheque[index], tome };
+  }
+  return null;
+}
+
+// Livre absent de tous les catalogues (souvent : un tome tout juste paru, pas encore enregistré) :
+// on demande à quelle série il appartient, et l'app retient son ISBN pour les prochains scans
+async function associerIsbnInconnu(isbn, sIndexPropose = null) {
+  // D'abord les séries du même éditeur (même début d'ISBN : 978-2-38288… = Kbooks)
+  const prefixe = isbn.slice(0, 8);
+  const memeEditeur = (serie) => {
+    if (serie.tomes.some(t => t.isbn && t.isbn.startsWith(prefixe))) return true;
+    const mi = indexMI && infosMangaInsight(serie);
+    return !!mi && Object.values(mi.isbnParTome).some(e => e.startsWith(prefixe));
+  };
+  const candidats = bibliotheque.map((serie, index) => ({ serie, index }))
+    .filter(c => c.index === sIndexPropose || memeEditeur(c.serie))
+    .sort((a, b) => (b.index === sIndexPropose) - (a.index === sIndexPropose) || a.serie.titre.localeCompare(b.serie.titre, 'fr', { sensitivity: 'base' }))
+    .slice(0, 6);
+  const choix = candidats.map((c, i) => ({ libelle: '📚 ' + c.serie.titre, valeur: String(c.index), principal: i === 0 }));
+  choix.push({ libelle: '🔎 Une autre série…', valeur: 'autre' });
+  if (sIndexPropose === null) choix.push({ libelle: '🖼️ Scanner plutôt la jaquette (IA)', valeur: 'ia' });
+  const reponse = await choisirAction(`Livre introuvable pour l'ISBN ${isbn} : les catalogues ne le connaissent pas encore (souvent le cas d'un tome tout juste paru).\n\nÀ quelle série appartient-il ? L'app retiendra son ISBN pour le reconnaître aux prochains scans.`, choix);
+  if (!reponse) return;
+  if (reponse === 'ia') { declencherScanIA(); return; }
+
+  let index, numero;
+  if (reponse === 'autre') {
+    const saisie = await demanderSerieEtTome('', 1, 'Quel livre est-ce ?', true);
+    if (!saisie) return;
+    index = bibliotheque.findIndex(s => normaliserTitre(s.titre) === normaliserTitre(saisie.titre));
+    if (index === -1) {
+      await enregistrerSerie(saisie.titre, saisie.tome);
+      index = bibliotheque.findIndex(s => normaliserTitre(s.titre) === normaliserTitre(saisie.titre));
+      if (saisie.edition) appliquerEditionChoisie(saisie.titre, saisie.edition);
+    }
+    numero = saisie.tome;
+  } else {
+    index = Number(reponse);
+    const serie = bibliotheque[index];
+    // Tome proposé : le plus récent dont l'ISBN n'est connu nulle part (c'est sûrement lui)
+    const mi = indexMI && infosMangaInsight(serie);
+    const connus = new Set([...serie.tomes.filter(t => t.isbn && !t.isbnAuto).map(t => t.numero), ...Object.keys(mi ? mi.isbnParTome : {}).map(Number)]);
+    const dernier = Math.max(serie.tomesParus || 0, ...serie.tomes.map(t => t.numero), 0) + 1;
+    let propose = dernier;
+    while (propose > 1 && connus.has(propose)) propose--;
+    const saisie = await demanderTexte(`Quel tome de « ${serie.titre} » ?`, String(propose));
+    if (saisie === null) return;
+    numero = parseInt(saisie, 10);
+    if (!(numero > 0)) return;
+  }
+  const serie = bibliotheque[index];
+  if (!serie || !numero) return;
+  const deja = ajouterTomeScanne(serie, numero, isbn);
+  sauvegarder();
+  afficherToast(`✓ ${serie.titre} · tome ${numero}${deja ? '' : ' ajouté'} : ISBN retenu`);
+}
+
+// Cherche le livre puis affiche sa fiche ; s'il est introuvable, demande à quelle série il appartient
 async function afficherLivreIsbn(isbn) {
+  // Déjà dans la collection (ISBN scanné ou appris) : pas besoin de chercher
+  const connu = tomeParIsbn(isbn);
+  if (connu && !connu.tome.isbnAuto) {
+    if (!connu.tome.possede) { connu.tome.possede = true; sauvegarder(); }
+    ouvrirModalSerie(connu.index);
+    afficherToast(`✅ ${connu.serie.titre} · tome ${connu.tome.numero} : dans ta collection`);
+    return;
+  }
   const loader = document.getElementById('loader-ia');
   document.getElementById('loader-status').textContent = 'Recherche du livre…';
   loader.style.display = 'flex';
   const livre = await chercherLivreParIsbn(isbn);
   loader.style.display = 'none';
   if (!livre.trouve) {
-    if (await confirmerAction("Livre introuvable pour l'ISBN " + isbn + '.\n\n' + livre.erreurs.join('\n') + "\n\nScanner plutôt la jaquette avec l'IA ?")) {
-      declencherScanIA();
-    }
+    console.info('Livre introuvable', isbn, livre.erreurs);
+    await associerIsbnInconnu(isbn);
     return;
   }
   const analyse = analyserTitreLivre(livre.titre, livre.sousTitre);
