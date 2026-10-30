@@ -152,6 +152,20 @@ async function nouvellePartieSaga() {
   if (!nomActuelle) return;
 
   const avant = JSON.stringify(bibliotheque);
+  const { nouvelle, deplaces } = separerPartie(index, debut, nomNouvelle, nomActuelle);
+  sauvegarder();
+  ouvrirModalSerie(bibliotheque.indexOf(nouvelle));
+  afficherToast(`✓ ${deplaces.length} tome${deplaces.length > 1 ? 's' : ''} rangé${deplaces.length > 1 ? 's' : ''} dans « ${nomNouvelle} »`, () => {
+    bibliotheque = JSON.parse(avant);
+    fermerModal();
+    sauvegarder();
+  });
+}
+
+// Déplace les tomes à partir de « debut » dans une nouvelle partie (renumérotés à partir de 1), dans une saga
+function separerPartie(index, debut, nomNouvelle, nomActuelle) {
+  const serie = bibliotheque[index];
+  const saga = serie.saga || nomDeSagaPropose(serie);
   const deplaces = serie.tomes.filter(t => t.numero >= debut);
   serie.tomes = serie.tomes.filter(t => t.numero < debut);
   const nouvelle = {
@@ -167,11 +181,49 @@ async function nouvellePartieSaga() {
   bibliotheque.splice(index + 1, 0, nouvelle);
   const indexActuelle = nomActuelle !== serie.titre ? changerTitreSerie(index, nomActuelle) : index;
   for (const s of [bibliotheque[indexActuelle], nouvelle]) if (s.tomesParusSource !== 'manuel') appliquerMangaInsight(s);
+  return { nouvelle, deplaces };
+}
+
+// --- Au lancement : saison suivante rangée par erreur dans la même série ---
+// Ex. « Jungle Juice » suit « Jungle Juice - Saison 1 » (6 tomes) mais contient un tome 7 : c'est la saison 2, tome 1.
+function saisonARanger() {
+  for (let index = 0; index < bibliotheque.length; index++) {
+    const serie = bibliotheque[index];
+    const saison = serie.parution && !serie.saisonsVerifiees && serie.parution.nom.match(/^(.*?)\s*-\s*Saison\s*(\d+)$/i);
+    if (saison && serie.tomesParus && serie.tomes.some(t => t.possede && t.numero > serie.tomesParus)) {
+      return { index, serie, base: saison[1].trim(), numero: Number(saison[2]) };
+    }
+  }
+  return null;
+}
+
+// Renvoie true si une proposition a été faite (la page « Quoi de neuf ? » attendra le prochain lancement)
+async function proposerRangementSaisons() {
+  const a = saisonARanger();
+  if (!a || document.querySelector('.modal-overlay.active')) return false;
+  const { index, serie, base, numero } = a;
+  const debut = serie.tomesParus + 1;
+  const deplaces = serie.tomes.filter(t => t.numero >= debut).map(t => t.numero);
+  const nomNouvelle = `${base} (Saison ${numero + 1})`;
+  const nomActuelle = normaliserTitre(serie.titre) === normaliserTitre(base) ? `${base} (Saison ${numero})` : serie.titre;
+  const reponse = await choisirAction(`${serie.titre} : d'après les sorties, la saison ${numero} compte ${serie.tomesParus} tomes. Ton${deplaces.length > 1 ? 's tomes' : ' tome'} ${deplaces.join(', ')} ${deplaces.length > 1 ? 'appartiennent' : 'appartient'} sans doute à la saison ${numero + 1}, qui repart au tome 1.\n\nRanger en deux saisons, dans une saga « ${serie.saga || base} » ? Tes lectures sont gardées.`, [
+    { libelle: `✓ Ranger : « ${nomActuelle} » et « ${nomNouvelle} »`, valeur: 'ranger', principal: true },
+    { libelle: 'Non, c\u2019est bien la même série', valeur: 'non' }
+  ]);
+  if (reponse === 'non') { serie.saisonsVerifiees = true; sauvegarder(); }
+  if (reponse !== 'ranger') return true;
+  if (bibliotheque.some(s => normaliserTitre(s.titre) === normaliserTitre(nomNouvelle))) {
+    alert(`La série « ${nomNouvelle} » existe déjà : range les tomes avec ⋯ → ✂️ Séparer une nouvelle partie.`);
+    return true;
+  }
+  const avant = JSON.stringify(bibliotheque);
+  const { nouvelle } = separerPartie(index, debut, nomNouvelle, nomActuelle);
   sauvegarder();
   ouvrirModalSerie(bibliotheque.indexOf(nouvelle));
-  afficherToast(`✓ ${deplaces.length} tome${deplaces.length > 1 ? 's' : ''} rangé${deplaces.length > 1 ? 's' : ''} dans « ${nomNouvelle} »`, () => {
+  afficherToast(`✓ Saisons rangées : « ${nomNouvelle} » créée`, () => {
     bibliotheque = JSON.parse(avant);
     fermerModal();
     sauvegarder();
   });
+  return true;
 }
