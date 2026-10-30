@@ -1004,7 +1004,7 @@ test('Scan en rafale : plusieurs tomes à la suite, résumé puis ajout (et annu
     '☑️ One Piece · tome 109 · déjà dans ta collection',
     'Kagurabachi · tome 3 · nouvelle sérieLes tomes d’avant seront à cocher dans sa fiche.',
     '⚠️ Berserk (Prestige) · tome 3 : édition Prestige, ta série « Berserk » est en édition standard : ajoute-le seul avec 📷 Scanner',
-    '⚠️ ISBN 9782090000009 : livre introuvable, ajoute-le avec ➕ Saisie'
+    '⚠️ ISBN 9782090000009 : livre introuvable (trop récent ?), ajoute-le seul avec 📷 Scanner : l\u2019app te demandera sa série'
   ], 'résumé');
   egal(await page.textContent('#rafale-valider'), '📚 Ajouter 2 tomes', 'bouton de validation');
   await page.click('#rafale-valider');
@@ -1039,7 +1039,7 @@ test('Vérifier en magasin : déjà possédé, manquant, nouvelle série, autre 
   egal(await verdict('9782344065662'), ['verdict manque', 'Il te manque', 'One Piece · tome 111. Il te manque aussi les tomes 105, 107.'], 'tome manquant, et les trous signalés');
   egal(await verdict('9782505133797'), ['verdict manque', 'Pas dans ta collection', 'Kagurabachi · tome 3 : une série que tu n’as pas encore.'], 'nouvelle série');
   egal(await verdict('9782344067826'), ['verdict alerte', 'Autre édition !', 'Berserk (Prestige) · tome 3 : édition Prestige. Ta série « Berserk » est en édition standard.'], 'autre édition');
-  egal(await verdict('9782090000009'), ['verdict alerte', 'Livre non reconnu', 'ISBN 9782090000009 : introuvable dans les catalogues. Vérifie à l’œil.'], 'livre inconnu');
+  egal(await verdict('9782090000009'), ['verdict alerte', 'Livre non reconnu', 'ISBN 9782090000009 : introuvable dans les catalogues (tome tout juste paru ?). Vérifie à l’œil.'], 'livre inconnu');
   egal(await page.evaluate(() => JSON.stringify(bibliotheque)), avant, 'collection inchangée');
   await page.click('#magasin-boutons button');
   verifier(!(await page.evaluate(() => document.getElementById('scanner-modal').classList.contains('active'))), 'écran fermé');
@@ -1164,6 +1164,40 @@ test('Saga : parties qui repartent au tome 1 regroupées (SAO), saison 2 sépar�
   egal(await page.$$eval('#fiche-parties button', l => l.map(b => b.textContent)), ['Saison 1', 'Saison 2'], 'onglets des saisons');
   await page.click('#toast button');
   egal(await page.evaluate(() => bibliotheque.map(s => s.titre)), ['Sword Art Online - Aincrad', 'Jungle Juice', 'Sword Art Online (Fairy Dance)'], 'annuler remet comme avant');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('ISBN inconnu des catalogues (tome tout juste paru) : l’app demande sa série et le retient', async ({ navigateur, base }) => {
+  let recherches = 0;
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    worker: (req) => { if (req.url().includes('/isbn')) { recherches++; return { body: { trouve: false } }; } return null; }
+  });
+  const sl = tomes(21, 19);
+  sl[0].isbn = '9782382880012'; sl[0].isbnAuto = false; // un tome Kbooks déjà scanné : même début d'ISBN
+  await definirBibliotheque(page, [
+    { titre: 'One Piece', editeur: 'Glénat', tomes: [{ numero: 1, possede: true, lu: true, isbn: '9782723488525', isbnAuto: false }] },
+    { titre: 'Solo Leveling', editeur: 'Kbooks', tomesParus: 21, tomesParusSource: 'manuel', tomes: sl }
+  ]);
+  page.evaluate(() => afficherLivreIsbn('9782382884577'));
+  await page.waitForSelector('#choix-modal.active', { timeout: 10000 });
+  verifier((await page.textContent('#choix-message')).includes('les catalogues ne le connaissent pas encore'), 'explication');
+  egal(await page.$$eval('#choix-boutons button', l => l.map(b => b.textContent)), ['📚 Solo Leveling', '🔎 Une autre série…', '🖼️ Scanner plutôt la jaquette (IA)', 'Annuler'], 'seule la série du même éditeur (Kbooks) est proposée');
+  await page.click('#choix-boutons button >> text=Solo Leveling');
+  await page.waitForSelector('#form-text-modal.active');
+  egal(await page.inputValue('#form-text-input'), '22', 'le tome le plus récent sans ISBN connu est proposé');
+  await page.fill('#form-text-input', '21');
+  await page.click('#form-text-ok');
+  await page.waitForFunction(() => bibliotheque[1].tomes[20].isbn);
+  egal(await page.evaluate(() => [bibliotheque[1].tomes[20].isbn, bibliotheque[1].tomes[20].isbnAuto, bibliotheque[1].tomes[20].lu]), ['9782382884577', false, false], 'ISBN retenu sur le tome 21, lecture inchangée');
+  egal(await page.textContent('#toast span'), '✓ Solo Leveling · tome 21 : ISBN retenu', 'message');
+  // Ensuite : reconnu tout de suite, sans interroger les catalogues
+  const avant = recherches;
+  await page.evaluate(() => afficherLivreIsbn('9782382884577'));
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes('dans ta collection'));
+  egal([recherches - avant, await page.textContent('#modal-title')], [0, 'Solo Leveling'], 'reconnu sans recherche, fiche ouverte');
+  await page.evaluate(() => { fermerModal(); serieAVerifier = null; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); passerEnModeMagasin(); codeBarresLu('9782382884577'); });
+  await page.waitForFunction(() => document.querySelector('#verdict-magasin .verdict-titre')?.textContent === 'Tu l’as déjà');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });

@@ -91,7 +91,7 @@ async function identifierPourRafale(isbn) {
     analyse = { serie: livreMI.serie, edition: livreMI.edition, tome: livreMI.tome };
   } else {
     livre = await chercherLivreParIsbn(isbn);
-    if (!livre.trouve) return { etat: 'inconnu', message: 'livre introuvable, ajoute-le avec ➕ Saisie' };
+    if (!livre.trouve) return { etat: 'inconnu', message: 'livre introuvable (trop récent ?), ajoute-le seul avec 📷 Scanner : l’app te demandera sa série' };
     analyse = analyserTitreLivre(livre.titre, livre.sousTitre);
     if (!analyse.tome && livre.numero) analyse.tome = livre.numero;
   }

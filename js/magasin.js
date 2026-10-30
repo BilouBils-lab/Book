@@ -60,7 +60,7 @@ function verdictMagasin(r, isbn) {
       detail: `${r.titre} : édition ${r.autreEdition.livre || 'standard'}. Ta série « ${r.autreEdition.serie} » est en édition ${editionDuTitre(r.autreEdition.serie) || 'standard'}.` };
   }
   return { icone: '❓', titre: 'Livre non reconnu', classe: 'alerte',
-    detail: r.titre ? `${r.titre} : numéro du tome introuvable.` : `ISBN ${isbn} : introuvable dans les catalogues. Vérifie à l’œil.` };
+    detail: r.titre ? `${r.titre} : numéro du tome introuvable.` : `ISBN ${isbn} : introuvable dans les catalogues (tome tout juste paru ?). Vérifie à l’œil.` };
 }
 
 function afficherVerdict({ icone, titre, detail, classe }) {
