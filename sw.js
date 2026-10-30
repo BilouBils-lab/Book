@@ -10,7 +10,7 @@
 //
 // À chaque nouvelle version de l'app, changer VERSION : le téléphone installe alors la nouvelle copie.
 
-const VERSION = '3.52';
+const VERSION = '3.53';
 const CACHE = 'mangatheque-' + VERSION;
 const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.23.0/umd/index.min.js';
 const CACHE_JAQUETTES = 'mangatheque-jaquettes';

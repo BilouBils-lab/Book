@@ -186,3 +186,87 @@ async function chercherJaquetteEdition() {
   }
   await choisirJaquetteParIsbn(serieIndexActive, isbns);
 }
+
+// --- Jaquettes manquantes : pour toutes les séries sans jaquette (ou dont l'image ne s'affiche plus) ---
+
+// L'image s'affiche-t-elle ? 'ok', 'erreur' (lien mort), ou 'delai' (réseau trop lent : on ne conclut rien)
+function testerImage(lien, delai = 10000) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const minuteur = setTimeout(() => { img.src = ''; resolve('delai'); }, delai);
+    const fin = (etat) => { clearTimeout(minuteur); resolve(etat); };
+    // Une image de 1 pixel veut dire « pas de jaquette » (Amazon)
+    img.onload = () => fin(img.naturalWidth > 20 ? 'ok' : 'erreur');
+    img.onerror = () => fin('erreur');
+    img.src = lien;
+  });
+}
+
+// ISBN qui désignent la bonne édition : tome 1 d'après Manga Insight, puis les tomes possédés
+function isbnsPourJaquette(serie) {
+  const mi = infosMangaInsight(serie);
+  const isbns = [mi && mi.isbnParTome[1], ...serie.tomes.filter(t => t.isbn).sort((a, b) => a.numero - b.numero).map(t => t.isbn)];
+  if (mi) isbns.push(...Object.keys(mi.isbnParTome).map(Number).sort((a, b) => a - b).map(v => mi.isbnParTome[v]));
+  return [...new Set(isbns.filter(Boolean))].slice(0, 3);
+}
+
+async function trouverJaquette(serie) {
+  for (const isbn of isbnsPourJaquette(serie)) {
+    for (const lien of await jaquettesPourIsbn(isbn)) {
+      if (await testerImage(lien) === 'ok') return lien;
+    }
+  }
+  return null;
+}
+
+// Traite la liste par petits groupes (pas des dizaines de téléchargements à la fois)
+async function parGroupes(liste, taille, traiter) {
+  let suivant = 0;
+  await Promise.all(Array.from({ length: Math.min(taille, liste.length) }, async () => {
+    while (suivant < liste.length) await traiter(liste[suivant++]);
+  }));
+}
+
+async function trouverJaquettesManquantes() {
+  if (!navigator.onLine) { alert('Pas de réseau : réessaie quand tu seras connecté.'); return; }
+  fermerParametres();
+  const loader = document.getElementById('loader-ia');
+  const statut = document.getElementById('loader-status');
+  statut.textContent = 'Vérification des jaquettes…';
+  loader.style.display = 'flex';
+  await chargerMangaInsight(false);
+
+  const manquantes = [];
+  await parGroupes(bibliotheque, 6, async (serie) => {
+    if (!serie.couverture || serie.couverture === JAQUETTE_DEFAUT || await testerImage(serie.couverture) === 'erreur') manquantes.push(serie);
+  });
+  if (!manquantes.length) {
+    loader.style.display = 'none';
+    afficherToast('✓ Toutes tes séries ont une jaquette');
+    return;
+  }
+
+  const anciennes = new Map(), introuvables = [];
+  let faites = 0;
+  statut.textContent = `Recherche des jaquettes… 0 / ${manquantes.length}`;
+  await parGroupes(manquantes, 4, async (serie) => {
+    const lien = await trouverJaquette(serie);
+    if (lien) { anciennes.set(serie, serie.couverture); serie.couverture = lien; }
+    else introuvables.push(serie.titre);
+    statut.textContent = `Recherche des jaquettes… ${++faites} / ${manquantes.length}`;
+  });
+  loader.style.display = 'none';
+  if (anciennes.size) sauvegarder();
+
+  const trie = (l) => l.sort((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'base' }));
+  const bilan = (anciennes.size ? `✓ ${anciennes.size} jaquette${anciennes.size > 1 ? 's' : ''} trouvée${anciennes.size > 1 ? 's' : ''} : ${trie([...anciennes.keys()].map(s => s.titre)).join(', ')}.` : 'Aucune jaquette trouvée.')
+    + (introuvables.length ? `\n\nToujours sans jaquette (${introuvables.length}) : ${trie(introuvables).join(', ')}.\nPour celles-ci : fiche → ⋯ → 🔄 Édition, tomes et jaquette, ou une photo.` : '');
+  if (!anciennes.size) { alert(bilan); return; }
+  // « Annuler » remet les jaquettes d'avant
+  const choix = await choisirAction(bilan, [{ libelle: '✓ Garder les jaquettes trouvées', valeur: 'garder', principal: true }]);
+  if (choix !== 'garder') {
+    for (const [serie, ancienne] of anciennes) serie.couverture = ancienne;
+    sauvegarder();
+    afficherToast('Jaquettes remises comme avant');
+  }
+}

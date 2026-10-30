@@ -979,6 +979,37 @@ test('Notification touchée : l’app ouvre À venir et la fiche de la série', 
   await fermer();
 });
 
+test('Trouver les jaquettes manquantes (et annuler)', async ({ navigateur, base }) => {
+  const { page, erreurs, alertes, fermer } = await ouvrirApp(navigateur, base);
+  const image = fs.readFileSync(path.join(RACINE, 'icones', 'icone-192.png'));
+  const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64');
+  const demandes = [];
+  // Open Library n'a que la jaquette du tome 1 de Kagurabachi ; Amazon répond « 1 pixel » (pas de jaquette)
+  await page.route('https://covers.openlibrary.org/**', route => { demandes.push(route.request().url()); return route.request().url().includes('9782505132912') ? route.fulfill({ body: image, contentType: 'image/png' }) : route.fulfill({ status: 404 }); });
+  await page.route('https://images-na.ssl-images-amazon.com/**', route => route.fulfill({ body: pixel, contentType: 'image/gif' }));
+  await page.route('https://jaquette.morte/**', route => route.abort());
+  await page.route('https://jaquette.ok/**', route => route.fulfill({ body: image, contentType: 'image/png' }));
+  await avecMangaInsight(page, [
+    { titre: 'Kagurabachi', tomes: tomes(2) },
+    { titre: 'Ma série perso', couverture: 'https://jaquette.morte/a.jpg', tomes: tomes(1) },
+    { titre: 'One Piece', couverture: 'https://jaquette.ok/op.jpg', tomes: tomes(1) }
+  ]);
+  const couvertures = () => page.evaluate(() => bibliotheque.map(s => s.couverture || ''));
+  page.evaluate(() => trouverJaquettesManquantes());
+  await page.waitForSelector('#choix-modal.active', { timeout: 20000 });
+  egal(await page.textContent('#choix-message'), '✓ 1 jaquette trouvée : Kagurabachi.\n\nToujours sans jaquette (1) : Ma série perso.\nPour celles-ci : fiche → ⋯ → 🔄 Édition, tomes et jaquette, ou une photo.', 'bilan');
+  egal(await couvertures(), ['https://covers.openlibrary.org/b/isbn/9782505132912-L.jpg?default=false', 'https://jaquette.morte/a.jpg', 'https://jaquette.ok/op.jpg'], 'jaquette du tome 1 de la bonne édition, image valide gardée');
+  verifier(!demandes.some(u => u.includes('op.jpg')), 'One Piece (jaquette valide) n’est pas recherchée');
+  await page.click('#choix-boutons button >> text=Annuler');
+  egal(await couvertures(), ['', 'https://jaquette.morte/a.jpg', 'https://jaquette.ok/op.jpg'], 'annuler remet comme avant');
+  await page.evaluate(() => { bibliotheque[0].couverture = 'https://jaquette.ok/k.jpg'; bibliotheque[1].couverture = 'https://jaquette.ok/p.jpg'; });
+  page.evaluate(() => trouverJaquettesManquantes());
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Toutes tes séries'), null, { timeout: 20000 });
+  egal(alertes, [], 'aucune alerte');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Ajouter une série : éditions proposées pendant la saisie du titre', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: [{ numero: 1, possede: true, lu: false }] }]);

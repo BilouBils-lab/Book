@@ -16,7 +16,7 @@ Application web pour gérer sa collection de mangas : tomes possédés et lus, p
 | **Quoi de neuf ?** | S'ouvre au lancement **seulement s'il y a du nouveau** : tomes sortis depuis la dernière visite, sorties attendues ce mois-ci. |
 | **Fiche d'une série** | Tomes (lus, possédés, manquants), prochain à acheter, prochaine sortie. Menu ⋯ : édition / tomes / jaquette, renommer, infos, mettre de côté, supprimer. |
 | **Notifications 🔔** | Sur l'iPhone, même app fermée : tome annoncé, nouveau tome en librairie. Calculées chaque jour par le dépôt privé `mangatheque-sauvegarde`, envoyées par Web Push. Un appui ouvre *À venir* (et la fiche s'il n'y a qu'une série). |
-| **Paramètres ⚙️** | Mise à jour des séries, complétion des infos, inventaire, recherche ISBN, sauvegarde en ligne, apparence (clair / sombre / automatique). |
+| **Paramètres ⚙️** | Mise à jour des séries, complétion des infos, jaquettes manquantes (d'après l'ISBN de l'édition), inventaire, recherche ISBN, sauvegarde en ligne, apparence (clair / sombre / automatique). |
 
 Autres fonctions : ajout d'une série guidé (« ➕ Saisie » propose les éditions françaises avec éditeur, nombre de tomes et jaquette), scan du code-barres (ISBN) avec vérification de l'édition, **scan en rafale** (plusieurs tomes à la suite après un achat, puis un résumé à valider), **vérification en magasin** (scanner un livre pour savoir si on l'a déjà, sans rien modifier), inventaire série par série, import CSV / JSON, export.
 
