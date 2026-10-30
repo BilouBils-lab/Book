@@ -2,7 +2,8 @@
 
 Ces tests ouvrent l'app dans un vrai navigateur (Chromium, piloté par Playwright) et vérifient
 les fonctions principales : pile à lire, collection, fiche, À venir, ISBN, scan, renommage,
-complétion, Manga Insight, ainsi que le Worker Cloudflare.
+complétion, Manga Insight, ainsi que le Worker Cloudflare. Ils contrôlent aussi l'accessibilité
+(axe-core), la rapidité et la qualité du code (ESLint).
 
 Les services extérieurs (Worker, AniList, Google Books, BnF…) sont **simulés** : pas besoin
 d'internet ni de clé API, et les résultats sont toujours les mêmes. La date est figée au
@@ -19,16 +20,20 @@ npx playwright install chromium   # une seule fois : télécharge le navigateur 
 npm test
 ```
 
-Résultat attendu : une ligne ✅ par test, puis `✅ 14/14 tests réussis`.
+Résultat attendu : une ligne ✅ par test, puis `✅ 40/40 tests réussis`.
 Un ❌ indique ce qui ne va pas (valeur attendue / valeur obtenue).
 
 Pour lancer un seul test, donne un morceau de son nom : `node app.test.js isbn`.
+
+Pour relire seulement le code (quelques secondes, détail de chaque problème) : `npm run qualite`.
 
 Pour utiliser un Chromium déjà installé : `CHROMIUM_PATH=/chemin/vers/chromium npm test`.
 
 ## Fichiers
 
 - `app.test.js` : les tests.
+- `qualite.js` : relecture du code par ESLint (lancée aussi par `app.test.js`).
+- `surveillance.js` : surveillance hebdomadaire des vraies sources (voir le README principal).
 - `donnees/` : un extrait des données Manga Insight (licence CC BY 4.0) et une photo de code-barres.
 
 ## Tests automatiques sur GitHub

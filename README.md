@@ -137,7 +137,7 @@ Sans cela, le téléphone garderait l'ancienne copie de l'app.
 
 ## Tests
 
-Des tests de bout en bout (Playwright) ouvrent l'app dans un vrai navigateur, avec les services extérieurs simulés : pile à lire, collection, fiche, À venir, ISBN, scan, inventaire, éditions, sauvegarde, mode hors ligne, thèmes, Worker… Ils vérifient aussi l'**accessibilité** de chaque écran dans les deux thèmes (contrastes, noms des boutons et des champs, titres, zoom possible : audit axe-core) et la **rapidité** (poids de l'app au démarrage, affichage d'une collection de 300 séries). Ils tournent à chaque PR. Pour les lancer soi-même : voir [`tests/README.md`](tests/README.md).
+Des tests de bout en bout (Playwright) ouvrent l'app dans un vrai navigateur, avec les services extérieurs simulés : pile à lire, collection, fiche, À venir, ISBN, scan, inventaire, éditions, sauvegarde, mode hors ligne, thèmes, Worker… Ils vérifient aussi l'**accessibilité** de chaque écran dans les deux thèmes (contrastes, noms des boutons et des champs, titres, zoom possible : audit axe-core) et la **rapidité** (poids de l'app au démarrage, affichage d'une collection de 300 séries). Avant eux, **ESLint** relit tout le code (`tests/qualite.js`) : nom de fonction mal écrit, variable inutile, code jamais exécuté, fonction appelée par la page mais inexistante, même nom déclaré dans deux fichiers. Ils tournent à chaque PR. Pour les lancer soi-même : voir [`tests/README.md`](tests/README.md).
 
 ---
 

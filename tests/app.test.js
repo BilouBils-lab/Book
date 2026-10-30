@@ -113,6 +113,10 @@ test('Chaque élément utilisé par le code existe dans la page', async () => {
   egal(manquants, [], 'identifiants utilisés par le code mais absents de index.html');
 });
 
+test('Qualité du code : aucune erreur signalée par ESLint (noms mal écrits, code inutile…)', async () => {
+  egal(await require('./qualite.js').verifierQualite(), [], 'problèmes de qualité du code (détail : node tests/qualite.js)');
+});
+
 test('Le numéro de version est le même partout', async () => {
   const html = fs.readFileSync(path.join(RACINE, 'index.html'), 'utf8');
   const affiche = (html.match(/version-tag">v([\d.]+)</) || [])[1];
