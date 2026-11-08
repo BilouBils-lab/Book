@@ -344,7 +344,17 @@ function choisirTheme(theme) {
     localStorage.setItem('theme', theme);
     document.documentElement.dataset.theme = theme;
   }
+  majCouleurBarre();
   majChoixTheme();
+}
+
+// Couleur de la barre d'état de l'iPhone (heure, batterie), assortie au fond de l'app
+function majCouleurBarre() {
+  const theme = document.documentElement.dataset.theme;
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+    const sombre = theme ? theme === 'sombre' : m.media.includes('dark');
+    m.content = sombre ? '#1c1a17' : '#f6f1e7';
+  });
 }
 
 function majChoixTheme() {

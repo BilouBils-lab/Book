@@ -871,7 +871,12 @@ test('Thème « Papier & encre » : clair, sombre automatique ou choisi', async 
   // Police des titres fournie avec l'app
   await page.evaluate(() => document.fonts.ready);
   egal(await page.evaluate(() => document.fonts.check("30px Bangers")), true, 'police Bangers chargée');
-  egal(erreurs, [], 'erreurs JavaScript');
+    await page.evaluate(() => choisirTheme('sombre'));
+  egal(await page.$$eval('meta[name="theme-color"]', l => l.map(m => m.content)), ['#1c1a17', '#1c1a17'], 'barre d\u2019état assortie au thème sombre');
+  await page.evaluate(() => choisirTheme('auto'));
+  egal(await page.$$eval('meta[name="theme-color"]', l => l.map(m => m.content)), ['#f6f1e7', '#1c1a17'], 'barre d\u2019état selon le réglage de l\u2019iPhone');
+  egal(await page.getAttribute('meta[name="apple-mobile-web-app-status-bar-style"]', 'content'), 'default', 'barre d\u2019état opaque (pas de contenu dessous)');
+egal(erreurs, [], 'erreurs JavaScript');
   await contexte.close();
 });
 
