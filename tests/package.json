@@ -10,7 +10,7 @@
     "@eslint/js": "9.39.1",
     "@zxing/library": "0.23.0",
     "axe-core": "4.14.0",
-    "eslint": "9.39.1",
+    "eslint": "10.14.0",
     "globals": "16.5.0",
     "playwright": "1.64.0"
   }
