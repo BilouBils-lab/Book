@@ -41,7 +41,7 @@ function texteRafale() {
 function libelleRafale(e) {
   if (e.etat === 'recherche') return ['⏳', `ISBN ${e.isbn} : recherche…`];
   if (e.etat === 'ajout') return ['✅', `${e.titre} · tome ${e.tome}`];
-  if (e.etat === 'deja') return ['☑️', `${e.titre} · tome ${e.tome} · déjà dans ta collection`];
+  if (e.etat === 'deja') return ['☑️', `${e.titre} · tome ${e.tome} · déjà dans ta collection${e.confirmerIsbn ? ' · ISBN enregistré' : ''}`];
   if (e.etat === 'nouvelle') return ['🆕', `${e.titre} · tome ${e.tome} · nouvelle série`];
   return ['⚠️', `${e.titre || 'ISBN ' + e.isbn} : ${e.message}`];
 }
@@ -58,7 +58,9 @@ function afficherListeRafale() {
     liste.appendChild(ligne);
   }
   const n = rafale.filter(e => e.etat === 'ajout' || e.etat === 'nouvelle').length;
-  document.getElementById('rafale-terminer').textContent = n ? `✓ Terminer (${n} à ajouter)` : '✓ Terminer';
+  const c = aConfirmerRafale().length;
+  const detail = [n ? `${n} à ajouter` : '', c ? `${c} ISBN` : ''].filter(Boolean).join(' · ');
+  document.getElementById('rafale-terminer').textContent = detail ? `✓ Terminer (${detail})` : '✓ Terminer';
 }
 
 function ajouterALaRafale(isbn) {
@@ -83,7 +85,8 @@ function ajouterALaRafale(isbn) {
 async function identifierPourRafale(isbn) {
   for (const serie of bibliotheque) {
     const tome = serie.tomes.find(t => t.isbn === isbn);
-    if (tome) return { etat: tome.possede ? 'deja' : 'ajout', titre: serie.titre, tome: tome.numero };
+    // Tome déjà là dont l'ISBN n'était que déduit : le scan le confirme (rescan de l'étagère)
+    if (tome) return { etat: tome.possede ? 'deja' : 'ajout', titre: serie.titre, tome: tome.numero, confirmerIsbn: tome.possede && tome.isbnAuto === true };
   }
   // Manga Insight connaît l'édition exacte de chaque ISBN ; sinon, on interroge la BnF
   const livreMI = livreMangaInsight(isbn);
@@ -105,7 +108,8 @@ async function identifierPourRafale(isbn) {
   if (!serie) serie = bibliotheque.find(s => titreSansEdition(s.titre) === cleTitre(analyse.serie) && editionDuTitre(s.titre) === analyse.edition);
   if (serie) {
     const tome = serie.tomes.find(t => t.numero === analyse.tome);
-    return { etat: tome && tome.possede ? 'deja' : 'ajout', titre: serie.titre, tome: analyse.tome };
+    return { etat: tome && tome.possede ? 'deja' : 'ajout', titre: serie.titre, tome: analyse.tome,
+      confirmerIsbn: !!tome && tome.possede && (!tome.isbn || tome.isbnAuto === true) };
   }
   // Nouvelle partie d'une saga (Sword Art Online - Alicization) : une nouvelle série, qui rejoindra la saga
   const saga = bibliotheque.find(s => s.saga && normaliserRecherche(s.saga) === normaliserRecherche(analyse.serie.split(' - ')[0]));
@@ -174,11 +178,24 @@ function aAjouterRafale() {
   return rafale.filter(e => e.coche && (e.etat === 'ajout' || e.etat === 'nouvelle'));
 }
 
+// Tomes déjà possédés dont le vrai ISBN sera enregistré (il n'était que déduit de l'édition)
+function aConfirmerRafale() {
+  return rafale.filter(e => e.etat === 'deja' && e.confirmerIsbn);
+}
+
 function majBoutonRafale() {
   const n = aAjouterRafale().length;
+  const c = aConfirmerRafale().length;
   const bouton = document.getElementById('rafale-valider');
-  bouton.disabled = !n;
-  bouton.textContent = n ? `📚 Ajouter ${n} tome${n > 1 ? 's' : ''}` : 'Rien à ajouter';
+  bouton.disabled = !n && !c;
+  bouton.textContent = n ? `📚 Ajouter ${n} tome${n > 1 ? 's' : ''}${c ? ` · ${c} ISBN` : ''}`
+    : c ? `✓ Enregistrer ${c} ISBN` : 'Rien à ajouter';
+}
+
+// Part des tomes possédés dont l'ISBN a été vraiment scanné (et pas seulement déduit)
+function texteIsbnReels() {
+  const possedes = bibliotheque.flatMap(s => s.tomes.filter(t => t.possede));
+  return `ISBN réels : ${possedes.filter(t => t.isbn && t.isbnAuto === false).length} / ${possedes.length} tomes`;
 }
 
 function fermerResumeRafale() {
@@ -188,8 +205,14 @@ function fermerResumeRafale() {
 
 function validerRafale() {
   const choisis = aAjouterRafale();
-  if (!choisis.length) return;
+  const confirmes = aConfirmerRafale();
+  if (!choisis.length && !confirmes.length) return;
   const avant = JSON.stringify(bibliotheque);
+  for (const e of confirmes) {
+    const serie = bibliotheque.find(s => normaliserTitre(s.titre) === normaliserTitre(e.titre));
+    const tome = serie && serie.tomes.find(t => t.numero === e.tome);
+    if (tome && (!tome.isbn || tome.isbnAuto)) Object.assign(tome, { isbn: e.isbn, isbnAuto: false });
+  }
   const nouvelles = [];
   for (const e of choisis) {
     let serie = bibliotheque.find(s => normaliserTitre(s.titre) === normaliserTitre(e.titre));
@@ -211,7 +234,10 @@ function validerRafale() {
   quitterModeRafale();
   sauvegarder();
   const n = choisis.length;
-  afficherToast(`📚 ${n} tome${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} à ta collection`, () => {
+  const c = confirmes.length;
+  const message = n ? `📚 ${n} tome${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} à ta collection${c ? ` · ${c} ISBN enregistré${c > 1 ? 's' : ''}` : ''}`
+    : `✓ ${c} ISBN enregistré${c > 1 ? 's' : ''} · ${texteIsbnReels()}`;
+  afficherToast(message, () => {
     bibliotheque = JSON.parse(avant);
     sauvegarder();
   });
