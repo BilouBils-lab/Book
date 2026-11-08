@@ -991,6 +991,22 @@ test('Recherche par ISBN (BnF) puis ajout du tome', async ({ navigateur, base })
   await fermer();
 });
 
+test('Scanner : conseil « rapproche-toi » si rien n’est lu au bout de 5 secondes', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  // Caméra simulée : ouverte, mais aucun code-barres lu
+  await page.evaluate(() => { document.getElementById('scanner-modal').classList.add('active'); scanTermine = false; lecteurCodeBarres = { reset() {} }; statutScanner('Vise le code-barres au dos du livre'); relancerConseilScan(); });
+  await page.waitForTimeout(3000);
+  egal(await page.textContent('#scanner-statut'), 'Vise le code-barres au dos du livre', 'pas de conseil avant 5 secondes');
+  await page.waitForFunction(() => document.getElementById('scanner-statut').textContent.startsWith('💡'), null, { timeout: 4000 });
+  egal(await page.textContent('#scanner-statut'), '💡 Rien de lu ? Rapproche le téléphone : le code-barres doit remplir le cadre vert. Évite les reflets.', 'conseil affiché');
+  // Un code lu (même un prix) annule le conseil suivant ; fermer le scanner aussi
+  await page.evaluate(() => { relancerConseilScan(); codeBarresLu('3760000000001'); });
+  await page.waitForTimeout(5500);
+  verifier((await page.textContent('#scanner-statut')).includes("ce n'est pas un ISBN"), 'pas de conseil après une lecture');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Scan du code-barres depuis une photo', async ({ navigateur, base }) => {
   const isbnDemandes = [];
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
