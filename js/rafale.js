@@ -21,16 +21,44 @@ function quitterModeRafale() {
   afficherModeRafale();
 }
 
+const AIDES_SCANNER = {
+  ajouter: 'Ajoute un tome à ta collection',
+  rafale: 'Plusieurs tomes d’affilée : achats ou étagère',
+  verifier: 'En magasin : l’as-tu déjà ? Rien n’est modifié',
+  inventaire: 'Vérifie que ce tome est bien celui de la série'
+};
+
+function modeScanner() {
+  return serieAVerifier !== null ? 'inventaire' : modeRafale ? 'rafale' : modeVerification ? 'verifier' : 'ajouter';
+}
+
+// Écran de scan selon le mode : onglet actif, phrase d'aide, et ce qui s'affiche sous la caméra
 function afficherModeRafale() {
-  const special = modeRafale || modeVerification;
-  document.getElementById('scanner-boutons').style.display = special ? 'none' : 'flex';
-  document.getElementById('rafale-boutons').style.display = modeRafale ? 'flex' : 'none';
-  document.getElementById('magasin-boutons').style.display = modeVerification ? 'flex' : 'none';
-  // Pendant l'inventaire, le scan sert à vérifier une série : pas de rafale ni de magasin
-  for (const id of ['scanner-rafale', 'scanner-magasin']) document.getElementById(id).style.display = serieAVerifier === null ? '' : 'none';
-  document.getElementById('scanner-titre').textContent = modeRafale ? '📚 Scan en rafale' : modeVerification ? '🏪 Vérifier en magasin' : '📷 Scanner le code-barres';
+  const mode = modeScanner();
+  // Pendant l'inventaire, le scan sert seulement à vérifier une série : pas d'onglets
+  document.getElementById('scanner-modes').style.display = mode === 'inventaire' ? 'none' : '';
+  for (const [id, m] of [['scanner-ajouter', 'ajouter'], ['scanner-rafale', 'rafale'], ['scanner-magasin', 'verifier']]) {
+    document.getElementById(id).className = m === mode ? 'actif' : '';
+  }
+  document.getElementById('scanner-aide').textContent = AIDES_SCANNER[mode];
+  // Photo, saisie et jaquette : pour ajouter ou vérifier un seul tome
+  document.getElementById('scanner-boutons').style.display = mode === 'ajouter' || mode === 'inventaire' ? 'flex' : 'none';
+  document.getElementById('scanner-jaquette').style.display = mode === 'inventaire' ? 'none' : '';
+  document.getElementById('rafale-boutons').style.display = mode === 'rafale' ? 'block' : 'none';
   if (!modeVerification) document.getElementById('verdict-magasin').innerHTML = '';
   afficherListeRafale();
+}
+
+// Onglets du scanner ; la caméra reste ouverte
+async function choisirModeScanner(mode) {
+  if (mode === modeScanner()) return;
+  const n = rafale.length;
+  const question = n === 1 ? 'Abandonner le livre scanné sans l’ajouter ?' : `Abandonner les ${n} livres scannés sans les ajouter ?`;
+  if (modeRafale && n && !(await confirmerAction(question))) return;
+  quitterModeRafale();
+  if (mode === 'rafale') passerEnModeRafale();
+  else if (mode === 'verifier') passerEnModeMagasin();
+  else { statutScanner('Vise le code-barres au dos du livre'); relancerConseilScan(); }
 }
 
 function texteRafale() {
@@ -137,11 +165,6 @@ async function terminerRafale() {
     loader.style.display = 'none';
   }
   ouvrirResumeRafale();
-}
-
-function annulerRafale() {
-  quitterModeRafale();
-  fermerScanner();
 }
 
 function ouvrirResumeRafale() {
