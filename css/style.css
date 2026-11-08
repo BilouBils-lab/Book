@@ -672,7 +672,7 @@ main {
   margin-bottom: 10px;
 }
 .fiche-legende span { display: flex; align-items: center; gap: 5px; }
-.fiche-astuce { margin-left: auto; opacity: 0.7; }
+.fiche-astuce { margin-left: auto; }
 .pt { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
 .pt.lu { background: var(--accent); }
 .pt.possede { border: 1.5px solid var(--accent); }
