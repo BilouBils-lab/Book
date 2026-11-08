@@ -1009,6 +1009,42 @@ test('Rescan de l’étagère : la rafale enregistre le vrai ISBN des tomes déj
   await fermer();
 });
 
+test('Scanner : trois modes en onglets (Ajouter, Rafale, Vérifier), solutions de secours en tuiles', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, { worker: (req) => req.url().includes('/isbn') ? { body: { trouve: false } } : null });
+  await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: tomes(109) }]);
+  await page.evaluate(() => { serieAVerifier = null; scanTermine = false; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); });
+  const etat = () => page.evaluate(() => [
+    document.querySelector('#scanner-modes .actif').textContent, document.getElementById('scanner-aide').textContent,
+    getComputedStyle(document.getElementById('scanner-boutons')).display !== 'none', getComputedStyle(document.getElementById('rafale-boutons')).display !== 'none']);
+  egal(await etat(), ['➕Ajouter', 'Ajoute un tome à ta collection', true, false], 'par défaut : Ajouter, avec Photo / ISBN / Jaquette');
+  egal(await page.$$eval('#scanner-boutons button', l => l.map(b => b.textContent)), ['📸Photo', '⌨️Saisir l’ISBN', '🖼️Jaquette (IA)'], 'tuiles de secours');
+  await page.click('#scanner-rafale');
+  egal(await etat(), ['📚Rafale', 'Plusieurs tomes d’affilée : achats ou étagère', false, true], 'Rafale : bouton Terminer, pas de tuiles');
+  await page.evaluate(() => codeBarresLu('9782344062814'));
+  await page.waitForFunction(() => rafale.length && rafale[0].etat !== 'recherche');
+  // Changer de mode avec des livres scannés : confirmation, « Annuler » garde la rafale
+  await page.click('#scanner-magasin');
+  await page.waitForSelector('#confirm-modal.active');
+  egal(await page.textContent('#confirm-message'), 'Abandonner le livre scanné sans l’ajouter ?', 'confirmation');
+  await page.click('#confirm-cancel');
+  egal((await etat())[0], '📚Rafale', 'toujours en rafale');
+  await page.click('#scanner-magasin');
+  await page.click('#confirm-ok');
+  await page.waitForFunction(() => document.querySelector('#scanner-modes .actif').textContent === '🏪Vérifier');
+  egal(await etat(), ['🏪Vérifier', 'En magasin : l’as-tu déjà ? Rien n’est modifié', false, false], 'Vérifier : ni tuiles ni bouton');
+  egal(await page.evaluate(() => rafale.length), 0, 'rafale abandonnée');
+  await page.click('#scanner-ajouter');
+  egal((await etat())[0], '➕Ajouter', 'retour à Ajouter');
+  // Inventaire : pas d'onglets, pas de jaquette IA
+  await page.evaluate(() => { fermerScanner(); serieAVerifier = 0; ouvrirScanner(); });
+  egal(await page.evaluate(() => [getComputedStyle(document.getElementById('scanner-modes')).display, document.getElementById('scanner-aide').textContent, getComputedStyle(document.getElementById('scanner-jaquette')).display]),
+    ['none', 'Vérifie que ce tome est bien celui de la série', 'none'], 'mode inventaire');
+  await page.click('#scanner-modal .scanner-entete .icone-btn');
+  verifier(!(await page.evaluate(() => document.getElementById('scanner-modal').classList.contains('active'))), 'la croix ferme le scanner');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Scanner : conseil « rapproche-toi » si rien n’est lu au bout de 5 secondes', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   // Caméra simulée : ouverte, mais aucun code-barres lu
@@ -1049,7 +1085,8 @@ test('Scan en rafale : plusieurs tomes à la suite, résumé puis ajout (et annu
   ]);
   await page.evaluate(() => { serieAVerifier = null; scanTermine = false; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); });
   await page.click('#scanner-rafale');
-  egal(await page.textContent('#scanner-titre'), '📚 Scan en rafale', 'mode rafale');
+  egal(await page.textContent('#scanner-modes .actif'), '📚Rafale', 'onglet Rafale actif');
+  egal(await page.textContent('#scanner-aide'), 'Plusieurs tomes d’affilée : achats ou étagère', 'aide du mode');
   for (const isbn of ['9782344062814', '9782344061343', '9782344062814', '9782505133797', '9782344067826', '9782090000009']) {
     await page.evaluate((i) => codeBarresLu(i), isbn);
   }
@@ -1092,7 +1129,7 @@ test('Vérifier en magasin : déjà possédé, manquant, nouvelle série, autre 
   const avant = await page.evaluate(() => JSON.stringify(bibliotheque));
   await page.evaluate(() => { serieAVerifier = null; scanTermine = false; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); });
   await page.click('#scanner-magasin');
-  egal(await page.textContent('#scanner-titre'), '🏪 Vérifier en magasin', 'mode magasin');
+  egal(await page.textContent('#scanner-modes .actif'), '🏪Vérifier', 'onglet Vérifier actif');
   const verdict = async (isbn) => {
     await page.evaluate((i) => codeBarresLu(i), isbn);
     await page.waitForFunction(() => !document.querySelector('#verdict-magasin .verdict-titre')?.textContent.startsWith('Recherche'));
@@ -1104,7 +1141,7 @@ test('Vérifier en magasin : déjà possédé, manquant, nouvelle série, autre 
   egal(await verdict('9782344067826'), ['verdict alerte', 'Autre édition !', 'Berserk (Prestige) · tome 3 : édition Prestige. Ta série « Berserk » est en édition standard.'], 'autre édition');
   egal(await verdict('9782090000009'), ['verdict alerte', 'Livre non reconnu', 'ISBN 9782090000009 : introuvable dans les catalogues (tome tout juste paru ?). Vérifie à l’œil.'], 'livre inconnu');
   egal(await page.evaluate(() => JSON.stringify(bibliotheque)), avant, 'collection inchangée');
-  await page.click('#magasin-boutons button');
+  await page.click('#scanner-modal .scanner-entete .icone-btn');
   verifier(!(await page.evaluate(() => document.getElementById('scanner-modal').classList.contains('active'))), 'écran fermé');
   egal(await page.$eval('#verdict-magasin', z => z.innerHTML), '', 'verdict effacé pour la prochaine fois');
   egal(erreurs, [], 'erreurs JavaScript');
