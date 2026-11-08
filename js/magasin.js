@@ -11,6 +11,7 @@ function passerEnModeMagasin() {
   dernierIsbnVerifie = null;
   afficherModeRafale();
   statutScanner('Vise le code-barres du livre à vérifier');
+  relancerConseilScan();
 }
 
 async function verifierEnMagasin(isbn) {

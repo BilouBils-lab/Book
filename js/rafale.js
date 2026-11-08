@@ -10,6 +10,7 @@ function passerEnModeRafale() {
   rafale = [];
   afficherModeRafale();
   statutScanner(texteRafale());
+  relancerConseilScan();
 }
 
 // Quitte aussi la vérification en magasin (magasin.js) : l'écran de scan revient à la normale

@@ -304,6 +304,18 @@ function statutScanner(texte) {
   document.getElementById('scanner-statut').textContent = texte;
 }
 
+// Conseil si la caméra ne lit rien au bout de quelques secondes : l'iPhone a souvent besoin d'être plus près
+const DELAI_CONSEIL_SCAN_MS = 5000;
+let minuteurConseilScan = null;
+
+function relancerConseilScan() {
+  clearTimeout(minuteurConseilScan);
+  minuteurConseilScan = setTimeout(() => {
+    if (scanTermine || !lecteurCodeBarres) return;
+    statutScanner('💡 Rien de lu ? Rapproche le téléphone : le code-barres doit remplir le cadre vert. Évite les reflets.');
+  }, DELAI_CONSEIL_SCAN_MS);
+}
+
 async function ouvrirScanner() {
   scanTermine = false;
   quitterModeRafale();
@@ -318,7 +330,10 @@ async function ouvrirScanner() {
       document.getElementById('scanner-video'),
       (resultat) => { if (resultat) codeBarresLu(resultat.getText()); }
     );
-    if (!scanTermine) statutScanner(modeRafale ? texteRafale() : 'Vise le code-barres au dos du livre');
+    if (!scanTermine) {
+      statutScanner(modeRafale ? texteRafale() : 'Vise le code-barres au dos du livre');
+      relancerConseilScan();
+    }
   } catch (e) {
     const refus = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
     statutScanner(refus
@@ -328,6 +343,7 @@ async function ouvrirScanner() {
 }
 
 function arreterCamera() {
+  clearTimeout(minuteurConseilScan);
   if (lecteurCodeBarres) { lecteurCodeBarres.reset(); lecteurCodeBarres = null; }
 }
 
@@ -343,6 +359,7 @@ function fermerScanner() {
 
 async function codeBarresLu(texte) {
   if (scanTermine) return;
+  clearTimeout(minuteurConseilScan); // la caméra lit : plus besoin du conseil
   const isbn = nettoyerIsbn(texte);
   // Un EAN-13 qui n'est pas un ISBN (ex. code-barres de prix) est ignoré : on continue de viser
   if (!/^97[89]/.test(isbn) || !isbnValide(isbn)) {
