@@ -322,6 +322,34 @@ test('Pile à lire : en cours, encore un effort, à commencer', async ({ navigat
   await fermer();
 });
 
+test('Pile à lire : « En attente » quand le tome suivant manque (achats d’occasion)', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  const ac = tomes(8, 7).concat([12, 13, 14, 19].map(numero => ({ numero, possede: true, lu: false })));
+  await definirBibliotheque(page, [
+    { titre: 'Assassination Classroom', tomes: ac },
+    { titre: 'Dreamland', tomes: tomes(10, 10).concat([{ numero: 24, possede: true, lu: false }]) },
+    { titre: 'One Piece', tomes: tomes(20, 5) }
+  ]);
+  await page.evaluate(() => changerOnglet('pal'));
+  const onglets = () => page.$$eval('#view-pal .selecteur-vue button', l => l.map(b => b.textContent));
+  egal(await onglets(), ['En cours2', 'Effort0', 'À commencer0', 'En attente1'], 'Dreamland en attente (lu jusqu’au 10, possède le 24)');
+  // Lire le tome 8 : Assassination Classroom passe en attente du tome 9
+  await page.evaluate(() => { vuePile = 'enCours'; rendrePileALire(); });
+  await page.click('.pal-item:has-text("Assassination Classroom") .btn-read-action');
+  egal(await page.textContent('#toast span'), '⏳ Assassination Classroom : il te manque le tome 9 (et 10, 11) pour continuer', 'message après la lecture');
+  egal(await onglets(), ['En cours1', 'Effort0', 'À commencer0', 'En attente2'], 'plus dans « En cours »');
+  await page.evaluate(() => { vuePile = 'attente'; rendrePileALire(); });
+  egal(await page.$$eval('#view-pal .pal-item', l => l.map(c => c.querySelector('.pal-title').textContent + ' | ' + c.querySelector('.pal-tome').textContent)), [
+    'Assassination Classroom | Tome 12 · ⏳ il te manque le tome 9 (et 10, 11)',
+    'Dreamland | Tome 24 · ⏳ il te manque le tome 11 (et 12 à 23)'
+  ], 'cartes « En attente »');
+  // Le tome 9 trouvé : la série revient dans « En cours »
+  await page.evaluate(() => { bibliotheque[0].tomes.push({ numero: 9, possede: true, lu: false }); sauvegarder(); });
+  egal(await page.evaluate(() => groupePile(bibliotheque[0])), 'enCours', 'de retour dans « En cours »');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Pile à lire : glisser une carte vers la droite pour « Lu ✓ »', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await definirBibliotheque(page, [{ titre: 'Ao Ashi', tomes: tomes(36, 30).map((t, i) => (i < 30 ? { ...t, luLe: 1000 } : t)) }]);

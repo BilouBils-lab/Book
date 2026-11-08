@@ -291,13 +291,38 @@ const GROUPES_PILE = [
   { cle: 'effort', onglet: 'Effort', intro: '💪 Encore un effort ! La ligne d\u2019arrivée est en vue.',
     vide: 'Aucune série presque finie pour l\u2019instant.', reste: (n) => n === 1 ? 'le dernier, courage !' : `plus que ${n} !` },
   { cle: 'aCommencer', onglet: 'À commencer', intro: '📚 Pour quand tu auras fini le reste…',
-    vide: 'Rien à commencer : toutes tes séries sont entamées.', reste: (n) => `${n} tome${n > 1 ? 's' : ''} à lire` }
+    vide: 'Rien à commencer : toutes tes séries sont entamées.', reste: (n) => `${n} tome${n > 1 ? 's' : ''} à lire` },
+  { cle: 'attente', onglet: 'En attente', intro: '⏳ Le tome qui suit ta lecture te manque : à trouver avant de continuer.',
+    vide: 'Aucune série en attente d\u2019un tome manquant.', reste: (n, item) => '⏳ ' + texteManque(item.manque) }
 ];
+
+// Tomes qui manquent entre ta lecture et le prochain tome possédé (ex. lu jusqu'au 8, possédé le 12 → [9, 10, 11])
+function tomesManquantsAvantLecture(serie) {
+  const prochain = serie.tomes.filter(t => t.possede && !t.lu).reduce((min, t) => Math.min(min, t.numero), Infinity);
+  if (prochain === Infinity) return [];
+  const dernierLu = serie.tomes.filter(t => t.lu && t.numero < prochain).reduce((max, t) => Math.max(max, t.numero), 0);
+  const manque = [];
+  for (let n = dernierLu + 1; n < prochain; n++) {
+    if (!serie.tomes.some(t => t.numero === n && (t.possede || t.lu))) manque.push(n);
+  }
+  return manque;
+}
+
+// [9] → « il te manque le tome 9 » ; [9, 10, 11] → « il te manque le tome 9 (et 10, 11) » ; [11…23] → « (et 12 à 23) »
+function texteManque(manque) {
+  const reste = manque.slice(1);
+  const suite = reste.every((n, i) => !i || n === reste[i - 1] + 1);
+  const detail = !reste.length ? '' : reste.length <= 2 ? ` (et ${reste.join(', ')})`
+    : suite ? ` (et ${reste[0]} à ${reste[reste.length - 1]})` : ` (et ${reste.slice(0, 3).join(', ')}…)`;
+  return `il te manque le tome ${manque[0]}${detail}`;
+}
 let vuePile = null; // null : premier groupe non vide
 
 function groupePile(serie) {
   const aLire = serie.tomes.filter(t => t.possede && !t.lu).length;
   if (!aLire) return null;
+  // Le tome suivant n'est pas encore là (achats d'occasion) : rien à lire dans l'ordre pour l'instant
+  if (tomesManquantsAvantLecture(serie).length) return 'attente';
   if (!serie.tomes.some(t => t.lu)) return 'aCommencer';
   return aLire <= SEUIL_ENCORE_UN_EFFORT ? 'effort' : 'enCours';
 }
@@ -305,16 +330,16 @@ function groupePile(serie) {
 function rendrePileALire() {
   const container = document.getElementById('view-pal');
   container.innerHTML = '';
-  const groupes = { enCours: [], effort: [], aCommencer: [] };
+  const groupes = { enCours: [], effort: [], aCommencer: [], attente: [] };
   bibliotheque.forEach((serie, sIndex) => {
     const groupe = groupePile(serie);
     if (!groupe) return;
     const aLire = serie.tomes.filter(t => t.possede && !t.lu).sort((a, b) => a.numero - b.numero);
     const derniereLecture = Math.max(0, ...serie.tomes.filter(t => t.lu).map(t => t.luLe || 0));
-    groupes[groupe].push({ serie, sIndex, aLire, derniereLecture });
+    groupes[groupe].push({ serie, sIndex, aLire, derniereLecture, manque: tomesManquantsAvantLecture(serie) });
   });
 
-  if (!groupes.enCours.length && !groupes.effort.length && !groupes.aCommencer.length) {
+  if (!groupes.enCours.length && !groupes.effort.length && !groupes.aCommencer.length && !groupes.attente.length) {
     container.innerHTML = `<div class="empty-state">Pile à lire vide : tu es à jour ! 🎉<br>Il est peut-être temps de passer en librairie…</div>`;
     return;
   }
@@ -323,12 +348,14 @@ function rendrePileALire() {
   groupes.enCours.sort((a, b) => b.derniereLecture - a.derniereLecture || parTitre(a, b));
   groupes.effort.sort((a, b) => a.aLire.length - b.aLire.length || parTitre(a, b));
   groupes.aCommencer.sort(parTitre);
+  groupes.attente.sort(parTitre);
 
   // Sélecteur, comme dans « À venir » : un seul groupe affiché à la fois
-  const actif = GROUPES_PILE.find(g => g.cle === vuePile) || GROUPES_PILE.find(g => groupes[g.cle].length);
+  const actif = GROUPES_PILE.find(g => g.cle === vuePile && (g.cle !== 'attente' || groupes.attente.length)) || GROUPES_PILE.find(g => groupes[g.cle].length);
   const selecteur = document.createElement('div');
   selecteur.className = 'selecteur-vue';
   for (const g of GROUPES_PILE) {
+    if (g.cle === 'attente' && !groupes.attente.length) continue; // onglet affiché seulement s'il sert
     const bouton = document.createElement('button');
     bouton.textContent = g.onglet;
     const compte = document.createElement('span');
@@ -356,7 +383,7 @@ function rendrePileALire() {
     astuce.textContent = '👉 Astuce : glisse une carte vers la droite pour marquer le tome comme lu.';
     container.appendChild(astuce);
   }
-  for (const item of items) container.appendChild(cartePileALire(item, actif.reste(item.aLire.length)));
+  for (const item of items) container.appendChild(cartePileALire(item, actif.reste(item.aLire.length, item)));
 }
 
 function cartePileALire(item, texteReste) {
@@ -513,6 +540,7 @@ function marquerCommeLu(sIndex, tIndex) {
   const apres = groupePile(serie);
   const annuler = () => { tome.lu = false; delete tome.luLe; sauvegarder(); };
   if (!apres) afficherToast(`🎉 ${serie.titre} : plus rien à lire, bravo !`, annuler);
+  else if (apres === 'attente') afficherToast(`⏳ ${serie.titre} : ${texteManque(tomesManquantsAvantLecture(serie))} pour continuer`, annuler);
   else if (apres !== avant) afficherToast(`${serie.titre} passe dans « ${GROUPES_PILE.find(g => g.cle === apres).onglet} »`, annuler);
   else afficherToast(`✓ ${serie.titre} — tome ${tome.numero} lu`, annuler);
 }
