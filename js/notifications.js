@@ -16,9 +16,8 @@ function notificationsActives() {
 
 function majBoutonNotifications() {
   const bouton = document.getElementById('bouton-notifications');
-  bouton.innerHTML = notificationsActives()
-    ? '<span>🔕</span>Désactiver les notifications<i>›</i>'
-    : '<span>🔔</span>Activer les notifications des sorties<i>›</i>';
+  const actives = notificationsActives();
+  bouton.innerHTML = `<span>${actives ? '🔔' : '🔕'}</span><div class="libelle">Notifications des sorties<small>${actives ? 'Activées · touche pour les couper' : 'Désactivées · touche pour les activer'}</small></div><i>›</i>`;
 }
 
 function basculerNotifications() {

@@ -29,7 +29,7 @@ function rendreVues() {
     });
   });
 
-  document.getElementById('total-count').innerText = `${totalPossedes} tome(s)`;
+  document.getElementById('total-count').innerText = `${totalPossedes} tome${totalPossedes > 1 ? 's' : ''}`;
   document.getElementById('pal-count').innerText = elementsPAL.length;
 
   rendrePileALire();
@@ -179,7 +179,7 @@ function rendreAVenir() {
     }
     const aide = document.createElement('div');
     aide.className = 'avenir-intro';
-    aide.textContent = 'Tomes déjà sortis que tu n’as pas. En magasin, touche un numéro acheté : il rejoint ta collection.';
+    aide.textContent = 'Tomes sortis qui te manquent. Touche un numéro acheté pour l’ajouter.';
     container.appendChild(aide);
     for (const achat of achats) container.appendChild(carteAchat(achat));
     return;
@@ -187,7 +187,7 @@ function rendreAVenir() {
 
   const intro = document.createElement('div');
   intro.className = 'avenir-intro';
-  intro.textContent = "Estimations d'après le rythme de parution des tomes en France (Manga Insight). Un éditeur peut toujours décaler une sortie.";
+  intro.textContent = 'Sorties estimées d’après le rythme de chaque série, à quelques semaines près.';
   container.appendChild(intro);
 
   const recentes = sortiesRecentes();
@@ -218,7 +218,7 @@ function rendreAVenir() {
     for (const item of items.sort(parTitre)) container.appendChild(carteAVenir(item));
   };
 
-  if (imminents.length) groupe('⏳ Imminent <small>la date estimée est passée</small>', imminents);
+  if (imminents.length) groupe('⏳ Bientôt <small>attendus d’un jour à l’autre</small>', imminents);
   for (const k of [...parMois.keys()].sort((a, b) => a - b)) {
     const nom = moisTexte(k);
     const titre = nom.charAt(0).toUpperCase() + nom.slice(1);
@@ -380,7 +380,7 @@ function rendrePileALire() {
   if (!localStorage.getItem('astuce_glisser_vue')) {
     const astuce = document.createElement('div');
     astuce.className = 'avenir-intro astuce-glisser';
-    astuce.textContent = '👉 Astuce : glisse une carte vers la droite pour marquer le tome comme lu.';
+    astuce.textContent = '👉 Glisse une carte vers la droite pour la marquer comme lue.';
     container.appendChild(astuce);
   }
   for (const item of items) container.appendChild(cartePileALire(item, actif.reste(item.aLire.length, item)));

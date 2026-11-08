@@ -227,41 +227,44 @@ async function parGroupes(liste, taille, traiter) {
   }));
 }
 
+// Jaquettes des séries qui n'en ont pas (ou dont l'image ne s'affiche plus) ; progression(texte) suit l'avancement.
+// Renvoie les titres trouvés, introuvables, et les anciennes jaquettes (pour « Annuler »).
+async function chercherJaquettesManquantes(progression) {
+  progression('Vérification des jaquettes…');
+  await chargerMangaInsight(false);
+  const manquantes = [];
+  await parGroupes(bibliotheque, 6, async (serie) => {
+    if (!serie.couverture || serie.couverture === JAQUETTE_DEFAUT || await testerImage(serie.couverture) === 'erreur') manquantes.push(serie);
+  });
+  const anciennes = new Map(), introuvables = [];
+  let faites = 0;
+  if (manquantes.length) progression(`Recherche des jaquettes… 0 / ${manquantes.length}`);
+  await parGroupes(manquantes, 4, async (serie) => {
+    const lien = await trouverJaquette(serie);
+    if (lien) { anciennes.set(serie, serie.couverture); serie.couverture = lien; }
+    else introuvables.push(serie.titre);
+    progression(`Recherche des jaquettes… ${++faites} / ${manquantes.length}`);
+  });
+  if (anciennes.size) sauvegarder();
+  const trie = (l) => l.sort((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'base' }));
+  return { manquantes: manquantes.length, anciennes, trouvees: trie([...anciennes.keys()].map(s => s.titre)), introuvables: trie(introuvables) };
+}
+
 async function trouverJaquettesManquantes() {
   if (!navigator.onLine) { alert('Pas de réseau : réessaie quand tu seras connecté.'); return; }
   fermerParametres();
   const loader = document.getElementById('loader-ia');
   const statut = document.getElementById('loader-status');
-  statut.textContent = 'Vérification des jaquettes…';
   loader.style.display = 'flex';
-  await chargerMangaInsight(false);
-
-  const manquantes = [];
-  await parGroupes(bibliotheque, 6, async (serie) => {
-    if (!serie.couverture || serie.couverture === JAQUETTE_DEFAUT || await testerImage(serie.couverture) === 'erreur') manquantes.push(serie);
-  });
-  if (!manquantes.length) {
-    loader.style.display = 'none';
+  const { manquantes, anciennes, trouvees, introuvables } = await chercherJaquettesManquantes((texte) => { statut.textContent = texte; });
+  loader.style.display = 'none';
+  if (!manquantes) {
     afficherToast('✓ Toutes tes séries ont une jaquette');
     return;
   }
-
-  const anciennes = new Map(), introuvables = [];
-  let faites = 0;
-  statut.textContent = `Recherche des jaquettes… 0 / ${manquantes.length}`;
-  await parGroupes(manquantes, 4, async (serie) => {
-    const lien = await trouverJaquette(serie);
-    if (lien) { anciennes.set(serie, serie.couverture); serie.couverture = lien; }
-    else introuvables.push(serie.titre);
-    statut.textContent = `Recherche des jaquettes… ${++faites} / ${manquantes.length}`;
-  });
-  loader.style.display = 'none';
-  if (anciennes.size) sauvegarder();
-
-  const trie = (l) => l.sort((a, b) => a.localeCompare(b, 'fr', { sensitivity: 'base' }));
-  const bilan = (anciennes.size ? `✓ ${anciennes.size} jaquette${anciennes.size > 1 ? 's' : ''} trouvée${anciennes.size > 1 ? 's' : ''} : ${trie([...anciennes.keys()].map(s => s.titre)).join(', ')}.` : 'Aucune jaquette trouvée.')
-    + (introuvables.length ? `\n\nToujours sans jaquette (${introuvables.length}) : ${trie(introuvables).join(', ')}.\nPour celles-ci : fiche → ⋯ → 🔄 Édition, tomes et jaquette, ou une photo.` : '');
-  if (!anciennes.size) { alert(bilan); return; }
+  const bilan = (trouvees.length ? `✓ ${trouvees.length} jaquette${trouvees.length > 1 ? 's' : ''} trouvée${trouvees.length > 1 ? 's' : ''} : ${trouvees.join(', ')}.` : 'Aucune jaquette trouvée.')
+    + (introuvables.length ? `\n\nToujours sans jaquette (${introuvables.length}) : ${introuvables.join(', ')}.\nPour celles-ci : fiche → ⋯ → 🔄 Édition et tomes, ou une photo.` : '');
+  if (!trouvees.length) { alert(bilan); return; }
   // « Annuler » remet les jaquettes d'avant
   const choix = await choisirAction(bilan, [{ libelle: '✓ Garder les jaquettes trouvées', valeur: 'garder', principal: true }]);
   if (choix !== 'garder') {

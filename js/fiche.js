@@ -275,8 +275,9 @@ function ajouterTomeNumero(sIndex, numero) {
 
 function ouvrirMenuSerie() {
   const serie = bibliotheque[serieIndexActive];
-  document.getElementById('menu-mise-de-cote').textContent = serie && serie.misDeCote
-    ? '▶ Reprendre la série' : '⏸ Mettre de côté (je ne la suis plus)';
+  document.getElementById('menu-serie-titre').textContent = serie ? serie.titre : '';
+  document.getElementById('menu-mise-de-cote').innerHTML = serie && serie.misDeCote
+    ? '<span aria-hidden="true">▶️</span>Reprendre la série<i>›</i>' : '<span aria-hidden="true">⏸️</span>Mettre de côté<i>›</i>';
   document.getElementById('menu-serie-modal').classList.add('active');
 }
 

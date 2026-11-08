@@ -409,16 +409,24 @@ test('À venir : sorties par mois, achats cochables, annuler, mise de côté', a
   await fermer();
 });
 
-test('« Mettre à jour mes séries » affiche un bilan', async ({ navigateur, base }) => {
+test('« Tout mettre à jour » : tomes parus, infos et jaquettes, avec un seul bilan', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, { worker: () => ({ body: { total: 0, notices: [] } }) });
-  await definirBibliotheque(page, [{ titre: 'Ao Ashi', tomes: tomes(3) }, { titre: 'Série Inexistante', tomes: tomes(1) }]);
+  const jaquette = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="90" height="135"><rect width="90" height="135"/></svg>');
+  await definirBibliotheque(page, [
+    { titre: 'Ao Ashi', auteur: 'Yūgo Kobayashi', genre: 'Sport', editeur: 'Mangetsu', couverture: jaquette, tomes: tomes(3) },
+    { titre: 'Série Inexistante', tomes: tomes(1) }]);
   await page.evaluate(() => ouvrirParametres());
-  await page.click('#settings-modal button:has-text("Mettre à jour mes séries")');
+  await page.click('#bouton-tout-maj');
+  await page.waitForSelector('#confirm-modal.active');
+  verifier((await page.textContent('#confirm-message')).includes('🖼️ Jaquettes manquantes'), 'les trois étapes annoncées');
   await page.click('#confirm-ok');
-  await page.waitForFunction(() => document.getElementById('completion-bouton').textContent === 'Fermer', null, { timeout: 15000 });
+  await page.waitForFunction(() => document.getElementById('completion-titre').textContent === '✅ Tout est à jour', null, { timeout: 60000 });
   const bilan = await page.textContent('#completion-bilan');
-  verifier(bilan.includes('1 série(s) mises à jour avec Manga Insight'), 'bilan Manga Insight : ' + bilan);
+  verifier(bilan.startsWith('🔄 1 série(s) mises à jour avec Manga Insight'), 'bilan des tomes parus : ' + bilan);
   verifier(bilan.includes('Série Inexistante'), 'série introuvable signalée : ' + bilan);
+  verifier(bilan.includes('\n\n✨ '), 'bilan des infos : ' + bilan);
+  verifier(bilan.includes('\n\n🖼️ Aucune nouvelle jaquette.\nToujours sans jaquette (1) : Série Inexistante.'), 'bilan des jaquettes : ' + bilan);
+  egal(await page.textContent('#completion-bouton'), 'Fermer', 'bouton Fermer à la fin');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });
@@ -486,7 +494,7 @@ test('Inventaire : avancement, validation des séries et vérification d\u2019un
   };
 
   await page.evaluate(() => ouvrirParametres());
-  await page.click("#settings-modal button:has-text(\"Faire l'inventaire\")");
+  await page.click('#settings-modal button:has-text("Faire l’inventaire")');
   await page.click('#confirm-ok');
   await page.waitForSelector('#inventaire-modal.active');
   egal(await page.textContent('#inventaire-compteur'), '0 / 3 séries vérifiées', 'compteur au départ');
@@ -655,7 +663,7 @@ test('Édition, tomes et jaquette d\u2019une série (Slam Dunk Star Edition)', a
 
   await page.evaluate(() => ouvrirModalSerie(0));
   await page.click('button[aria-label="Plus d\'actions"]');
-  await page.click('text=🔄 Édition, tomes et jaquette');
+  await page.click('#menu-serie-modal button:has-text("Édition et tomes")');
   await page.waitForSelector('#choix-modal.active');
   egal(await page.$$eval('#choix-boutons button', b => b.map(x => x.textContent)), [
     '✓ Édition standard · 31 tomes · Kana · 1999–2004', 'Édition Star · 20 tomes · Kana · 2019–2021', 'Édition Deluxe · 16 tomes · Kana · 2024–2026',
@@ -678,7 +686,7 @@ test('Édition, tomes et jaquette d\u2019une série (Slam Dunk Star Edition)', a
 
   // Nombre de tomes saisi à la main : plus modifié automatiquement
   await page.click('button[aria-label="Plus d\'actions"]');
-  await page.click('text=🔄 Édition, tomes et jaquette');
+  await page.click('#menu-serie-modal button:has-text("Édition et tomes")');
   await page.click('#choix-boutons button >> text=Saisir le nombre');
   await page.fill('#form-text-input', '25');
   await page.click('#form-text-ok');
@@ -890,7 +898,7 @@ test('Accessibilité : aucun problème détecté sur les écrans principaux (th�
       ['à venir : sorties', () => { fermerToutesLesFenetres(); vueAVenir = 'sorties'; changerOnglet('avenir'); }],
       ['à venir : à acheter', () => { fermerToutesLesFenetres(); vueAVenir = 'achats'; changerOnglet('avenir'); }],
       ['fiche', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); }],
-      ['menu de la fiche', () => { document.getElementById('menu-serie-modal').classList.add('active'); }],
+      ['menu de la fiche', () => { ouvrirMenuSerie(); }],
       ['paramètres', () => { fermerToutesLesFenetres(); ouvrirParametres(); document.querySelector('.settings-avance').open = true; }],
       ['quoi de neuf', () => { fermerToutesLesFenetres(); ouvrirNouveautes(); }],
       ['inventaire', () => { fermerToutesLesFenetres(); ouvrirInventaire(); }],
@@ -1182,7 +1190,7 @@ test('Trouver les jaquettes manquantes (et annuler)', async ({ navigateur, base 
   const couvertures = () => page.evaluate(() => bibliotheque.map(s => s.couverture || ''));
   page.evaluate(() => trouverJaquettesManquantes());
   await page.waitForSelector('#choix-modal.active', { timeout: 20000 });
-  egal(await page.textContent('#choix-message'), '✓ 1 jaquette trouvée : Kagurabachi.\n\nToujours sans jaquette (1) : Ma série perso.\nPour celles-ci : fiche → ⋯ → 🔄 Édition, tomes et jaquette, ou une photo.', 'bilan');
+  egal(await page.textContent('#choix-message'), '✓ 1 jaquette trouvée : Kagurabachi.\n\nToujours sans jaquette (1) : Ma série perso.\nPour celles-ci : fiche → ⋯ → 🔄 Édition et tomes, ou une photo.', 'bilan');
   egal(await couvertures(), ['https://covers.openlibrary.org/b/isbn/9782505132912-L.jpg?default=false', 'https://jaquette.morte/a.jpg', 'https://jaquette.ok/op.jpg'], 'jaquette du tome 1 de la bonne édition, image valide gardée');
   verifier(!demandes.some(u => u.includes('op.jpg')), 'One Piece (jaquette valide) n’est pas recherchée');
   await page.click('#choix-boutons button >> text=Annuler');
@@ -1332,7 +1340,7 @@ test('ISBN inconnu des catalogues (tome tout juste paru) : l’app demande sa s�
 test('Ajouter une série : éditions proposées pendant la saisie du titre', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: [{ numero: 1, possede: true, lu: false }] }]);
-  await page.click('button:has-text("➕ Saisie")');
+  await page.click('button:has-text("➕ Ajouter")');
   await page.fill('#form-serie-titre', 'one pi');
   await page.waitForSelector('#form-serie-suggestions .suggestion');
   const suggestions = () => page.$$eval('#form-serie-suggestions .suggestion', l => l.map(x => x.querySelector('.suggestion-titre').textContent + ' | ' + x.querySelector('.suggestion-detail').textContent));
@@ -1358,7 +1366,7 @@ test('Ajouter une série : éditions proposées pendant la saisie du titre', asy
   egal(await page.textContent('#toast span'), '✓ Kagurabachi ajoutée · Édition standard · 10 tomes · Kana · 2025–2026', 'message');
 
   // Titre modifié après le choix : l'édition est oubliée, saisie libre comme avant
-  await page.click('button:has-text("➕ Saisie")');
+  await page.click('button:has-text("➕ Ajouter")');
   await page.fill('#form-serie-titre', 'kagura');
   await page.waitForSelector('#form-serie-suggestions .suggestion');
   await page.click('#form-serie-suggestions .suggestion >> nth=1');
@@ -1403,12 +1411,12 @@ test('Notifications : activer puis désactiver (abonnement de l’appareil aupr�
     Object.defineProperty(navigator.serviceWorker, 'ready', { get: () => Promise.resolve(enregistrement) });
   });
   await page.evaluate(() => ouvrirParametres());
-  egal(await page.textContent('#bouton-notifications'), '🔔Activer les notifications des sorties›', 'bouton d’activation');
+  egal(await page.textContent('#bouton-notifications'), '🔕Notifications des sortiesDésactivées · touche pour les activer›', 'bouton d’activation');
   await page.click('#bouton-notifications');
   await page.waitForFunction(() => localStorage.getItem('notifications') === '1');
   egal(appels, [['/push/cle', 'code', null], ['/push/abonnement', 'code', { endpoint: 'https://web.push.apple.com/abc', keys: { p256dh: 'p', auth: 'a' } }]], 'clé lue puis appareil abonné');
   egal(await page.evaluate(() => notificationsMontrees), ['🔔 Notifications activées'], 'notification de confirmation');
-  egal(await page.textContent('#bouton-notifications'), '🔕Désactiver les notifications›', 'bouton de désactivation');
+  egal(await page.textContent('#bouton-notifications'), '🔔Notifications des sortiesActivées · touche pour les couper›', 'bouton de désactivation');
   await page.click('#bouton-notifications');
   await page.waitForFunction(() => !localStorage.getItem('notifications'));
   egal(appels[2], ['/push/desabonnement', 'code', { endpoint: 'https://web.push.apple.com/abc' }], 'appareil désabonné');
