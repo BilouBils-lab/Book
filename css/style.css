@@ -311,14 +311,18 @@ main {
 .selecteur-vue {
   display: flex;
   gap: 4px;
+  /* Sur un petit écran, les onglets défilent plutôt que de déborder */
+  overflow-x: auto;
+  scrollbar-width: none;
   padding: 4px;
   background: var(--surface-creuse);
   border-radius: 12px;
   margin-bottom: 14px;
 }
 .selecteur-vue button {
-  flex: 1;
-  padding: 8px 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 4px;
   border: none;
   border-radius: 9px;
   background: none;
@@ -329,7 +333,7 @@ main {
   white-space: nowrap;
 }
 .selecteur-vue button.actif { background: var(--surface-relief); color: var(--text-main); }
-.selecteur-compte { margin-left: 5px; padding: 1px 6px; border-radius: 8px; background: var(--surface-relief); font-size: 11px; }
+.selecteur-compte { margin-left: 4px; padding: 1px 5px; border-radius: 8px; background: var(--surface-relief); font-size: 11px; }
 .selecteur-vue button.actif .selecteur-compte { background: var(--accent); color: var(--texte-sur-accent); }
 
 .achat-item {

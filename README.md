@@ -10,7 +10,7 @@ Application web pour gérer sa collection de mangas : tomes possédés et lus, p
 
 | Écran | Rôle |
 |---|---|
-| **Pile à lire** | Tomes possédés mais pas encore lus, en sous-onglets : *En cours*, *Effort* (presque fini), *À commencer*, et *En attente* quand le tome qui suit ta lecture te manque (achats d'occasion). « Lu ✓ » en un geste, avec « Annuler ». |
+| **Pile à lire** | Tomes possédés mais pas encore lus, en sous-onglets : *En cours*, *Effort* (presque fini), *À débuter*, et *En attente* quand le tome qui suit ta lecture te manque (achats d'occasion). « Lu ✓ » en un geste, avec « Annuler ». |
 | **Collection** | Toutes les séries, avec progression, tri et recherche. Un appui ouvre la **fiche** de la série. |
 | **À venir** | *Prochaines sorties* estimées mois par mois, et *À acheter* : les tomes sortis qui manquent, à cocher en magasin. |
 | **Quoi de neuf ?** | S'ouvre au lancement **seulement s'il y a du nouveau** : tomes sortis depuis la dernière visite, sorties attendues ce mois-ci. |
