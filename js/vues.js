@@ -287,12 +287,12 @@ const SEUIL_ENCORE_UN_EFFORT = 3;
 // Groupes de la pile : en cours, presque finies (« encore un effort »), pas encore commencées
 const GROUPES_PILE = [
   { cle: 'enCours', onglet: 'En cours', intro: '▶ La dernière série lue en haut.',
-    vide: 'Aucune série en cours : choisis-en une dans « À commencer » !', reste: (n) => `encore ${n} à lire` },
+    vide: 'Aucune série en cours : choisis-en une dans « À débuter » !', reste: (n) => `encore ${n} à lire` },
   { cle: 'effort', onglet: 'Effort', intro: '💪 Encore un effort ! La ligne d\u2019arrivée est en vue.',
     vide: 'Aucune série presque finie pour l\u2019instant.', reste: (n) => n === 1 ? 'le dernier, courage !' : `plus que ${n} !` },
-  { cle: 'aCommencer', onglet: 'À commencer', intro: '📚 Pour quand tu auras fini le reste…',
+  { cle: 'aCommencer', onglet: 'À débuter', intro: '📚 Pour quand tu auras fini le reste…',
     vide: 'Rien à commencer : toutes tes séries sont entamées.', reste: (n) => `${n} tome${n > 1 ? 's' : ''} à lire` },
-  { cle: 'attente', onglet: 'En attente', intro: '⏳ Le tome qui suit ta lecture te manque : à trouver avant de continuer.',
+  { cle: 'attente', onglet: 'En attente', intro: '⏳ Il te manque le tome suivant pour continuer.',
     vide: 'Aucune série en attente d\u2019un tome manquant.', reste: (n, item) => '⏳ ' + texteManque(item.manque) }
 ];
 
@@ -367,6 +367,9 @@ function rendrePileALire() {
     selecteur.appendChild(bouton);
   }
   container.appendChild(selecteur);
+  // Onglet actif visible si les onglets défilent (petit écran), sans faire bouger la page
+  const ongletVisible = selecteur.querySelector('.actif');
+  if (ongletVisible && selecteur.scrollWidth > selecteur.clientWidth) selecteur.scrollLeft = ongletVisible.offsetLeft - selecteur.offsetLeft - 8;
 
   const items = groupes[actif.cle];
   if (!items.length) {

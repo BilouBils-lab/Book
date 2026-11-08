@@ -291,17 +291,17 @@ test('Pile à lire : en cours, encore un effort, à commencer', async ({ navigat
   await page.evaluate(() => changerOnglet('pal'));
   const onglets = () => page.$$eval('#view-pal .selecteur-vue button', b => b.map(x => (x.className === 'actif' ? '*' : '') + x.textContent));
   const cartes = () => page.$$eval('#view-pal .pal-item', els => els.map(e => e.querySelector('.pal-title').textContent + ' — ' + e.querySelector('.pal-tome').textContent));
-  egal(await onglets(), ['*En cours2', 'Effort1', 'À commencer1'], 'sous-onglets avec leur nombre de séries');
+  egal(await onglets(), ['*En cours2', 'Effort1', 'À débuter1'], 'sous-onglets avec leur nombre de séries');
   egal(await cartes(), ['Ao Ashi — Tome 31 · encore 6 à lire', 'Kagurabachi — Tome 4 · encore 7 à lire'], 'en cours : la dernière lue en haut');
   await page.click('#view-pal .selecteur-vue button >> text=Effort');
   egal(await cartes(), ['Berserk of Gluttony — Tome 13 · le dernier, courage !'], 'encore un effort');
-  await page.click('#view-pal .selecteur-vue button >> text=À commencer');
+  await page.click('#view-pal .selecteur-vue button >> text=À débuter');
   egal(await cartes(), ['Berserk (Prestige) — Tome 1 · 4 tomes à lire'], 'à commencer');
 
   // « Lu ✓ » : la série change de sous-onglet, un message le signale
   await page.click('.pal-item:has-text("Berserk (Prestige)") .btn-read-action');
   egal(await page.textContent('#toast span'), 'Berserk (Prestige) passe dans « Effort »', 'message de changement de groupe');
-  egal(await onglets(), ['En cours2', 'Effort2', '*À commencer0'], 'on reste sur le sous-onglet choisi');
+  egal(await onglets(), ['En cours2', 'Effort2', '*À débuter0'], 'on reste sur le sous-onglet choisi');
   verifier((await page.textContent('#view-pal')).includes('Rien à commencer'), 'message quand le groupe est vide');
   await page.click('#view-pal .selecteur-vue button >> text=En cours');
   await page.click('.pal-item:has-text("Kagurabachi") .btn-read-action');
@@ -332,12 +332,12 @@ test('Pile à lire : « En attente » quand le tome suivant manque (achats d’o
   ]);
   await page.evaluate(() => changerOnglet('pal'));
   const onglets = () => page.$$eval('#view-pal .selecteur-vue button', l => l.map(b => b.textContent));
-  egal(await onglets(), ['En cours2', 'Effort0', 'À commencer0', 'En attente1'], 'Dreamland en attente (lu jusqu’au 10, possède le 24)');
+  egal(await onglets(), ['En cours2', 'Effort0', 'À débuter0', 'En attente1'], 'Dreamland en attente (lu jusqu’au 10, possède le 24)');
   // Lire le tome 8 : Assassination Classroom passe en attente du tome 9
   await page.evaluate(() => { vuePile = 'enCours'; rendrePileALire(); });
   await page.click('.pal-item:has-text("Assassination Classroom") .btn-read-action');
   egal(await page.textContent('#toast span'), '⏳ Assassination Classroom : il te manque le tome 9 (et 10, 11) pour continuer', 'message après la lecture');
-  egal(await onglets(), ['En cours1', 'Effort0', 'À commencer0', 'En attente2'], 'plus dans « En cours »');
+  egal(await onglets(), ['En cours1', 'Effort0', 'À débuter0', 'En attente2'], 'plus dans « En cours »');
   await page.evaluate(() => { vuePile = 'attente'; rendrePileALire(); });
   egal(await page.$$eval('#view-pal .pal-item', l => l.map(c => c.querySelector('.pal-title').textContent + ' | ' + c.querySelector('.pal-tome').textContent)), [
     'Assassination Classroom | Tome 12 · ⏳ il te manque le tome 9 (et 10, 11)',
