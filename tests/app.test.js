@@ -991,6 +991,24 @@ test('Recherche par ISBN (BnF) puis ajout du tome', async ({ navigateur, base })
   await fermer();
 });
 
+test('Rescan de l’étagère : la rafale enregistre le vrai ISBN des tomes déjà possédés', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: tomes(110) }]);
+  await page.evaluate(() => { bibliotheque[0].tomes[107].isbnAuto = false; }); // tome 108 : déjà scanné autrefois
+  await page.evaluate(() => { serieAVerifier = null; scanTermine = false; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); passerEnModeRafale(); });
+  for (const isbn of ['9782344061336', '9782344061343', '9782344062814']) await page.evaluate((i) => codeBarresLu(i), isbn);
+  await page.waitForFunction(() => !rafale.some(e => e.etat === 'recherche'));
+  egal(await page.textContent('#rafale-terminer'), '✓ Terminer (2 ISBN)', 'deux ISBN à enregistrer (le 108 l’était déjà)');
+  await page.click('#rafale-terminer');
+  await page.waitForSelector('#rafale-modal.active');
+  egal(await page.textContent('#rafale-valider'), '✓ Enregistrer 2 ISBN', 'bouton');
+  await page.click('#rafale-valider');
+  egal(await page.evaluate(() => [107, 108, 109].map(i => bibliotheque[0].tomes[i].isbnAuto)), [false, false, false], 'ISBN des tomes 109 et 110 enregistrés');
+  egal(await page.textContent('#toast span'), '✓ 2 ISBN enregistrés · ISBN réels : 3 / 110 tomes', 'message avec l’avancement');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Scanner : conseil « rapproche-toi » si rien n’est lu au bout de 5 secondes', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   // Caméra simulée : ouverte, mais aucun code-barres lu
@@ -1037,7 +1055,7 @@ test('Scan en rafale : plusieurs tomes à la suite, résumé puis ajout (et annu
   }
   await page.waitForFunction(() => !rafale.some(e => e.etat === 'recherche'));
   egal(await page.textContent('#scanner-statut'), '5 livres scannés · vise le suivant', 'le doublon n’est compté qu’une fois');
-  egal(await page.textContent('#rafale-terminer'), '✓ Terminer (2 à ajouter)', 'compteur');
+  egal(await page.textContent('#rafale-terminer'), '✓ Terminer (2 à ajouter · 1 ISBN)', 'compteur');
   verifier(await page.evaluate(() => document.getElementById('scanner-modal').classList.contains('active')), 'la caméra reste ouverte entre deux livres');
 
   await page.click('#rafale-terminer');
@@ -1045,17 +1063,18 @@ test('Scan en rafale : plusieurs tomes à la suite, résumé puis ajout (et annu
   const resume = await page.$$eval('#rafale-resume .rafale-ligne', l => l.map(x => x.textContent.trim()));
   egal(resume, [
     'One Piece · tome 110',
-    '☑️ One Piece · tome 109 · déjà dans ta collection',
+    '☑️ One Piece · tome 109 · déjà dans ta collection · ISBN enregistré',
     'Kagurabachi · tome 3 · nouvelle sérieLes tomes d’avant seront à cocher dans sa fiche.',
     '⚠️ Berserk (Prestige) · tome 3 : édition Prestige, ta série « Berserk » est en édition standard : ajoute-le seul avec 📷 Scanner',
     '⚠️ ISBN 9782090000009 : livre introuvable (trop récent ?), ajoute-le seul avec 📷 Scanner : l\u2019app te demandera sa série'
   ], 'résumé');
-  egal(await page.textContent('#rafale-valider'), '📚 Ajouter 2 tomes', 'bouton de validation');
+  egal(await page.textContent('#rafale-valider'), '📚 Ajouter 2 tomes · 1 ISBN', 'bouton de validation');
   await page.click('#rafale-valider');
   const etat = () => page.evaluate(() => bibliotheque.map(s => [s.titre, s.tomes.filter(t => t.possede).slice(-2).map(t => t.numero + (t.isbnAuto === false ? '#' : '')).join(' '), s.tomes.length]));
-  egal(await etat(), [['One Piece', '109 110#', 110], ['Berserk', '1 2', 2], ['Kagurabachi', '3#', 3]], 'tome 110 coché, série Kagurabachi créée');
+  egal(await etat(), [['One Piece', '109# 110#', 110], ['Berserk', '1 2', 2], ['Kagurabachi', '3#', 3]], 'tome 110 coché, ISBN du 109 confirmé, série Kagurabachi créée');
   egal(await page.evaluate(() => bibliotheque[2].miNom), 'Kagurabachi', 'édition Manga Insight retenue pour la nouvelle série');
-  egal(await page.textContent('#toast span'), '📚 2 tomes ajoutés à ta collection', 'message');
+  egal(await page.textContent('#toast span'), '📚 2 tomes ajoutés à ta collection · 1 ISBN enregistré', 'message');
+  egal(await page.evaluate(() => bibliotheque[0].tomes[108].isbnAuto), false, 'ISBN du tome 109 confirmé par le scan');
   await page.click('#toast button');
   egal(await etat(), [['One Piece', '108 109', 110], ['Berserk', '1 2', 2]], 'annuler remet la collection comme avant');
   egal(erreurs, [], 'erreurs JavaScript');
