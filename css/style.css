@@ -800,6 +800,14 @@ main {
 .fiche-parties-titre { font-size: 12px; color: var(--text-sub); margin-bottom: 6px; }
 .fiche-parties .selecteur-vue { flex-wrap: wrap; }
 
+/* Listes d'actions (Paramètres, menu ⋯) : un libellé sur deux lignes, et l'action dangereuse à part */
+.settings-groupe button .libelle { display: flex; flex-direction: column; text-align: left; }
+.settings-groupe button .libelle small { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+.settings-groupe button.texte-danger { color: var(--danger); }
+#menu-serie-modal .settings-titre { margin: 4px 4px 6px; }
+#menu-serie-modal .settings-groupe + .settings-titre { margin-top: 16px; }
+.menu-danger { margin-top: 16px; }
+
 /* Scanner : trois modes en onglets, la caméra, puis les solutions de secours en tuiles */
 .scanner { max-width: 380px; }
 .scanner-entete { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }

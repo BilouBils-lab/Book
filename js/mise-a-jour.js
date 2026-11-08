@@ -50,7 +50,12 @@ async function completerCollection() {
   const minutes = Math.max(1, Math.round(cibles.length * 4 / 60));
   if (!(await confirmerAction(`Compléter ${cibles.length} série(s) incomplète(s) ?\n\nSeuls les champs vides sont remplis, rien n'est écrasé. Compte environ ${minutes} min : garde l'app ouverte.`))) return;
   fermerParametres();
+  document.getElementById('completion-bilan').textContent = await etapeCompleter(cibles);
+}
 
+// Infos manquantes (auteur, genre, éditeur, jaquette) des séries incomplètes ; renvoie le bilan
+async function etapeCompleter(cibles) {
+  if (!cibles.length) return 'Toutes tes séries ont déjà leurs infos.';
   let completees = 0;
   const incompletes = [];
   await traiterEnLot('✨ Compléter ma collection', cibles, async (serie) => {
@@ -66,8 +71,32 @@ async function completerCollection() {
   }, PAUSE_ENTRE_SERIES_MS);
 
   let bilan = `${completees} série(s) enrichie(s).`;
-  if (incompletes.length) bilan += `\n\nEncore incomplètes (${incompletes.length}) — il manque :\n${incompletes.join('\n')}\n\nOuvre leur fiche (✏️ Infos) pour compléter à la main ou vérifier le titre.`;
-  document.getElementById('completion-bilan').textContent = bilan;
+  if (incompletes.length) bilan += `\n\nEncore incomplètes (${incompletes.length}) — il manque :\n${incompletes.join('\n')}\n\nOuvre leur fiche (⋯ → Infos) pour compléter à la main ou vérifier le titre.`;
+  return bilan;
+}
+
+// Paramètres → « Tout mettre à jour » : tomes parus, infos manquantes, puis jaquettes manquantes, avec un seul bilan
+async function toutMettreAJour() {
+  if (!bibliotheque.length) return;
+  if (!navigator.onLine) { alert('Pas de réseau : réessaie quand tu seras connecté.'); return; }
+  if (!(await confirmerAction('Tout mettre à jour ?\n\n🔄 Tomes parus et prochaines sorties\n✨ Infos manquantes (auteur, genre, éditeur)\n🖼️ Jaquettes manquantes\n\nSeuls les champs vides sont remplis. Compte quelques minutes : garde l\u2019app ouverte.'))) return;
+  fermerParametres();
+  const bilans = ['🔄 ' + await etapeTomesParus()];
+  if (!completionArretee) bilans.push('✨ ' + await etapeCompleter(bibliotheque.filter(serieIncomplete)));
+  if (!completionArretee) {
+    document.getElementById('completion-titre').textContent = '🖼️ Jaquettes manquantes';
+    document.getElementById('completion-bouton').textContent = 'Patiente…';
+    document.getElementById('completion-bouton').onclick = null;
+    const { trouvees, introuvables } = await chercherJaquettesManquantes((texte) => { document.getElementById('completion-etape').textContent = texte; });
+    bilans.push('🖼️ ' + (trouvees.length ? `${trouvees.length} jaquette(s) trouvée(s) : ${trouvees.join(', ')}.` : 'Aucune nouvelle jaquette.')
+      + (introuvables.length ? `\nToujours sans jaquette (${introuvables.length}) : ${introuvables.join(', ')}.` : ''));
+    const bouton = document.getElementById('completion-bouton');
+    bouton.textContent = 'Fermer';
+    bouton.onclick = () => document.getElementById('completion-modal').classList.remove('active');
+    document.getElementById('completion-etape').textContent = 'Terminé ✅';
+  }
+  document.getElementById('completion-titre').textContent = completionArretee ? '🔄 Mise à jour arrêtée' : '✅ Tout est à jour';
+  document.getElementById('completion-bilan').textContent = bilans.join('\n\n');
 }
 
 // --- Tomes parus en France pour une édition (catalogue de la BnF) ---
@@ -384,6 +413,11 @@ async function majTomesParusCollection() {
   if (!bibliotheque.length) return;
   if (!(await confirmerAction(`Mettre à jour tes ${bibliotheque.length} séries ?\n\nTomes parus en France, dernière sortie et prochaine sortie estimée (Manga Insight), puis la BnF pour les séries introuvables.`))) return;
   fermerParametres();
+  document.getElementById('completion-bilan').textContent = await etapeTomesParus();
+}
+
+// Tomes parus et sorties de toute la collection (Manga Insight, puis BnF) ; renvoie le bilan
+async function etapeTomesParus() {
   document.getElementById('loader-status').textContent = 'Téléchargement des sorties (Manga Insight)…';
   document.getElementById('loader-ia').style.display = 'flex';
   const miOk = await chargerMangaInsight(true);
@@ -421,5 +455,5 @@ async function majTomesParusCollection() {
   if (manuelles) bilan += `\n${manuelles} série(s) avec un nombre de tomes saisi à la main (inchangées).`;
   if (corrections.length) bilan += `\n\nÉditeur corrigé d'après la BnF (${corrections.length}) :\n${corrections.join('\n')}`;
   if (introuvables.length) bilan += `\n\nIntrouvables (${introuvables.length}) :\n${introuvables.join('\n')}\n\nVérifie le titre de ces séries : une édition spéciale se note entre parenthèses, ex. « Berserk (Prestige) ».`;
-  document.getElementById('completion-bilan').textContent = bilan;
+  return bilan;
 }
