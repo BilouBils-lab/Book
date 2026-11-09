@@ -883,6 +883,45 @@ egal(erreurs, [], 'erreurs JavaScript');
   await contexte.close();
 });
 
+// Les textes posés directement sur le fond (halos en dégradé) : axe ne sait pas mesurer leur contraste.
+// On le mesure sur les vrais pixels du fond, texte caché, au pire endroit derrière chaque texte (seuil : 4,5).
+const ECRANS_SUR_FOND = ['pile à lire', 'collection', 'à venir : sorties', 'à venir : à acheter'];
+async function contrastesSurFond(page) {
+  const textes = await page.evaluate(() => {
+    const r = [];
+    for (const el of document.querySelectorAll('main *, header *')) {
+      if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
+      let a = el, surUnFond = false;
+      for (; a && a !== document.body; a = a.parentElement) { const bg = getComputedStyle(a).backgroundColor; if (!/rgba\(.*, 0\)$/.test(bg)) { surUnFond = true; break; } }
+      const b = el.getBoundingClientRect();
+      if (surUnFond || !b.width || b.top > innerHeight - 100 || b.bottom < 0) continue;
+      r.push({ texte: el.textContent.trim().slice(0, 40), couleur: getComputedStyle(el).color, x: b.left, y: b.top, w: b.width, h: b.height });
+    }
+    return r;
+  });
+  const cache = await page.addStyleTag({ content: 'main, header > *, .barre-onglets { visibility: hidden !important }' });
+  const png = (await page.screenshot()).toString('base64');
+  await cache.evaluate(st => st.remove());
+  return page.evaluate(async ([png, textes]) => {
+    const im = new Image(); im.src = 'data:image/png;base64,' + png; await im.decode();
+    const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height;
+    const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0);
+    const px = cx.getImageData(0, 0, im.width, im.height).data, k = im.width / innerWidth;
+    const lum = (r, g, b) => [r, g, b].map(c => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }).reduce((s, c, i) => s + c * [0.2126, 0.7152, 0.0722][i], 0);
+    const faibles = [];
+    for (const t of textes) {
+      const lt = lum(...t.couleur.match(/[\d.]+/g).map(Number));
+      let pire = 99;
+      for (let y = Math.max(0, t.y); y < Math.min(innerHeight, t.y + t.h); y += 3) for (let x = Math.max(0, t.x); x < Math.min(innerWidth, t.x + t.w); x += 6) {
+        const i = (Math.floor(y * k) * im.width + Math.floor(x * k)) * 4, lf = lum(px[i], px[i + 1], px[i + 2]);
+        pire = Math.min(pire, (Math.max(lt, lf) + 0.05) / (Math.min(lt, lf) + 0.05));
+      }
+      if (pire < 4.5) faibles.push({ texte: t.texte, c: pire });
+    }
+    return faibles;
+  }, [png, textes]);
+}
+
 // Accessibilité : axe-core (la référence des audits d'accessibilité) sur chaque écran, en thème clair et sombre.
 // Toute anomalie fait échouer le test : contraste des couleurs, boutons et champs sans nom, titres, zoom bloqué…
 test('Accessibilité : aucun problème détecté sur les écrans principaux (thèmes clair et sombre)', async ({ navigateur, base }) => {
@@ -923,6 +962,7 @@ test('Accessibilité : aucun problème détecté sur les écrans principaux (th�
       const violations = await page.evaluate(async () => (await axe.run(document, { resultTypes: ['violations'] })).violations
         .map(v => `${v.id} (${v.impact}) : ${v.nodes.slice(0, 2).map(n => n.target.join(' ')).join(', ')}`));
       for (const v of violations) problemes.push(`${theme} / ${nom} → ${v}`);
+      if (ECRANS_SUR_FOND.includes(nom)) for (const t of await contrastesSurFond(page)) problemes.push(`${theme} / ${nom} → contraste ${t.c.toFixed(2)} sur le fond : « ${t.texte} »`);
     }
   }
   egal(problemes, [], 'problèmes d’accessibilité');
