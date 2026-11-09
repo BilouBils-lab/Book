@@ -15,7 +15,7 @@ Application web pour gérer sa collection de mangas : tomes possédés et lus, p
 | **À venir** | *Prochaines sorties* estimées mois par mois, et *À acheter* : les tomes sortis qui manquent, à cocher en magasin. |
 | **Quoi de neuf ?** | S'ouvre au lancement **seulement s'il y a du nouveau** : tomes sortis depuis la dernière visite, sorties attendues ce mois-ci. |
 | **Sagas et suites** | Une histoire en plusieurs parties qui repartent au tome 1 (SAO, Jungle Juice saisons 1 et 2) : une **saga**, une seule carte dans la Collection et les parties en onglets dans la fiche (⋯ → 📚 Saga, ✂️ Séparer une nouvelle partie). Une suite qui continue la numérotation (Solo Leveling Ragnarok à partir du tome 20) est reconnue automatiquement dans les sorties et affichée en parties, comme les arcs de One Piece. |
-| **Fiche d'une série** | Épurée : à côté de la jaquette, deux tuiles (tomes possédés, tomes lus) ; une phrase (tomes parus, prochaine sortie) ; les tomes (lus, possédés, manquants) ; « Infos de la série » repliées (auteur, éditeur, genres, rythme de parution). Un appui sur l'**éditeur** ouvre sa page : ses prochaines sorties, toutes ses séries françaises (Manga Insight, éditions spéciales regroupées, recherche), celles qu'on a déjà, et un ＋ pour ajouter les autres. Menu ⋯ : édition / tomes / jaquette, renommer, infos, mettre de côté, supprimer. |
+| **Fiche d'une série** | Épurée : à côté de la jaquette, deux tuiles (tomes possédés, tomes lus) ; une phrase (tomes parus, prochaine sortie) ; les tomes (lus, possédés, manquants) ; « Infos de la série » repliées (auteur, éditeur, genres, rythme de parution). Un appui sur l'**éditeur** ouvre sa page : ses prochaines sorties, toutes ses séries françaises (Manga Insight, éditions spéciales regroupées, recherche), celles qu'on a déjà, et un ＋ pour ajouter les autres. En tête, **« Pour toi »** : jusqu'à 4 séries de l'éditeur choisies d'après ta collection (même univers, même auteur, recommandées par les lecteurs d'une de tes séries, ou mêmes genres, d'après AniList), chacune avec sa raison. Menu ⋯ : édition / tomes / jaquette, renommer, infos, mettre de côté, supprimer. |
 | **Notifications 🔔** | Sur l'iPhone, même app fermée : tome annoncé, nouveau tome en librairie. Calculées chaque jour par le dépôt privé `mangatheque-sauvegarde`, envoyées par Web Push. Un appui ouvre *À venir* (et la fiche s'il n'y a qu'une série). |
 | **Réglages ⚙️** | « Tout mettre à jour » (tomes parus, infos manquantes, jaquettes manquantes, un seul bilan), inventaire, notifications, sauvegarde en ligne, apparence (clair / sombre / automatique). |
 
@@ -61,6 +61,7 @@ js/                   Code de l'app, découpé par thème (chargé dans l'ordre 
   vues.js               Onglets Pile à lire, Collection, À venir
   fiche.js              Fiche d'une série
   editeur.js            Page d'un éditeur (découverte de ses séries)
+  suggestions.js        Suggestions « Pour toi » (AniList, gardé 30 jours sur l'appareil)
   maj-serie.js          Édition, nombre de tomes et jaquette d'une série
   ajout-serie.js        Ajouter une série : éditions proposées pendant la saisie du titre
   sagas.js              Sagas : parties d'une même histoire regroupées
