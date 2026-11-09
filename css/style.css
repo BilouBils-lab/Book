@@ -622,12 +622,16 @@ main {
 /* --- Fiche d'une série --- */
 .fiche { padding: 16px; }
 
+/* En-tête : jaquette à gauche ; titre et statut, puis les deux tuiles (sous les boutons ⋯ ✕) */
 .fiche-entete {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  margin-bottom: 18px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto 1fr;
+  column-gap: 14px;
+  margin-bottom: 14px;
 }
+.fiche-entete .fiche-jaquette { grid-row: 1 / 3; }
+.fiche-entete .fiche-tuiles { grid-column: 2 / 4; align-self: end; }
 
 .fiche-jaquette {
   width: 76px;
@@ -646,12 +650,6 @@ main {
   line-height: 1.2;
   cursor: pointer;
   margin-bottom: 4px;
-}
-
-.fiche-auteur {
-  font-size: 13px;
-  color: var(--text-sub);
-  margin-bottom: 8px;
 }
 
 .fiche-pastilles { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -684,43 +682,55 @@ main {
   cursor: pointer;
 }
 
-.fiche-progression {
-  background: var(--surface-creuse);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 16px;
-}
-
-.fiche-compteur { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-.fiche-compteur span { color: var(--text-sub); font-weight: 400; }
-
-/* Frise : un segment par tome, les trous montrent les tomes manquants */
-.fiche-frise { display: flex; gap: 2px; height: 8px; }
-.fiche-frise i { flex: 1; border-radius: 2px; background: var(--surface-relief); }
-.fiche-frise i.possede { background: var(--accent-moyen); }
-.fiche-frise i.lu { background: var(--accent); }
-
-/* Longue série : segments collés en une barre continue */
-.fiche-frise.dense { gap: 0; border-radius: 3px; overflow: hidden; }
-.fiche-frise.dense i { border-radius: 0; }
-
-.fiche-prochain { font-size: 12px; color: var(--text-sub); margin-top: 8px; }
-.fiche-prochain b { color: var(--text-main); }
-
-.fiche-legende {
+.fiche-tuiles { display: flex; gap: 8px; margin-top: 10px; }
+.fiche-tuile {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  font-size: 11px;
-  color: var(--text-sub);
-  margin-bottom: 10px;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  border-radius: 18px;
+  background: var(--surface-creuse);
+  color: var(--text-main);
 }
-.fiche-legende span { display: flex; align-items: center; gap: 5px; }
-.fiche-astuce { margin-left: auto; }
-.pt { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
-.pt.lu { background: var(--accent); }
-.pt.possede { border: 1.5px solid var(--accent); }
-.pt.manquant { border: 1.5px dashed var(--texte-faible); }
+.fiche-tuile b { font-size: 18px; white-space: nowrap; }
+.fiche-tuile span { font-size: 12px; color: var(--text-sub); }
+.fiche-tuile.principale { background: var(--accent); color: var(--texte-sur-accent); }
+.fiche-tuile.principale span { color: inherit; opacity: 0.85; }
+
+.fiche-resume { font-size: 14px; color: var(--text-sub); margin-bottom: 12px; }
+
+.fiche-astuce { font-size: 12px; color: var(--text-sub); text-align: center; margin: 8px 0 2px; }
+
+/* Lignes du bas : « Ajouter un tome », « Infos de la série » */
+.fiche-ligne, .fiche-infos-serie summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 4px;
+  border: none;
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.fiche-ligne { border-bottom: 1px solid var(--card-border); margin-top: 4px; }
+.fiche-ligne span, .fiche-infos-fleche { width: 20px; text-align: center; flex-shrink: 0; }
+.fiche-ligne span { font-size: 19px; }
+.fiche-infos-serie summary { list-style: none; }
+.fiche-infos-serie summary::-webkit-details-marker { display: none; }
+.fiche-infos-fleche { color: var(--text-sub); transition: transform 0.2s; }
+.fiche-infos-serie[open] .fiche-infos-fleche { transform: rotate(90deg); }
+.fiche-infos-serie summary small { display: block; font-size: 13px; font-weight: 400; color: var(--text-sub); margin-top: 2px; }
+.fiche-infos-serie[open] summary small { display: none; }
+.fiche-infos-serie dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0 4px 6px 36px; font-size: 14px; }
+.fiche-infos-serie dt { color: var(--text-sub); }
+.fiche-infos-serie dd { margin: 0; }
 
 .volumes-grid {
   display: grid;
@@ -786,8 +796,6 @@ main {
 
 .tranche .volumes-grid { grid-template-columns: repeat(5, 1fr); padding: 0 0 12px; display: none; }
 .tranche.ouverte .volumes-grid { display: grid; }
-
-.fiche-ajouter { margin-top: 16px; }
 
 .empty-state {
   text-align: center;

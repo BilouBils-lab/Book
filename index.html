@@ -13,15 +13,15 @@
   <meta name="theme-color" content="#1c1a17" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.68">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.68">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.69">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.69">
   <!-- Manifeste : nécessaire aux notifications sur iPhone (app installée sur l'écran d'accueil) -->
   <link rel="manifest" href="manifest.webmanifest">
 
   <!-- Thème choisi dans les Paramètres, appliqué avant l'affichage (pas de flash de la mauvaise couleur) -->
   <script>try { var t = localStorage.getItem('theme'); if (t === 'clair' || t === 'sombre') { document.documentElement.dataset.theme = t; document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = t === 'sombre' ? '#1c1a17' : '#f6f1e7'; }); } } catch (e) {}</script>
   <link rel="preload" href="polices/bangers-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=3.68">
+  <link rel="stylesheet" href="css/style.css?v=3.69">
 </head>
 <body>
 
@@ -112,7 +112,7 @@
         </div>
       </details>
 
-      <div class="version-tag">v3.68</div>
+      <div class="version-tag">v3.69</div>
       <div class="settings-credits">Données de parution : <a href="https://mangainsight.fr/" style="color: inherit;">Manga Insight</a> (CC BY 4.0) et catalogue de la BnF.</div>
       <input type="file" id="file-input" style="display: none;" accept=".json" onchange="importerSauvegarde(event)">
       <input type="file" id="csv-input" style="display: none;" accept=".csv" onchange="importerCSV(event)">
@@ -154,33 +154,33 @@
         <img id="modal-cover" class="fiche-jaquette" src="" alt="Jaquette" onclick="ouvrirMenuImage()">
         <div class="fiche-infos">
           <h2 id="modal-title" class="fiche-titre" onclick="renommerSerieActuelle()" title="Renommer la série"></h2>
-          <div id="modal-author" class="fiche-auteur"></div>
           <div id="modal-pastilles" class="fiche-pastilles"></div>
         </div>
         <div class="fiche-boutons-haut">
           <button class="icone-btn" onclick="ouvrirMenuSerie()" aria-label="Plus d'actions">⋯</button>
           <button class="icone-btn" onclick="fermerModal()" aria-label="Fermer">✕</button>
         </div>
+        <!-- Les deux chiffres clés, à côté de la jaquette -->
+        <div class="fiche-tuiles">
+          <div class="fiche-tuile principale"><b id="fiche-possedes"></b><span id="fiche-possedes-libelle"></span></div>
+          <div class="fiche-tuile"><b id="fiche-lus"></b><span id="fiche-lus-libelle"></span></div>
+        </div>
       </div>
+
+      <!-- Une phrase : tomes parus, prochaine sortie ou état de la série -->
+      <div id="fiche-resume" class="fiche-resume"></div>
 
       <div id="fiche-parties" class="fiche-parties"></div>
 
-      <div class="fiche-progression">
-        <div id="fiche-compteur" class="fiche-compteur"></div>
-        <div id="fiche-frise" class="fiche-frise"></div>
-        <div id="fiche-prochain" class="fiche-prochain"></div>
-        <div id="fiche-sortie" class="fiche-prochain"></div>
-      </div>
-
-      <div class="fiche-legende">
-        <span><i class="pt lu"></i>lu</span>
-        <span><i class="pt possede"></i>possédé</span>
-        <span><i class="pt manquant"></i>manquant</span>
-        <span class="fiche-astuce">appui long : retirer</span>
-      </div>
       <div id="modal-volumes-grid" class="volumes-grid"></div>
+      <div id="fiche-astuce" class="fiche-astuce">Touche un tome pour le cocher, appui long pour le retirer.</div>
 
-      <button class="btn btn-secondary fiche-ajouter" onclick="ajouterNouveauTomeModal()">+ Ajouter un tome</button>
+      <button class="fiche-ligne" onclick="ajouterNouveauTomeModal()"><span aria-hidden="true">＋</span>Ajouter un tome</button>
+      <!-- Infos secondaires, repliées : auteur, éditeur, genres, rythme de parution -->
+      <details id="fiche-infos-serie" class="fiche-infos-serie">
+        <summary><span class="fiche-infos-fleche" aria-hidden="true">›</span><span><b>Infos de la série</b><small id="fiche-infos-apercu"></small></span></summary>
+        <dl id="fiche-infos-liste"></dl>
+      </details>
 
       <!-- Pendant un inventaire -->
       <div id="fiche-inventaire" class="fiche-inventaire" style="display: none;">
@@ -400,23 +400,23 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.68"></script>
-  <script src="js/recherche-infos.js?v=3.68"></script>
-  <script src="js/isbn-scanner.js?v=3.68"></script>
-  <script src="js/mise-a-jour.js?v=3.68"></script>
-  <script src="js/stockage.js?v=3.68"></script>
-  <script src="js/jaquettes.js?v=3.68"></script>
-  <script src="js/import-export.js?v=3.68"></script>
-  <script src="js/vues.js?v=3.68"></script>
-  <script src="js/fiche.js?v=3.68"></script>
-  <script src="js/maj-serie.js?v=3.68"></script>
-  <script src="js/sagas.js?v=3.68"></script>
-  <script src="js/ajout-serie.js?v=3.68"></script>
-  <script src="js/inventaire.js?v=3.68"></script>
-  <script src="js/rafale.js?v=3.68"></script>
-  <script src="js/magasin.js?v=3.68"></script>
-  <script src="js/nouveautes.js?v=3.68"></script>
-  <script src="js/notifications.js?v=3.68"></script>
-  <script src="js/demarrage.js?v=3.68"></script>
+  <script src="js/outils.js?v=3.69"></script>
+  <script src="js/recherche-infos.js?v=3.69"></script>
+  <script src="js/isbn-scanner.js?v=3.69"></script>
+  <script src="js/mise-a-jour.js?v=3.69"></script>
+  <script src="js/stockage.js?v=3.69"></script>
+  <script src="js/jaquettes.js?v=3.69"></script>
+  <script src="js/import-export.js?v=3.69"></script>
+  <script src="js/vues.js?v=3.69"></script>
+  <script src="js/fiche.js?v=3.69"></script>
+  <script src="js/maj-serie.js?v=3.69"></script>
+  <script src="js/sagas.js?v=3.69"></script>
+  <script src="js/ajout-serie.js?v=3.69"></script>
+  <script src="js/inventaire.js?v=3.69"></script>
+  <script src="js/rafale.js?v=3.69"></script>
+  <script src="js/magasin.js?v=3.69"></script>
+  <script src="js/nouveautes.js?v=3.69"></script>
+  <script src="js/notifications.js?v=3.69"></script>
+  <script src="js/demarrage.js?v=3.69"></script>
 </body>
 </html>
