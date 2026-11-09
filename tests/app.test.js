@@ -1476,6 +1476,55 @@ test('Découverte par éditeur : depuis les infos de la fiche, ses séries et se
   await fermer();
 });
 
+test('Suggestions « Pour toi » sur la page d’un éditeur, avec leur raison', async ({ navigateur, base }) => {
+  // AniList simulé : chaque série demandée (requêtes groupées « m0: Media(search: …) ») a sa fiche, ou rien
+  const media = (id, genres, auteur, lies = [], lecteurs = []) => ({ id, genres, staff: { edges: [{ role: 'Story & Art', node: { name: { full: auteur } } }] },
+    relations: { edges: lies.map(i => ({ relationType: 'SPIN_OFF', node: { id: i } })) },
+    recommendations: { nodes: lecteurs.map(i => ({ rating: 12, mediaRecommendation: { id: i } })) } });
+  const FICHES = {
+    'One Piece': media(1, ['Action', 'Adventure', 'Fantasy'], 'Eiichiro Oda', [], [50]),
+    'Dragon Ball': media(11, ['Action', 'Adventure', 'Comedy'], 'Akira Toriyama'),
+    'Dragon Ball Super': media(20, ['Action', 'Sci-Fi'], 'Akira Toriyama', [11]),
+    'One Piece Party': media(40, ['Comedy'], 'Ei Andoh', [1]),
+    'One Piece Z': media(50, ['Comedy'], 'Inconnu'),
+    'Berserk': media(30, ['Action', 'Drama', 'Fantasy'], 'Kentaro Miura')
+  };
+  const recherches = [];
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    anilist: (req) => {
+      const data = {};
+      for (const [, alias, titre] of JSON.parse(req.postData()).query.matchAll(/(m\d+): Media\(search: ("(?:[^"\\]|\\.)*")/g)) {
+        recherches.push(JSON.parse(titre));
+        data[alias] = FICHES[JSON.parse(titre)] || null;
+      }
+      return { status: 200, body: { data } };
+    }
+  });
+  await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: tomes(3) }, { titre: 'Dragon Ball', editeur: 'Glénat', tomes: tomes(2) }]);
+  await page.evaluate(() => { ouvrirModalSerie(0); ouvrirEditeur('Glénat'); });
+  await page.waitForSelector('#editeur-pour-toi:not([hidden]) .pour-toi-carte');
+  egal(await page.textContent('#pour-toi-profil'), 'D’après tes séries : Action, Aventure, Fantasy', 'genres préférés');
+  egal(await page.$$eval('.pour-toi-carte', l => l.map(c => [c.querySelector('.editeur-serie-titre').textContent, c.querySelector('.pour-toi-raison').textContent])), [
+    ['Dragon Ball Super', '🔗 Même univers que Dragon Ball'],
+    ['One Piece - Party', '🔗 Même univers que One Piece'],
+    ['One Piece Z', '👥 Les lecteurs de One Piece l’ont aimé'],
+    ['Berserk', '🎯 Action · Fantasy, comme One Piece']
+  ], 'quatre suggestions, la meilleure raison de chacune');
+  verifier(recherches.includes('One Piece') && recherches.includes('Dragon Ball Super'), 'tes séries et celles de l’éditeur demandées à AniList');
+  // Deuxième visite : tout vient du cache de l'appareil
+  const avant = recherches.length;
+  await page.click('#editeur-retour');
+  await page.evaluate(() => ouvrirEditeur('Glénat'));
+  await page.waitForSelector('#editeur-pour-toi:not([hidden]) .pour-toi-carte');
+  egal(recherches.length, avant, 'aucune nouvelle requête AniList');
+  // Le « ＋ » d'une suggestion ouvre l'ajout de la série
+  await page.click('.pour-toi-carte >> nth=3 >> .editeur-ajouter');
+  await page.waitForSelector('#form-serie-modal.active');
+  egal(await page.inputValue('#form-serie-titre'), 'Berserk', 'ajout depuis une suggestion');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Ajouter une série : éditions proposées pendant la saisie du titre', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: [{ numero: 1, possede: true, lu: false }] }]);

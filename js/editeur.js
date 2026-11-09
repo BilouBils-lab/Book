@@ -94,10 +94,12 @@ async function ouvrirEditeur(nom) {
   document.getElementById('editeur-filtres').innerHTML = '';
   document.getElementById('editeur-recherche').hidden = true;
   document.getElementById('editeur-liste').innerHTML = '';
+  document.getElementById('editeur-pour-toi').hidden = true;
   allerPage('editeur');
   if (!indexMI) await chargerMangaInsight(false);
   editeurAffiche = { nom, series: seriesEditeur(nom), filtre: 'toutes', recherche: '', limite: PAGE_SERIES_EDITEUR };
   rendreEditeur();
+  afficherPourToi();
 }
 
 function rendreEditeur() {
