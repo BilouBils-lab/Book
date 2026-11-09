@@ -161,7 +161,7 @@ test('Configuration du déploiement du Worker cohérente', async () => {
 
 test("L'app démarre sans erreur, avec sa barre d'onglets en bas", async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
-  egal(await page.$$eval('.barre-onglets button', b => b.map(x => x.getAttribute('aria-label') || x.textContent.replace(/\d+$/, ''))), ['📖Pile', '📚Collection', 'Ajouter une série', '📅À venir', '📷Scanner'], 'barre d\u2019onglets');
+  egal(await page.$$eval('.barre-onglets button', b => b.map(x => x.getAttribute('aria-label') || x.textContent.replace(/\d+$/, ''))), ['📖Pile', '📚Collection', 'Ajouter (scanner un livre)', '📅À venir', '⚙️Réglages'], 'barre d\u2019onglets');
   egal(await page.$eval('.barre-onglets .active', b => b.id), 'tab-col-btn', 'Collection affichée au démarrage');
   await page.click('#tab-pal-btn');
   egal(await page.evaluate(() => [ongletActif, document.getElementById('view-pal').style.display]), ['pal', 'block'], 'onglet Pile');
@@ -1033,7 +1033,7 @@ test('Scanner : trois modes en onglets (Ajouter, Rafale, Vérifier), solutions d
     document.querySelector('#scanner-modes .actif').textContent, document.getElementById('scanner-aide').textContent,
     getComputedStyle(document.getElementById('scanner-boutons')).display !== 'none', getComputedStyle(document.getElementById('rafale-boutons')).display !== 'none']);
   egal(await etat(), ['➕Ajouter', 'Ajoute un tome à ta collection', true, false], 'par défaut : Ajouter, avec Photo / ISBN / Jaquette');
-  egal(await page.$$eval('#scanner-boutons button', l => l.map(b => b.textContent)), ['📸Photo', '⌨️Saisir l’ISBN', '🖼️Jaquette (IA)'], 'tuiles de secours');
+  egal(await page.$$eval('#scanner-boutons button', l => l.map(b => b.textContent)), ['📸Photo', '⌨️Saisir l’ISBN', '🖼️Jaquette (IA)', '✏️À la main'], 'tuiles de secours');
   await page.click('#scanner-rafale');
   egal(await etat(), ['📚Rafale', 'Plusieurs tomes d’affilée : achats ou étagère', false, true], 'Rafale : bouton Terminer, pas de tuiles');
   await page.evaluate(() => codeBarresLu('9782344062814'));
@@ -1055,8 +1055,24 @@ test('Scanner : trois modes en onglets (Ajouter, Rafale, Vérifier), solutions d
   await page.evaluate(() => { fermerScanner(); serieAVerifier = 0; ouvrirScanner(); });
   egal(await page.evaluate(() => [getComputedStyle(document.getElementById('scanner-modes')).display, document.getElementById('scanner-aide').textContent, getComputedStyle(document.getElementById('scanner-jaquette')).display]),
     ['none', 'Vérifie que ce tome est bien celui de la série', 'none'], 'mode inventaire');
+  egal(await page.$eval('#scanner-a-la-main', b => getComputedStyle(b).display), 'none', 'pas d’ajout à la main en inventaire');
   await page.click('#scanner-modal .scanner-entete .icone-btn');
   verifier(!(await page.evaluate(() => document.getElementById('scanner-modal').classList.contains('active'))), 'la croix ferme le scanner');
+  // Le ＋ de la barre ouvre le scanner ; « À la main » le ferme et ouvre la saisie d'une série
+  await page.evaluate(() => { serieAVerifier = null; scanTermine = false; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); });
+  await page.click('#scanner-a-la-main');
+  await page.waitForSelector('#form-serie-modal.active');
+  egal(await page.evaluate(() => [document.getElementById('scanner-modal').classList.contains('active'), document.getElementById('form-serie-heading').textContent, document.getElementById('form-serie-titre').value]),
+    [false, 'Ajouter une série', ''], 'saisie à la main');
+  await page.click('#form-serie-cancel');
+  // Recherche sans résultat : bouton pour ajouter la série, titre déjà rempli et éditions proposées
+  await page.fill('#recherche-input', 'kagura');
+  await page.waitForSelector('#ajouter-recherche');
+  egal(await page.textContent('#ajouter-recherche'), '＋ Ajouter « kagura » à ma collection', 'bouton dans la recherche');
+  await page.click('#ajouter-recherche');
+  await page.waitForSelector('#form-serie-suggestions .suggestion');
+  egal(await page.inputValue('#form-serie-titre'), 'kagura', 'titre déjà rempli');
+  await page.click('#form-serie-cancel');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });
@@ -1348,7 +1364,7 @@ test('ISBN inconnu des catalogues (tome tout juste paru) : l’app demande sa s�
 test('Ajouter une série : éditions proposées pendant la saisie du titre', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: [{ numero: 1, possede: true, lu: false }] }]);
-  await page.click('.barre-plus');
+  await page.evaluate(() => { ajouterManuel(); });
   await page.fill('#form-serie-titre', 'one pi');
   await page.waitForSelector('#form-serie-suggestions .suggestion');
   const suggestions = () => page.$$eval('#form-serie-suggestions .suggestion', l => l.map(x => x.querySelector('.suggestion-titre').textContent + ' | ' + x.querySelector('.suggestion-detail').textContent));
@@ -1374,7 +1390,7 @@ test('Ajouter une série : éditions proposées pendant la saisie du titre', asy
   egal(await page.textContent('#toast span'), '✓ Kagurabachi ajoutée · Édition standard · 10 tomes · Kana · 2025–2026', 'message');
 
   // Titre modifié après le choix : l'édition est oubliée, saisie libre comme avant
-  await page.click('.barre-plus');
+  await page.evaluate(() => { ajouterManuel(); });
   await page.fill('#form-serie-titre', 'kagura');
   await page.waitForSelector('#form-serie-suggestions .suggestion');
   await page.click('#form-serie-suggestions .suggestion >> nth=1');

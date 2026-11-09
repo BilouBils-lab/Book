@@ -17,9 +17,11 @@ Application web pour gérer sa collection de mangas : tomes possédés et lus, p
 | **Sagas et suites** | Une histoire en plusieurs parties qui repartent au tome 1 (SAO, Jungle Juice saisons 1 et 2) : une **saga**, une seule carte dans la Collection et les parties en onglets dans la fiche (⋯ → 📚 Saga, ✂️ Séparer une nouvelle partie). Une suite qui continue la numérotation (Solo Leveling Ragnarok à partir du tome 20) est reconnue automatiquement dans les sorties et affichée en parties, comme les arcs de One Piece. |
 | **Fiche d'une série** | Tomes (lus, possédés, manquants), prochain à acheter, prochaine sortie. Menu ⋯ : édition / tomes / jaquette, renommer, infos, mettre de côté, supprimer. |
 | **Notifications 🔔** | Sur l'iPhone, même app fermée : tome annoncé, nouveau tome en librairie. Calculées chaque jour par le dépôt privé `mangatheque-sauvegarde`, envoyées par Web Push. Un appui ouvre *À venir* (et la fiche s'il n'y a qu'une série). |
-| **Paramètres ⚙️** | « Tout mettre à jour » (tomes parus, infos manquantes, jaquettes manquantes, un seul bilan), inventaire, notifications, sauvegarde en ligne, apparence (clair / sombre / automatique). |
+| **Réglages ⚙️** | « Tout mettre à jour » (tomes parus, infos manquantes, jaquettes manquantes, un seul bilan), inventaire, notifications, sauvegarde en ligne, apparence (clair / sombre / automatique). |
 
-Autres fonctions : ajout d'une série guidé (« ➕ Saisie » propose les éditions françaises avec éditeur, nombre de tomes et jaquette), scan du code-barres (ISBN) avec vérification de l'édition, **scan en rafale** (plusieurs tomes à la suite après un achat, puis un résumé à valider), **vérification en magasin** (scanner un livre pour savoir si on l'a déjà, sans rien modifier), inventaire série par série, import CSV / JSON, export.
+Barre d'onglets en bas : 📖 Pile · 📚 Collection · ＋ (ouvre le scanner) · 📅 À venir · ⚙️ Réglages.
+
+Autres fonctions : scan du code-barres (ISBN) avec vérification de l'édition, **scan en rafale** (plusieurs tomes à la suite après un achat, puis un résumé à valider), **vérification en magasin** (scanner un livre pour savoir si on l'a déjà, sans rien modifier), inventaire série par série, ajout d'une série à la main en secours (tuile « ✏️ À la main » du scanner, ou bouton proposé par une recherche sans résultat : les éditions françaises sont proposées avec éditeur, nombre de tomes et jaquette), import CSV / JSON, export.
 
 ---
 

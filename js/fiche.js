@@ -485,8 +485,9 @@ async function enregistrerSerie(titre, tomeNum) {
   sauvegarder();
 }
 
-async function ajouterManuel() {
-  const saisie = await demanderSerieEtTome('', 1, 'Ajouter une série', true);
+// Ajout sans code-barres (secours du scanner, ou depuis une recherche sans résultat : titre déjà rempli)
+async function ajouterManuel(titre = '') {
+  const saisie = await demanderSerieEtTome(titre, 1, 'Ajouter une série', true);
   if (!saisie) return;
   await enregistrerSerie(saisie.titre, saisie.tome);
   if (saisie.edition) appliquerEditionChoisie(saisie.titre, saisie.edition);
