@@ -60,7 +60,7 @@ function remplirInfosSerie(serie) {
       lien.id = 'fiche-lien-editeur';
       lien.className = 'fiche-lien';
       lien.textContent = valeur + ' ›';
-      lien.onclick = () => ouvrirEditeur(serie.miEditeur || serie.editeur);
+      lien.onclick = () => ouvrirEditeur(serie.miEditeur || (serie.parution && serie.parution.editeur) || serie.editeur);
       dd.appendChild(lien);
     } else {
       dd.textContent = valeur;
