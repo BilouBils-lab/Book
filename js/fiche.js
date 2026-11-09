@@ -4,8 +4,76 @@ function ouvrirModalSerie(index) {
   serieIndexActive = index;
   remplirModalSerie(index);
   afficherAstuceFiche();
-  document.getElementById('fiche-infos-serie').open = false;
+  revenirALaFiche();
   document.getElementById('detail-modal').classList.add('active');
+}
+
+// --- Pages dans la fenêtre de la fiche : fiche → infos → éditeur ---
+// La page suivante prend la place de la fiche (même cadre, même taille) en glissant depuis la droite.
+const PAGES_FICHE = { fiche: 'page-fiche', infos: 'page-infos', editeur: 'page-editeur' };
+const TITRES_PAGES = { fiche: 'modal-title', infos: 'infos-titre', editeur: 'editeur-titre' };
+let pilePages = []; // pages ouvertes au-dessus de la fiche
+let defilementFiche = 0;
+
+function pageVisible() {
+  return pilePages[pilePages.length - 1] || 'fiche';
+}
+
+function allerPage(nom) {
+  const fond = document.getElementById('detail-modal');
+  const carte = fond.querySelector('.modal-content');
+  if (!pilePages.length) {
+    // On fige le cadre à la taille de la fiche (dans la limite de l'écran)
+    defilementFiche = fond.scrollTop;
+    carte.style.height = Math.min(carte.offsetHeight, innerHeight - 32) + 'px';
+    carte.classList.add('en-page');
+    fond.scrollTop = 0;
+  }
+  if (pageVisible() === nom) return;
+  pilePages.push(nom);
+  montrerPage(nom, 'avance');
+}
+
+function retourPage() {
+  pilePages.pop();
+  montrerPage(pageVisible(), 'recule');
+  if (!pilePages.length) {
+    const fond = document.getElementById('detail-modal');
+    const carte = fond.querySelector('.modal-content');
+    carte.style.height = '';
+    carte.classList.remove('en-page');
+    fond.scrollTop = defilementFiche;
+  }
+}
+
+// Texte du bouton « ‹ … » d'une page : la page d'où l'on vient
+function libelleRetour(index) {
+  const precedente = index > 0 ? pilePages[index - 1] : 'fiche';
+  if (precedente === 'infos') return '‹ Infos';
+  if (precedente === 'editeur') return '‹ ' + document.getElementById('editeur-titre').textContent;
+  const serie = bibliotheque[serieIndexActive];
+  return '‹ ' + (serie ? serie.titre : 'Retour');
+}
+
+function montrerPage(nom, sens) {
+  for (const [cle, id] of Object.entries(PAGES_FICHE)) {
+    const page = document.getElementById(id);
+    page.hidden = cle !== nom;
+    page.classList.remove('avance', 'recule');
+  }
+  const page = document.getElementById(PAGES_FICHE[nom]);
+  if (sens) { void page.offsetWidth; page.classList.add(sens); } // relance l'animation
+  page.scrollTop = 0;
+  document.querySelector('#detail-modal .modal-content').setAttribute('aria-labelledby', TITRES_PAGES[nom]);
+  if (nom !== 'fiche') document.getElementById(nom === 'infos' ? 'infos-retour' : 'editeur-retour').textContent = libelleRetour(pilePages.length - 1);
+}
+
+function revenirALaFiche() {
+  pilePages = [];
+  const carte = document.querySelector('#detail-modal .modal-content');
+  carte.style.height = '';
+  carte.classList.remove('en-page');
+  montrerPage('fiche', null);
 }
 
 // Chiffres d'une série, partagés par la fiche et la liste : jusqu'au dernier tome paru (BnF)
@@ -39,7 +107,7 @@ function resumeSerie(serie, total, manquants) {
   return morceaux.join(' · ');
 }
 
-// « Infos de la série » (repliées) : auteur, éditeur, genres, rythme et dernière sortie
+// Page « Infos de la série » : auteur, éditeur, genres, rythme et dernière sortie
 function remplirInfosSerie(serie) {
   const lignes = [
     ['Auteur', serie.auteur || 'inconnu'],
@@ -62,6 +130,8 @@ function remplirInfosSerie(serie) {
       lien.textContent = valeur + ' ›';
       lien.onclick = () => ouvrirEditeur(serie.miEditeur || (serie.parution && serie.parution.editeur) || serie.editeur);
       dd.appendChild(lien);
+    } else if (nom === 'Genres') {
+      for (const genre of valeur.split(', ')) dd.appendChild(creerPastille(genre));
     } else {
       dd.textContent = valeur;
     }
@@ -462,6 +532,7 @@ async function supprimerSerieActuelle() {
 
 function fermerModal() {
   document.getElementById('detail-modal').classList.remove('active');
+  revenirALaFiche();
   serieIndexActive = null;
 }
 

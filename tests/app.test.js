@@ -207,10 +207,20 @@ test('Fiche : progression, prochain tome, tranches et ajout d’un tome manquant
   egal(await tuiles(), ['✓ 12/14 possédés', '4 lus'], 'tuiles à côté de la jaquette');
   egal(await page.textContent('#fiche-resume'), '14 tomes parus', 'résumé');
   egal(await page.$$eval('#modal-pastilles .pastille', p => p.map(x => x.textContent)), ['En cours'], 'seulement le statut sous le titre');
-  egal(await page.textContent('#fiche-infos-apercu'), 'Auteur, éditeur, genres', 'infos repliées : aperçu');
-  verifier(!(await page.isVisible('#fiche-infos-liste')), 'infos repliées au départ');
-  await page.click('#fiche-infos-serie summary');
-  egal(await page.$$eval('#fiche-infos-liste > *', l => l.map(x => x.textContent)), ['Auteur', 'inconnu', 'Genres', 'Seinen, Sport'], 'infos dépliées');
+  egal(await page.textContent('#fiche-infos-apercu'), 'Auteur, éditeur, genres', 'ligne « Infos de la série » : aperçu');
+  verifier(!(await page.isVisible('#page-infos')), 'page des infos fermée au départ');
+  // Les infos s'ouvrent à la place de la fiche, dans la même fenêtre et à la même taille
+  const hauteurFiche = await page.$eval('#detail-modal .modal-content', c => c.offsetHeight);
+  await page.click('#fiche-infos-serie');
+  egal(await page.evaluate(() => [document.getElementById('page-fiche').hidden, document.getElementById('page-infos').hidden, document.querySelector('#detail-modal .modal-content').getAttribute('aria-labelledby')]),
+    [true, false, 'infos-titre'], 'page des infos à la place de la fiche');
+  egal(await page.$eval('#detail-modal .modal-content', c => c.offsetHeight), hauteurFiche, 'même taille que la fiche');
+  egal(await page.textContent('#infos-retour'), '‹ Ao Ashi', 'retour vers la fiche');
+  egal(await page.$$eval('#fiche-infos-liste > *', l => l.map(x => x.textContent)), ['Auteur', 'inconnu', 'Genres', 'SeinenSport'], 'infos');
+  egal(await page.$$eval('#fiche-infos-liste .pastille', l => l.map(x => x.textContent)), ['Seinen', 'Sport'], 'genres en pastilles');
+  await page.click('#infos-retour');
+  egal(await page.evaluate(() => [document.getElementById('page-fiche').hidden, document.getElementById('page-infos').hidden, document.querySelector('#detail-modal .modal-content').style.height]),
+    [false, true, ''], '« ‹ Ao Ashi » revient à la fiche');
   await page.click('#modal-volumes-grid .tome-box >> text=/^6$/');
   egal(await tuiles(), ['✓ 13/14 possédés', '4 lus'], 'après appui sur le tome 6');
   await page.click('#modal-volumes-grid .tome-box >> text=/^9$/');
@@ -956,7 +966,8 @@ test('Accessibilité : aucun problème détecté sur les écrans principaux (th�
       ['collection', () => { fermerToutesLesFenetres(); changerOnglet('collection'); }],
       ['à venir : sorties', () => { fermerToutesLesFenetres(); vueAVenir = 'sorties'; changerOnglet('avenir'); }],
       ['à venir : à acheter', () => { fermerToutesLesFenetres(); vueAVenir = 'achats'; changerOnglet('avenir'); }],
-      ['fiche', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); document.getElementById('fiche-infos-serie').open = true; }],
+      ['fiche', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); }],
+      ['infos de la série', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); allerPage('infos'); }],
       ['page d’un éditeur', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); ouvrirEditeur('Glénat'); }],
       ['menu de la fiche', () => { ouvrirMenuSerie(); }],
       ['paramètres', () => { fermerToutesLesFenetres(); ouvrirParametres(); document.querySelector('.settings-avance').open = true; }],
@@ -1421,7 +1432,7 @@ test('Découverte par éditeur : depuis les infos de la fiche, ses séries et se
   await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: tomes(3) }, { titre: 'Ao Ashi', editeur: 'PUQ', tomes: tomes(2) }]);
   egal(await page.evaluate(() => bibliotheque.map(s => s.editeur)), ['Glénat', 'Mangetsu'], 'éditeur corrigé d’après l’édition française');
   await page.evaluate(() => ouvrirModalSerie(0));
-  await page.click('#fiche-infos-serie summary');
+  await page.click('#fiche-infos-serie');
   egal(await page.textContent('#fiche-lien-editeur'), 'Glénat ›', 'lien vers l’éditeur');
   // Une sortie annoncée dans deux mois (les données de test sont toutes passées)
   const mois = await page.evaluate(() => {
@@ -1430,10 +1441,10 @@ test('Découverte par éditeur : depuis les infos de la fiche, ses séries et se
     return moisTexte(k, true);
   });
   await page.click('#fiche-lien-editeur');
-  await page.waitForSelector('#editeur-modal.active .editeur-serie');
+  await page.waitForSelector('#page-editeur:not([hidden]) .editeur-serie');
   const lignes = () => page.$$eval('.editeur-serie', l => l.map(x => x.innerText.replace(/\s+/g, ' ').trim()));
   egal(await page.textContent('#editeur-titre'), 'Glénat', 'titre');
-  egal(await page.textContent('#editeur-retour'), '‹ One Piece', 'retour vers la fiche');
+  egal(await page.textContent('#editeur-retour'), '‹ Infos', 'retour vers les infos');
   egal(await page.textContent('#editeur-resume'), 'Éditeur · 31 séries en France · 1 dans ta collection', 'résumé');
   egal(await page.$$eval('.editeur-sortie', l => l.map(x => x.innerText.replace(/\s+/g, ' ').trim())), [`Dragon Ball Super Tome 25 ${mois}`], 'prochaines sorties');
   const toutes = await lignes();
@@ -1445,16 +1456,21 @@ test('Découverte par éditeur : depuis les infos de la fiche, ses séries et se
   egal(await page.textContent('.editeur-plus'), 'Voir plus (1)', 'liste par pages de 30');
   await page.fill('#editeur-recherche', 'berserk');
   egal(await lignes(), ['Berserk 43 tomes · en cours ＋'], 'recherche dans les séries de l’éditeur');
-  // Retour à la fiche, puis ajout d'une série depuis l'éditeur : titre rempli, éditions proposées
+  // Retour aux infos, puis ajout d'une série depuis l'éditeur : titre rempli, éditions proposées
   await page.click('#editeur-retour');
-  verifier(await page.evaluate(() => !document.getElementById('editeur-modal').classList.contains('active') && document.getElementById('detail-modal').classList.contains('active')), '« Retour » revient à la fiche');
+  egal(await page.evaluate(() => [document.getElementById('page-editeur').hidden, document.getElementById('page-infos').hidden, document.getElementById('detail-modal').classList.contains('active')]),
+    [true, false, true], '« ‹ Infos » revient aux infos');
   await page.click('#fiche-lien-editeur');
-  await page.waitForSelector('#editeur-modal.active .editeur-serie');
+  await page.waitForSelector('#page-editeur:not([hidden]) .editeur-serie');
   await page.fill('#editeur-recherche', 'berserk');
   await page.click('.editeur-ajouter');
   await page.waitForSelector('#form-serie-modal.active #form-serie-suggestions .suggestion');
-  egal(await page.evaluate(() => [document.getElementById('form-serie-titre').value, document.getElementById('editeur-modal').classList.contains('active'), document.getElementById('detail-modal').classList.contains('active')]),
-    ['Berserk', false, false], 'ajout de la série, éditions proposées');
+  egal(await page.evaluate(() => [document.getElementById('form-serie-titre').value, document.getElementById('detail-modal').classList.contains('active')]),
+    ['Berserk', false], 'ajout de la série, éditions proposées');
+  // La fiche se rouvre toujours sur sa première page
+  await page.click('#form-serie-cancel');
+  await page.evaluate(() => ouvrirModalSerie(0));
+  egal(await page.evaluate(() => [document.getElementById('page-fiche').hidden, document.getElementById('page-editeur').hidden]), [false, true], 'fiche rouverte sur sa première page');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });
