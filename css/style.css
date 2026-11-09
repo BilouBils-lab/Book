@@ -704,7 +704,7 @@ main {
 .fiche-astuce { font-size: 12px; color: var(--text-sub); text-align: center; margin: 8px 0 2px; }
 
 /* Lignes du bas : « Ajouter un tome », « Infos de la série » */
-.fiche-ligne, .fiche-infos-serie summary {
+.fiche-ligne {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -720,17 +720,29 @@ main {
   cursor: pointer;
 }
 .fiche-ligne { border-bottom: 1px solid var(--card-border); margin-top: 4px; }
-.fiche-ligne span, .fiche-infos-fleche { width: 20px; text-align: center; flex-shrink: 0; }
+.fiche-ligne span { width: 20px; text-align: center; flex-shrink: 0; }
 .fiche-ligne span { font-size: 19px; }
-.fiche-infos-serie summary { list-style: none; }
-.fiche-infos-serie summary::-webkit-details-marker { display: none; }
-.fiche-infos-fleche { color: var(--text-sub); transition: transform 0.2s; }
-.fiche-infos-serie[open] .fiche-infos-fleche { transform: rotate(90deg); }
-.fiche-infos-serie summary small { display: block; font-size: 13px; font-weight: 400; color: var(--text-sub); margin-top: 2px; }
-.fiche-infos-serie[open] summary small { display: none; }
-.fiche-infos-serie dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0 4px 6px 36px; font-size: 14px; }
-.fiche-infos-serie dt { color: var(--text-sub); }
-.fiche-infos-serie dd { margin: 0; }
+.fiche-ligne-infos { border-bottom: none; margin-top: 0; }
+.fiche-ligne .fiche-ligne-texte { flex: 1; width: auto; text-align: left; font-size: 15px; }
+.fiche-ligne-texte small { display: block; font-size: 13px; font-weight: 400; color: var(--text-sub); margin-top: 2px; }
+.fiche-ligne .fiche-ligne-fleche { color: var(--text-sub); font-size: 18px; }
+
+/* Pages dans la fenêtre de la fiche : le cadre garde la taille de la fiche, la page défile dedans */
+.modal-content.fiche.en-page { display: flex; flex-direction: column; }
+.en-page .fiche-page:not([hidden]) { flex: 1; min-height: 0; overflow-y: auto; }
+.fiche-page.avance { animation: page-avance 0.28s ease-out; }
+.fiche-page.recule { animation: page-recule 0.28s ease-out; }
+@keyframes page-avance { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes page-recule { from { transform: translateX(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .fiche-page.avance, .fiche-page.recule { animation: none; } }
+.page-haut { display: flex; align-items: center; justify-content: space-between; margin: -4px -6px 0 -4px; }
+.page-retour { border: none; background: none; font: inherit; font-size: 15px; color: var(--text-sub); padding: 6px 4px; cursor: pointer; max-width: 75%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.page-titre { font-size: 28px; margin: 4px 0 8px; cursor: default; }
+.infos-liste { margin: 0; }
+.infos-liste dt { font-size: 13px; color: var(--text-sub); padding-top: 12px; }
+.infos-liste dd { margin: 3px 0 0; padding-bottom: 12px; border-bottom: 1px solid var(--card-border); font-size: 15px; }
+.infos-liste dd .pastille { font-size: 13px; margin: 2px 6px 2px 0; display: inline-block; }
+.infos-sources { font-size: 12px; color: var(--text-sub); margin: 14px 0 4px; }
 
 .volumes-grid {
   display: grid;
@@ -1101,13 +1113,9 @@ select.filtre { appearance: none; -webkit-appearance: none; max-width: 170px; te
 
 /* --- Page d'un éditeur --- */
 .fiche-lien { padding: 0; border: none; background: none; font: inherit; font-weight: 700; color: var(--text-main); text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: pointer; text-align: left; }
-.editeur { padding: 16px 18px 10px; }
-.editeur-haut { display: flex; align-items: center; justify-content: space-between; margin: -4px -6px 0 -4px; }
-.editeur-retour { border: none; background: none; font: inherit; font-size: 15px; color: var(--text-sub); padding: 6px 4px; cursor: pointer; max-width: 75%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
-.editeur-titre { font-size: 30px; margin: 4px 0 2px; cursor: default; }
 .editeur-resume { font-size: 14px; color: var(--text-sub); margin-bottom: 16px; }
 .editeur-section { font-weight: 700; font-size: 16px; margin-bottom: 10px; }
-.editeur-sorties { display: flex; gap: 12px; overflow-x: auto; margin: 0 -18px 14px; padding: 0 18px 6px; scrollbar-width: none; }
+.editeur-sorties { display: flex; gap: 12px; overflow-x: auto; margin: 0 -16px 14px; padding: 0 16px 6px; scrollbar-width: none; }
 .editeur-sorties:empty { display: none; }
 .editeur-sortie { flex: 0 0 96px; display: flex; flex-direction: column; padding: 0; border: none; background: none; font: inherit; color: var(--text-main); text-align: left; cursor: pointer; min-width: 0; }
 .editeur-sortie-jaquette { width: 96px; height: 144px; border-radius: 10px; object-fit: cover; background: var(--surface-relief); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18); }

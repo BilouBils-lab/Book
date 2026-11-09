@@ -85,24 +85,19 @@ function jaquetteSerieEditeur(g, classe) {
   return img;
 }
 
+// La page de l'éditeur s'ouvre dans la fenêtre de la fiche, à la place de la page actuelle
 async function ouvrirEditeur(nom) {
-  const modal = document.getElementById('editeur-modal');
-  const serie = serieIndexActive !== null ? bibliotheque[serieIndexActive] : null;
-  document.getElementById('editeur-retour').textContent = serie ? '‹ ' + serie.titre : '‹ Retour';
   document.getElementById('editeur-titre').textContent = nom;
   document.getElementById('editeur-resume').textContent = 'Chargement…';
+  document.getElementById('editeur-sorties-titre').hidden = true;
   document.getElementById('editeur-sorties').innerHTML = '';
+  document.getElementById('editeur-filtres').innerHTML = '';
+  document.getElementById('editeur-recherche').hidden = true;
   document.getElementById('editeur-liste').innerHTML = '';
-  modal.classList.add('active');
-  modal.scrollTop = 0;
+  allerPage('editeur');
   if (!indexMI) await chargerMangaInsight(false);
   editeurAffiche = { nom, series: seriesEditeur(nom), filtre: 'toutes', recherche: '', limite: PAGE_SERIES_EDITEUR };
   rendreEditeur();
-}
-
-function fermerEditeur() {
-  document.getElementById('editeur-modal').classList.remove('active');
-  editeurAffiche = null;
 }
 
 function rendreEditeur() {
@@ -215,10 +210,9 @@ function ligneSerieEditeur(g) {
 function choisirSerieEditeur(g) {
   if (g.possedee) {
     const index = indexSeriePossedee(g.titre);
-    if (index !== -1) { fermerEditeur(); ouvrirModalSerie(index); }
+    if (index !== -1) ouvrirModalSerie(index);
     return;
   }
-  fermerEditeur();
   fermerModal();
   ajouterManuel(g.base);
 }
