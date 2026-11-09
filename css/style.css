@@ -16,7 +16,7 @@
   --card-bg: #fffdf8;
   --card-border: #e3d9c6;
   --text-main: #26231e;
-  --text-sub: #6e665a;
+  --text-sub: #5c554a;
   --texte-faible: #a39a8a;
   --accent: #26231e;
   --accent-hover: #000000;
@@ -28,6 +28,11 @@
   --surface-creuse: #f0e9db;
   --surface-relief: #e9dfcc;
   --fond-entete: rgba(246, 241, 231, 0.94);
+  /* Fond de l'app : trois halos de couleur (jaune en haut, rouge à droite, bleu en bas) */
+  --halo-jaune: rgba(255, 214, 10, 0.55);
+  --halo-rouge: rgba(192, 57, 43, 0.26);
+  --halo-bleu: rgba(46, 134, 193, 0.28);
+  --entete-voile: rgba(246, 241, 231, 0.6);
   --barre-etat: #26231e;
   --voile: rgba(38, 35, 30, 0.22);
   --alerte: #8a5a12;
@@ -55,7 +60,7 @@
   --card-bg: #25221e;
   --card-border: #36322c;
   --text-main: #e8e1d3;
-  --text-sub: #a59d8f;
+  --text-sub: #c4bcae;
   --texte-faible: #6f685d;
   --accent: #e9bd4c;
   --accent-hover: #f2cc68;
@@ -67,6 +72,10 @@
   --surface-creuse: #191714;
   --surface-relief: #322e28;
   --fond-entete: rgba(28, 26, 23, 0.94);
+  --halo-jaune: rgba(233, 189, 76, 0.32);
+  --halo-rouge: rgba(192, 57, 43, 0.28);
+  --halo-bleu: rgba(46, 134, 193, 0.3);
+  --entete-voile: rgba(28, 26, 23, 0.6);
   --barre-etat: rgba(28, 26, 23, 0.94);
   --voile: rgba(0, 0, 0, 0.35);
   --alerte: #e9a23b;
@@ -93,7 +102,7 @@
   --card-bg: #25221e;
   --card-border: #36322c;
   --text-main: #e8e1d3;
-  --text-sub: #a59d8f;
+  --text-sub: #c4bcae;
   --texte-faible: #6f685d;
   --accent: #e9bd4c;
   --accent-hover: #f2cc68;
@@ -105,6 +114,10 @@
   --surface-creuse: #191714;
   --surface-relief: #322e28;
   --fond-entete: rgba(28, 26, 23, 0.94);
+  --halo-jaune: rgba(233, 189, 76, 0.32);
+  --halo-rouge: rgba(192, 57, 43, 0.28);
+  --halo-bleu: rgba(46, 134, 193, 0.3);
+  --entete-voile: rgba(28, 26, 23, 0.6);
   --barre-etat: rgba(28, 26, 23, 0.94);
   --voile: rgba(0, 0, 0, 0.35);
   --alerte: #e9a23b;
@@ -139,10 +152,23 @@ body {
   padding-bottom: calc(120px + env(safe-area-inset-bottom));
 }
 
+/* Halos de couleur, immobiles derrière tout le contenu */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 0% 6%, var(--halo-jaune), transparent 55%),
+    radial-gradient(circle at 108% 42%, var(--halo-rouge), transparent 50%),
+    radial-gradient(circle at 8% 96%, var(--halo-bleu), transparent 55%);
+}
+
 header {
   position: sticky;
   top: 0;
-  background: linear-gradient(var(--barre-etat) 0, var(--barre-etat) env(safe-area-inset-top), var(--fond-entete) env(safe-area-inset-top));
+  background: linear-gradient(var(--barre-etat) 0, var(--barre-etat) env(safe-area-inset-top), var(--entete-voile) env(safe-area-inset-top));
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   padding: calc(12px + env(safe-area-inset-top)) 16px 0 16px;
