@@ -347,6 +347,12 @@ function arreterCamera() {
   if (lecteurCodeBarres) { lecteurCodeBarres.reset(); lecteurCodeBarres = null; }
 }
 
+// Le code-barres ne passe pas : on ferme le scanner et on saisit la série à la main
+function ajouterALaMain() {
+  fermerScanner();
+  ajouterManuel();
+}
+
 function fermerScanner() {
   // Fond touché pendant une rafale : on ne perd pas les livres scannés, on passe au résumé
   if (modeRafale && rafale.length) { terminerRafale(); return; }

@@ -170,15 +170,6 @@ header {
   letter-spacing: -0.5px;
 }
 
-.settings-btn {
-  background: transparent;
-  border: none;
-  font-size: 20px;
-  color: var(--text-sub);
-  cursor: pointer;
-  padding: 4px;
-}
-
 .tabs-nav {
   display: flex;
   gap: 8px;

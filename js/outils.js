@@ -81,6 +81,7 @@ function demanderSerieEtTome(titreParDefaut, tomeParDefaut, entete, avecSuggesti
         champTitre.value = titreDeEdition(e);
         zoneSuggestions.innerHTML = '';
       });
+      if (champTitre.value) champTitre.oninput(); // titre déjà rempli : ses éditions sont proposées tout de suite
     }
     modal.classList.add('active');
     setTimeout(() => champTitre.focus(), 50);

@@ -44,6 +44,7 @@ function afficherModeRafale() {
   // Photo, saisie et jaquette : pour ajouter ou vérifier un seul tome
   document.getElementById('scanner-boutons').style.display = mode === 'ajouter' || mode === 'inventaire' ? 'flex' : 'none';
   document.getElementById('scanner-jaquette').style.display = mode === 'inventaire' ? 'none' : '';
+  document.getElementById('scanner-a-la-main').style.display = mode === 'inventaire' ? 'none' : '';
   document.getElementById('rafale-boutons').style.display = mode === 'rafale' ? 'block' : 'none';
   if (!modeVerification) document.getElementById('verdict-magasin').innerHTML = '';
   afficherListeRafale();

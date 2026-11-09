@@ -78,7 +78,7 @@ function rendreVues() {
   });
 
   if (bibliotheque.length === 0) {
-    containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Clique sur ➕ pour ajouter une série.<br><br>Tu avais déjà une collection (nouveau raccourci, autre appareil) ?<br>⚙️ → 🔑 Code de sauvegarde cloud pour la récupérer.</div>`;
+    containerCol.innerHTML = `<div class="empty-state">Ta collection est vide.<br>Touche ＋ en bas pour scanner ton premier livre.<br><br>Tu avais déjà une collection (nouveau raccourci, autre appareil) ?<br>⚙️ → 🔑 Code de sauvegarde cloud pour la récupérer.</div>`;
   } else if (listeAffichee.length === 0) {
     const vide = document.createElement('div');
     vide.className = 'empty-state';
@@ -91,6 +91,17 @@ function rendreVues() {
       tout.textContent = 'Tout afficher';
       tout.onclick = () => { filtreActif = 'toutes'; editeurActif = ''; rendreVues(); };
       vide.appendChild(tout);
+    }
+    // Série absente de la collection : on propose de l'ajouter, titre déjà rempli
+    const cherche = rechercheTexte.trim();
+    if (cherche) {
+      const ajouter = document.createElement('button');
+      ajouter.className = 'btn';
+      ajouter.id = 'ajouter-recherche';
+      ajouter.style.margin = '12px auto 0';
+      ajouter.textContent = `＋ Ajouter « ${cherche} » à ma collection`;
+      ajouter.onclick = () => ajouterManuel(cherche);
+      vide.appendChild(ajouter);
     }
     containerCol.appendChild(vide);
   } else {
