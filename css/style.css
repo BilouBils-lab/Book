@@ -729,7 +729,7 @@ main {
 
 /* Pages dans la fenêtre de la fiche : le cadre garde la taille de la fiche, la page défile dedans */
 .modal-content.fiche.en-page { display: flex; flex-direction: column; }
-.en-page .fiche-page:not([hidden]) { flex: 1; min-height: 0; overflow-y: auto; }
+.en-page .fiche-page:not([hidden]) { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; } /* défile seulement de haut en bas */
 .fiche-page.avance { animation: page-avance 0.28s ease-out; }
 .fiche-page.recule { animation: page-recule 0.28s ease-out; }
 @keyframes page-avance { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
