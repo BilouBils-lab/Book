@@ -1444,6 +1444,7 @@ test('Découverte par éditeur : depuis les infos de la fiche, ses séries et se
   await page.waitForSelector('#page-editeur:not([hidden]) .editeur-serie');
   const lignes = () => page.$$eval('.editeur-serie', l => l.map(x => x.innerText.replace(/\s+/g, ' ').trim()));
   egal(await page.textContent('#editeur-titre'), 'Glénat', 'titre');
+  verifier(await page.$eval('#page-editeur', p => p.scrollWidth <= p.clientWidth || getComputedStyle(p).overflowX === 'hidden'), 'la page ne glisse pas sur le côté');
   egal(await page.textContent('#editeur-retour'), '‹ Infos', 'retour vers les infos');
   egal(await page.textContent('#editeur-resume'), 'Éditeur · 31 séries en France · 1 dans ta collection', 'résumé');
   egal(await page.$$eval('.editeur-sortie', l => l.map(x => x.innerText.replace(/\s+/g, ' ').trim())), [`Dragon Ball Super Tome 25 ${mois}`], 'prochaines sorties');
