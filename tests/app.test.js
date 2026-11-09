@@ -956,7 +956,8 @@ test('Accessibilité : aucun problème détecté sur les écrans principaux (th�
       ['collection', () => { fermerToutesLesFenetres(); changerOnglet('collection'); }],
       ['à venir : sorties', () => { fermerToutesLesFenetres(); vueAVenir = 'sorties'; changerOnglet('avenir'); }],
       ['à venir : à acheter', () => { fermerToutesLesFenetres(); vueAVenir = 'achats'; changerOnglet('avenir'); }],
-      ['fiche', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); }],
+      ['fiche', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); document.getElementById('fiche-infos-serie').open = true; }],
+      ['page d’un éditeur', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); ouvrirEditeur('Glénat'); }],
       ['menu de la fiche', () => { ouvrirMenuSerie(); }],
       ['paramètres', () => { fermerToutesLesFenetres(); ouvrirParametres(); document.querySelector('.settings-avance').open = true; }],
       ['quoi de neuf', () => { fermerToutesLesFenetres(); ouvrirNouveautes(); }],
@@ -1410,6 +1411,48 @@ test('ISBN inconnu des catalogues (tome tout juste paru) : l’app demande sa s�
   egal([recherches - avant, await page.textContent('#modal-title')], [0, 'Solo Leveling'], 'reconnu sans recherche, fiche ouverte');
   await page.evaluate(() => { fermerModal(); serieAVerifier = null; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); passerEnModeMagasin(); codeBarresLu('9782382884577'); });
   await page.waitForFunction(() => document.querySelector('#verdict-magasin .verdict-titre')?.textContent === 'Tu l’as déjà');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Découverte par éditeur : depuis les infos de la fiche, ses séries et ses sorties', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: tomes(3) }]);
+  await page.evaluate(() => ouvrirModalSerie(0));
+  await page.click('#fiche-infos-serie summary');
+  egal(await page.textContent('#fiche-lien-editeur'), 'Glénat ›', 'lien vers l’éditeur');
+  // Une sortie annoncée dans deux mois (les données de test sont toutes passées)
+  const mois = await page.evaluate(() => {
+    const k = moisActuel() + 2;
+    indexMI.get(normaliserRecherche('Dragon Ball Super')).push({ nom: 'Dragon Ball Super', base: 'Dragon Ball Super', suffixe: '', vol: 25, k, editeur: 'Glénat', ean: '' });
+    return moisTexte(k, true);
+  });
+  await page.click('#fiche-lien-editeur');
+  await page.waitForSelector('#editeur-modal.active .editeur-serie');
+  const lignes = () => page.$$eval('.editeur-serie', l => l.map(x => x.innerText.replace(/\s+/g, ' ').trim()));
+  egal(await page.textContent('#editeur-titre'), 'Glénat', 'titre');
+  egal(await page.textContent('#editeur-retour'), '‹ One Piece', 'retour vers la fiche');
+  egal(await page.textContent('#editeur-resume'), 'Éditeur · 31 séries en France · 1 dans ta collection', 'résumé');
+  egal(await page.$$eval('.editeur-sortie', l => l.map(x => x.innerText.replace(/\s+/g, ' ').trim())), [`Dragon Ball Super Tome 25 ${mois}`], 'prochaines sorties');
+  const toutes = await lignes();
+  egal(toutes[0], `Dragon Ball Super 24 tomes · tome 25 en ${mois} ＋`, 'série avec une sortie annoncée en premier');
+  verifier(toutes.includes('One Piece 113 tomes · en cours ✓ Dans ta collection'), 'série possédée signalée');
+  verifier(toutes.some(t => t.startsWith('One Piece - Party') && t.endsWith('＋')), 'une autre série du même nom n’est pas possédée');
+  verifier(toutes.some(t => t.startsWith('Berserk 43 tomes')) && !toutes.some(t => /Prestige|Coffret|Roman/.test(t)), 'éditions spéciales regroupées, coffrets et romans écartés');
+  egal(await page.$$eval('#editeur-filtres button', l => l.map(x => x.textContent)), ['Toutes 31', 'En cours 8', 'Plus de sortie 23'], 'filtres');
+  egal(await page.textContent('.editeur-plus'), 'Voir plus (1)', 'liste par pages de 30');
+  await page.fill('#editeur-recherche', 'berserk');
+  egal(await lignes(), ['Berserk 43 tomes · en cours ＋'], 'recherche dans les séries de l’éditeur');
+  // Retour à la fiche, puis ajout d'une série depuis l'éditeur : titre rempli, éditions proposées
+  await page.click('#editeur-retour');
+  verifier(await page.evaluate(() => !document.getElementById('editeur-modal').classList.contains('active') && document.getElementById('detail-modal').classList.contains('active')), '« Retour » revient à la fiche');
+  await page.click('#fiche-lien-editeur');
+  await page.waitForSelector('#editeur-modal.active .editeur-serie');
+  await page.fill('#editeur-recherche', 'berserk');
+  await page.click('.editeur-ajouter');
+  await page.waitForSelector('#form-serie-modal.active #form-serie-suggestions .suggestion');
+  egal(await page.evaluate(() => [document.getElementById('form-serie-titre').value, document.getElementById('editeur-modal').classList.contains('active'), document.getElementById('detail-modal').classList.contains('active')]),
+    ['Berserk', false, false], 'ajout de la série, éditions proposées');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });

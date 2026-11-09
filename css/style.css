@@ -1098,3 +1098,29 @@ select.filtre { appearance: none; -webkit-appearance: none; max-width: 170px; te
   font-weight: 400;
   box-shadow: 0 6px 16px var(--ombre-accent);
 }
+
+/* --- Page d'un éditeur --- */
+.fiche-lien { padding: 0; border: none; background: none; font: inherit; font-weight: 700; color: var(--text-main); text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: pointer; text-align: left; }
+.editeur { padding: 16px 18px 10px; }
+.editeur-haut { display: flex; align-items: center; justify-content: space-between; margin: -4px -6px 0 -4px; }
+.editeur-retour { border: none; background: none; font: inherit; font-size: 15px; color: var(--text-sub); padding: 6px 4px; cursor: pointer; max-width: 75%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.editeur-titre { font-size: 30px; margin: 4px 0 2px; cursor: default; }
+.editeur-resume { font-size: 14px; color: var(--text-sub); margin-bottom: 16px; }
+.editeur-section { font-weight: 700; font-size: 16px; margin-bottom: 10px; }
+.editeur-sorties { display: flex; gap: 12px; overflow-x: auto; margin: 0 -18px 14px; padding: 0 18px 6px; scrollbar-width: none; }
+.editeur-sorties:empty { display: none; }
+.editeur-sortie { flex: 0 0 96px; display: flex; flex-direction: column; padding: 0; border: none; background: none; font: inherit; color: var(--text-main); text-align: left; cursor: pointer; min-width: 0; }
+.editeur-sortie-jaquette { width: 96px; height: 144px; border-radius: 10px; object-fit: cover; background: var(--surface-relief); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18); }
+.editeur-sortie-titre { font-size: 13px; font-weight: 600; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.editeur-sortie-detail { font-size: 12px; color: var(--text-sub); }
+.editeur-filtres { margin-bottom: 8px; }
+.editeur-recherche { margin: 4px 0 6px; }
+.editeur-serie { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--card-border); }
+.editeur-serie-jaquette { width: 44px; height: 66px; border-radius: 6px; object-fit: cover; background: var(--surface-relief); flex-shrink: 0; }
+.editeur-serie-infos { flex: 1; min-width: 0; }
+.editeur-serie-titre { font-weight: 600; font-size: 15px; }
+.editeur-serie-detail { font-size: 12.5px; color: var(--text-sub); margin-top: 2px; }
+.editeur-deja { font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 999px; background: var(--surface-creuse); color: var(--text-sub); flex-shrink: 0; }
+.editeur-ajouter { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--accent); color: var(--texte-sur-accent); font-size: 20px; flex-shrink: 0; cursor: pointer; }
+.editeur-plus { margin: 12px 0 4px; }
+.editeur-vide { text-align: center; color: var(--text-sub); padding: 20px 0; }
