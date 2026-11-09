@@ -1490,12 +1490,17 @@ test('Suggestions « Pour toi » sur la page d’un éditeur, avec leur raison',
     'Berserk': media(30, ['Action', 'Drama', 'Fantasy'], 'Kentaro Miura')
   };
   const recherches = [];
+  let refusees = 0, enPanne = false;
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
     anilist: (req) => {
+      if (enPanne) return { status: 500, body: { errors: [{ message: 'Internal Server Error' }], data: null } };
+      const alias = [...JSON.parse(req.postData()).query.matchAll(/(m\d+): Page\(perPage: 1\) \{ media\(search: ("(?:[^"\\]|\\.)*")/g)];
+      // Comme AniList : une requête trop grosse est refusée en entier
+      if (alias.length > 4) { refusees++; return { status: 400, body: { errors: [{ message: 'Max query complexity of 500 exceeded' }], data: null } }; }
       const data = {};
-      for (const [, alias, titre] of JSON.parse(req.postData()).query.matchAll(/(m\d+): Media\(search: ("(?:[^"\\]|\\.)*")/g)) {
+      for (const [, cle, titre] of alias) {
         recherches.push(JSON.parse(titre));
-        data[alias] = FICHES[JSON.parse(titre)] || null;
+        data[cle] = { media: FICHES[JSON.parse(titre)] ? [FICHES[JSON.parse(titre)]] : [] }; // introuvable : liste vide
       }
       return { status: 200, body: { data } };
     }
@@ -1511,12 +1516,23 @@ test('Suggestions « Pour toi » sur la page d’un éditeur, avec leur raison',
     ['Berserk', '🎯 Action · Fantasy, comme One Piece']
   ], 'quatre suggestions, la meilleure raison de chacune');
   verifier(recherches.includes('One Piece') && recherches.includes('Dragon Ball Super'), 'tes séries et celles de l’éditeur demandées à AniList');
+  verifier(refusees > 0, 'requêtes trop grosses refusées par AniList, puis découpées');
   // Deuxième visite : tout vient du cache de l'appareil
   const avant = recherches.length;
   await page.click('#editeur-retour');
   await page.evaluate(() => ouvrirEditeur('Glénat'));
   await page.waitForSelector('#editeur-pour-toi:not([hidden]) .pour-toi-carte');
   egal(recherches.length, avant, 'aucune nouvelle requête AniList');
+  // AniList en panne et rien en mémoire : un message le dit, au lieu d'une section vide
+  await page.click('#editeur-retour');
+  enPanne = true;
+  await page.evaluate(() => { cacheAniList = {}; ouvrirEditeur('Glénat'); });
+  await page.waitForFunction(() => document.getElementById('pour-toi-profil').textContent.startsWith('Suggestions indisponibles'));
+  egal(await page.textContent('#pour-toi-profil'), 'Suggestions indisponibles pour l’instant (AniList : HTTP 500 — Internal Server Error).', 'message si AniList est en panne');
+  enPanne = false;
+  await page.click('#editeur-retour');
+  await page.evaluate(() => ouvrirEditeur('Glénat'));
+  await page.waitForSelector('#editeur-pour-toi:not([hidden]) .pour-toi-carte');
   // Le « ＋ » d'une suggestion ouvre l'ajout de la série
   await page.click('.pour-toi-carte >> nth=3 >> .editeur-ajouter');
   await page.waitForSelector('#form-serie-modal.active');

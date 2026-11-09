@@ -49,7 +49,32 @@ function resumerMedia(m) {
   };
 }
 
-// Fiches AniList de plusieurs séries (null si introuvable) : d'abord le cache, sinon par lots de 10
+// Une requête AniList pour un lot de séries → la fiche brute de chacune (null si introuvable).
+// Chaque série passe par une recherche (Page) : une série introuvable donne une liste vide, pas une erreur.
+// Requête refusée (trop « complexe » pour AniList) : on la coupe en deux. Trop de requêtes : on attend un peu.
+async function demanderLotAniList(lot, champs, essai = 0) {
+  const query = 'query {\n' + lot.map((t, j) =>
+    `m${j}: Page(perPage: 1) { media(search: ${JSON.stringify(rechercheAniList(t))}, type: MANGA, format_in: [MANGA, ONE_SHOT], sort: [SEARCH_MATCH]) { ${champs} } }`).join('\n') + '\n}';
+  const r = await fetchAvecTimeout('https://graphql.anilist.co', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ query })
+  }, 15000);
+  if (r.status === 429 && essai < 2) {
+    await pause(Math.min(parseInt(r.headers.get('Retry-After'), 10) || 5, 20) * 1000);
+    return demanderLotAniList(lot, champs, essai + 1);
+  }
+  const json = await r.json().catch(() => null);
+  if (json && json.data) return lot.map((t, j) => { const p = json.data['m' + j]; return (p && p.media && p.media[0]) || null; });
+  if (lot.length > 1) {
+    const moitie = Math.ceil(lot.length / 2);
+    return [...await demanderLotAniList(lot.slice(0, moitie), champs), ...await demanderLotAniList(lot.slice(moitie), champs)];
+  }
+  const detail = json && json.errors ? json.errors.map(e => e.message).join(' ; ') : '';
+  throw new Error('AniList : HTTP ' + r.status + (detail ? ' — ' + detail : ''));
+}
+
+// Fiches AniList de plusieurs séries (null si introuvable) : d'abord le cache, sinon par lots
 async function fichesAniList(titres, avecLecteurs) {
   const cache = await lireCacheAniList();
   const maintenant = Date.now();
@@ -64,20 +89,8 @@ async function fichesAniList(titres, avecLecteurs) {
   try {
     for (let i = 0; i < aDemander.length; i += parLot) {
       const lot = aDemander.slice(i, i + parLot);
-      const query = 'query {\n' + lot.map((t, j) =>
-        `m${j}: Media(search: ${JSON.stringify(rechercheAniList(t))}, type: MANGA, format_in: [MANGA, ONE_SHOT]) { ${champs} }`).join('\n') + '\n}';
-      const r = await fetchAvecTimeout('https://graphql.anilist.co', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ query })
-      }, 15000);
-      // Une série introuvable donne une erreur pour elle seule : les autres réponses restent utilisables
-      const json = await r.json().catch(() => null);
-      if (!json || !json.data) throw new Error('AniList indisponible (HTTP ' + r.status + ')');
-      lot.forEach((t, j) => {
-        const m = json.data['m' + j];
-        cache[cleAniList(t, avecLecteurs)] = { t: maintenant, d: m ? resumerMedia(m) : null };
-      });
+      const medias = await demanderLotAniList(lot, champs);
+      lot.forEach((t, j) => { cache[cleAniList(t, avecLecteurs)] = { t: maintenant, d: medias[j] ? resumerMedia(medias[j]) : null }; });
     }
   } finally {
     // Les réponses déjà reçues sont gardées, même si une requête suivante échoue
@@ -120,7 +133,7 @@ function noterSuggestions(candidats, ficheCandidats, possedees) {
   return resultats.sort((a, b) => b.score - a.score).slice(0, MAX_POUR_TOI);
 }
 
-// Section « Pour toi » de la page de l'éditeur (affichée seulement s'il y a des suggestions)
+// Section « Pour toi » de la page de l'éditeur : les suggestions, ou un message qui dit pourquoi il n'y en a pas
 async function afficherPourToi() {
   const affiche = editeurAffiche;
   const section = document.getElementById('editeur-pour-toi');
@@ -138,13 +151,13 @@ async function afficherPourToi() {
     const ficheCandidats = await fichesAniList(candidats.map(g => g.titre), false);
     if (editeurAffiche !== affiche) return; // on a changé de page entre-temps
     const suggestions = noterSuggestions(candidats, ficheCandidats, possedees);
-    if (!suggestions.length) { section.hidden = true; return; }
+    if (!suggestions.length) { profil.textContent = 'Pas de suggestion chez cet éditeur d’après ta collection.'; return; }
     const genres = genresPreferes(possedees.map(p => p.fiche));
     profil.textContent = genres.length ? 'D’après tes séries : ' + genres.join(', ') : 'D’après tes séries';
     for (const s of suggestions) liste.appendChild(cartePourToi(s));
   } catch (e) {
     console.error('Suggestions indisponibles', e);
-    if (editeurAffiche === affiche) section.hidden = true;
+    if (editeurAffiche === affiche) profil.textContent = 'Suggestions indisponibles pour l’instant (' + messageErreur(e) + ').';
   }
 }
 
