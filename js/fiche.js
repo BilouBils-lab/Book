@@ -3,6 +3,8 @@
 function ouvrirModalSerie(index) {
   serieIndexActive = index;
   remplirModalSerie(index);
+  afficherAstuceFiche();
+  document.getElementById('fiche-infos-serie').open = false;
   document.getElementById('detail-modal').classList.add('active');
 }
 
@@ -26,6 +28,46 @@ function statsSerie(serie) {
   };
 }
 
+// Une phrase sous l'en-tête : « 36 tomes parus · le 37 vers nov. 2026 », ou l'état de la série
+function resumeSerie(serie, total, manquants) {
+  if (serie.misDeCote) return '⏸ Série mise de côté : plus dans tes achats ni tes prochaines sorties';
+  const morceaux = [serie.tomesParus ? `${total} tome${total > 1 ? 's' : ''} paru${total > 1 ? 's' : ''}` : 'Nombre de tomes parus inconnu'];
+  const prochaine = prochaineSortie(serie);
+  if (prochaine) morceaux.push(prochaine.retard ? `le ${prochaine.vol} attendu prochainement` : `le ${prochaine.vol} vers ${MOIS_COURTS[prochaine.k % 12]} ${Math.floor(prochaine.k / 12)}`);
+  else if ((serie.statut || 'En cours') === 'Terminée') morceaux.push('série terminée');
+  if (serie.tomesParus && !manquants.length) morceaux.push((serie.statut === 'Terminée' ? 'complète 🎉' : 'à jour ✓'));
+  return morceaux.join(' · ');
+}
+
+// « Infos de la série » (repliées) : auteur, éditeur, genres, rythme et dernière sortie
+function remplirInfosSerie(serie) {
+  const lignes = [
+    ['Auteur', serie.auteur || 'inconnu'],
+    ['Éditeur', serie.editeur],
+    ['Genres', (serie.genre || '').split(/\s*,\s*/).filter(Boolean).join(', ')],
+    ['Rythme', serie.parution && prochaineSortie(serie) ? `un tome environ tous les ${serie.parution.rythme > 1 ? serie.parution.rythme + ' mois' : 'mois'}` : ''],
+    ['Dernier paru', serie.parution ? `tome ${serie.parution.dernier.vol}, ${moisTexte(serie.parution.dernier.k)}` : '']
+  ].filter(([, v]) => v);
+  const liste = document.getElementById('fiche-infos-liste');
+  liste.innerHTML = '';
+  for (const [nom, valeur] of lignes) {
+    const dt = document.createElement('dt');
+    dt.textContent = nom;
+    const dd = document.createElement('dd');
+    dd.textContent = valeur;
+    liste.append(dt, dd);
+  }
+  document.getElementById('fiche-infos-apercu').textContent = [serie.auteur, serie.editeur].filter(Boolean).join(' · ') || 'Auteur, éditeur, genres';
+}
+
+// L'astuce « touche / appui long » ne s'affiche qu'aux premières ouvertures d'une fiche
+const OUVERTURES_AVEC_ASTUCE = 5;
+function afficherAstuceFiche() {
+  let vues = 0;
+  try { vues = parseInt(localStorage.getItem('astuce_fiche') || '0', 10); localStorage.setItem('astuce_fiche', String(vues + 1)); } catch { /* stockage indisponible */ }
+  document.getElementById('fiche-astuce').hidden = vues >= OUVERTURES_AVEC_ASTUCE;
+}
+
 const CLASSES_STATUT = { 'En cours': 'en-cours', 'Terminée': 'terminee', 'En pause': 'en-pause', 'Abandonnée': 'abandonnee' };
 
 function creerPastille(texte, classe) {
@@ -39,15 +81,13 @@ function remplirModalSerie(index) {
   const serie = bibliotheque[index];
   document.getElementById('modal-title').innerText = serie.titre;
   document.getElementById('modal-title').classList.toggle('long', serie.titre.length > 20);
-  document.getElementById('modal-author').innerText = [serie.auteur || 'Auteur inconnu', serie.editeur].filter(Boolean).join(' · ');
   document.getElementById('modal-cover').src = serie.couverture || JAQUETTE_DEFAUT;
 
-  // Pastilles : statut coloré puis genres
+  // Sous le titre : seulement le statut (les genres sont dans « Infos de la série »)
   const pastilles = document.getElementById('modal-pastilles');
   pastilles.innerHTML = '';
   const statut = serie.statut || 'En cours';
   pastilles.appendChild(creerPastille(statut, 'statut ' + (CLASSES_STATUT[statut] || '')));
-  (serie.genre || '').split(/\s*,\s*/).filter(Boolean).slice(0, 3).forEach(g => pastilles.appendChild(creerPastille(g)));
   remplirBarreInventaire(serie);
   afficherPartiesSaga(serie, index);
 
@@ -63,43 +103,14 @@ function remplirModalSerie(index) {
   // Progression
   const { total, parNumero, possedes, lus, manquants } = statsSerie(serie);
 
-  document.getElementById('fiche-compteur').innerHTML = serie.tomesParus
-    ? `${possedes} / ${total} possédés <span>· ${lus} lu${lus > 1 ? 's' : ''}</span>`
-    : `${possedes} possédé${possedes > 1 ? 's' : ''} <span>· ${lus} lu${lus > 1 ? 's' : ''}</span>`;
+  // Les deux tuiles à côté de la jaquette
+  document.getElementById('fiche-possedes').textContent = serie.tomesParus ? `✓ ${possedes}/${total}` : `✓ ${possedes}`;
+  document.getElementById('fiche-possedes-libelle').textContent = possedes > 1 ? 'possédés' : 'possédé';
+  document.getElementById('fiche-lus').textContent = lus;
+  document.getElementById('fiche-lus-libelle').textContent = lus > 1 ? 'lus' : 'lu';
 
-  const frise = document.getElementById('fiche-frise');
-  frise.innerHTML = '';
-  frise.classList.toggle('dense', total > 40);
-  for (let n = 1; n <= total; n++) {
-    const tome = parNumero.has(n) ? serie.tomes[parNumero.get(n)] : null;
-    const seg = document.createElement('i');
-    if (tome && tome.lu) seg.className = 'lu';
-    else if (tome && tome.possede) seg.className = 'possede';
-    frise.appendChild(seg);
-  }
-
-  const prochain = document.getElementById('fiche-prochain');
-  if (serie.misDeCote) {
-    prochain.textContent = '⏸ Série mise de côté : plus dans tes achats ni tes prochaines sorties';
-  } else if (manquants.length) {
-    prochain.innerHTML = `Prochain à acheter : <b>tome ${manquants[0]}</b>` +
-      (manquants.length > 1 ? ` · ${manquants.length} manquants` : '');
-  } else if (serie.tomesParus) {
-    prochain.textContent = statut === 'Terminée' ? 'Série complète 🎉' : 'À jour : tu as tous les tomes parus ✓';
-  } else {
-    prochain.textContent = 'Nombre de tomes parus inconnu';
-  }
-
-  // Parution (Manga Insight) : prochaine sortie estimée, sinon dernière sortie connue
-  const sortie = document.getElementById('fiche-sortie');
-  const prochaine = prochaineSortie(serie);
-  if (prochaine) {
-    sortie.innerHTML = `📅 Tome ${prochaine.vol} ${prochaine.retard ? 'attendu prochainement' : 'attendu vers <b>' + moisTexte(prochaine.k) + '</b>'} <span>· environ tous les ${serie.parution.rythme > 1 ? serie.parution.rythme + ' mois' : 'mois'}</span>`;
-  } else if (serie.parution) {
-    sortie.textContent = `📅 Dernier tome paru : n° ${serie.parution.dernier.vol} en ${moisTexte(serie.parution.dernier.k)}`;
-  } else {
-    sortie.textContent = '';
-  }
+  document.getElementById('fiche-resume').textContent = resumeSerie(serie, total, manquants);
+  remplirInfosSerie(serie);
 
   // Grille : chaque tome jusqu'au dernier paru ; au-delà de 30 tomes, regroupée par arcs (si connus) ou tranches de 10
   const grid = document.getElementById('modal-volumes-grid');

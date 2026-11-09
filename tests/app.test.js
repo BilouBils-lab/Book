@@ -203,11 +203,23 @@ test('Fiche : progression, prochain tome, tranches et ajout d’un tome manquant
     { titre: 'Ao Ashi', tomesParus: 14, tomesParusSource: 'Manga Insight', statut: 'En cours', genre: 'Seinen, Sport', tomes: tomes(14, 4, [6, 9]) },
     { titre: 'One Piece', tomesParus: 110, tomesParusSource: 'Manga Insight', tomes: tomes(12, 4) }]);
   await page.evaluate(() => ouvrirModalSerie(0));
-  egal(await page.textContent('#fiche-compteur'), '12 / 14 possédés · 4 lus', 'compteur');
-  egal(await page.textContent('#fiche-prochain'), 'Prochain à acheter : tome 6 · 2 manquants', 'prochain tome');
-  egal(await page.$$eval('#modal-pastilles .pastille', p => p.map(x => x.textContent)), ['En cours', 'Seinen', 'Sport'], 'pastilles');
+  const tuiles = () => page.$$eval('.fiche-tuile', l => l.map(t => t.innerText.replace(/\s+/g, ' ')));
+  egal(await tuiles(), ['✓ 12/14 possédés', '4 lus'], 'tuiles à côté de la jaquette');
+  egal(await page.textContent('#fiche-resume'), '14 tomes parus', 'résumé');
+  egal(await page.$$eval('#modal-pastilles .pastille', p => p.map(x => x.textContent)), ['En cours'], 'seulement le statut sous le titre');
+  egal(await page.textContent('#fiche-infos-apercu'), 'Auteur, éditeur, genres', 'infos repliées : aperçu');
+  verifier(!(await page.isVisible('#fiche-infos-liste')), 'infos repliées au départ');
+  await page.click('#fiche-infos-serie summary');
+  egal(await page.$$eval('#fiche-infos-liste > *', l => l.map(x => x.textContent)), ['Auteur', 'inconnu', 'Genres', 'Seinen, Sport'], 'infos dépliées');
   await page.click('#modal-volumes-grid .tome-box >> text=/^6$/');
-  egal(await page.textContent('#fiche-prochain'), 'Prochain à acheter : tome 9', 'après appui sur le tome 6');
+  egal(await tuiles(), ['✓ 13/14 possédés', '4 lus'], 'après appui sur le tome 6');
+  await page.click('#modal-volumes-grid .tome-box >> text=/^9$/');
+  egal(await page.textContent('#fiche-resume'), '14 tomes parus · à jour ✓', 'tous les tomes parus');
+  // Astuce « touche / appui long » : seulement aux premières ouvertures
+  verifier(await page.isVisible('#fiche-astuce'), 'astuce visible au début');
+  await page.evaluate(() => { for (let i = 0; i < 5; i++) ouvrirModalSerie(0); });
+  verifier(!(await page.isVisible('#fiche-astuce')), 'astuce cachée ensuite');
+  await page.evaluate(() => { bibliotheque[0].tomes.find(t => t.numero === 9).possede = false; });
 
   await page.evaluate(() => ouvrirModalSerie(1));
   // One Piece : regroupé par arcs (coffrets Glénat), puis par tranches de 10 après le dernier coffret
@@ -222,10 +234,10 @@ test('Fiche : progression, prochain tome, tranches et ajout d’un tome manquant
   // Un coffret acheté : tout l'arc d'un coup, avec « Annuler »
   await page.click('.tranche.ouverte .tranche-tout >> text=Alabasta');
   egal(await page.textContent('#toast span'), '✓ Arc Alabasta : 11 tomes ajoutés', 'message');
-  egal(await page.textContent('#fiche-compteur'), '23 / 110 possédés · 4 lus', 'tomes 13 à 23 possédés');
+  egal(await page.textContent('#fiche-possedes'), '✓ 23/110', 'tomes 13 à 23 possédés');
   egal(await page.$$eval('.tranche-tout', b => b.some(x => x.textContent.includes('Alabasta'))), false, 'plus de bouton pour un arc complet');
   await page.click('#toast button');
-  egal(await page.textContent('#fiche-compteur'), '12 / 110 possédés · 4 lus', '« Annuler » retire le coffret');
+  egal(await page.textContent('#fiche-possedes'), '✓ 12/110', '« Annuler » retire le coffret');
   // Édition spéciale : pas d'arcs (le découpage est celui de l'édition standard)
   await page.evaluate(() => { bibliotheque[1].titre = 'One Piece (Collector)'; remplirModalSerie(1); });
   egal(await page.$eval('.tranche-nom', t => t.textContent), 'Tomes 1–10', 'tranches de 10 pour une autre édition');
@@ -1282,7 +1294,8 @@ test('Suite qui continue la numérotation : Solo Leveling 1–19 puis Ragnarok 2
   await page.evaluate(() => ouvrirModalSerie(0));
   const parties = await page.$$eval('#modal-volumes-grid .tranche-nom', l => l.map(x => x.textContent));
   egal(parties, ['Solo Leveling1–19', 'Ragnarok20–22'], 'la fiche montre les deux parties');
-  egal(await page.textContent('#fiche-prochain'), 'Prochain à acheter : tome 22', 'tome 22 à acheter');
+  egal(await page.evaluate(() => statsSerie(bibliotheque[0]).manquants), [22], 'tome 22 à acheter');
+  egal(await page.textContent('#fiche-possedes'), '✓ 21/22', 'tuile des tomes possédés');
   // En magasin : le tome 22 de Ragnarok est bien le tome manquant de Solo Leveling
   await page.evaluate(() => { fermerModal(); serieAVerifier = null; quitterModeRafale(); document.getElementById('scanner-modal').classList.add('active'); passerEnModeMagasin(); codeBarresLu('9782382884522'); });
   await page.waitForFunction(() => document.querySelector('#verdict-magasin .verdict-titre')?.textContent === 'Il te manque');
