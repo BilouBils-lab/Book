@@ -13,15 +13,15 @@
   <meta name="theme-color" content="#1c1a17" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.65">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.65">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.66">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.66">
   <!-- Manifeste : nécessaire aux notifications sur iPhone (app installée sur l'écran d'accueil) -->
   <link rel="manifest" href="manifest.webmanifest">
 
   <!-- Thème choisi dans les Paramètres, appliqué avant l'affichage (pas de flash de la mauvaise couleur) -->
   <script>try { var t = localStorage.getItem('theme'); if (t === 'clair' || t === 'sombre') { document.documentElement.dataset.theme = t; document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = t === 'sombre' ? '#1c1a17' : '#f6f1e7'; }); } } catch (e) {}</script>
   <link rel="preload" href="polices/bangers-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=3.65">
+  <link rel="stylesheet" href="css/style.css?v=3.66">
 </head>
 <body>
 
@@ -33,11 +33,6 @@
         <span id="badge-hors-ligne" class="badge-hors-ligne" hidden>📴 hors ligne</span>
       </div>
       <button class="settings-btn" onclick="ouvrirParametres()" aria-label="Réglages">⚙️</button>
-    </div>
-    <div class="tabs-nav">
-      <button class="tab-btn" id="tab-pal-btn" onclick="changerOnglet('pal')">Pile à lire (<span id="pal-count">0</span>)</button>
-      <button class="tab-btn active" id="tab-col-btn" onclick="changerOnglet('collection')">Collection</button>
-      <button class="tab-btn" id="tab-avenir-btn" onclick="changerOnglet('avenir')">À venir</button>
     </div>
   </header>
 
@@ -56,10 +51,14 @@
     <div id="view-avenir" style="display: none;"></div>
   </main>
 
-  <div class="actions-bar">
-    <button class="btn-fab btn-fab-secondary" onclick="ouvrirScanner()">📷 Scanner</button>
-    <button class="btn-fab" onclick="ajouterManuel()">➕ Ajouter</button>
-  </div>
+  <!-- Barre du bas : les onglets et les actions, au pouce -->
+  <nav class="barre-onglets" aria-label="Navigation">
+    <button id="tab-pal-btn" onclick="changerOnglet('pal')"><span aria-hidden="true">📖</span>Pile<span id="pal-count" class="compteur-pile">0</span></button>
+    <button id="tab-col-btn" class="active" onclick="changerOnglet('collection')"><span aria-hidden="true">📚</span>Collection</button>
+    <button class="barre-plus" onclick="ajouterManuel()" aria-label="Ajouter une série">＋</button>
+    <button id="tab-avenir-btn" onclick="changerOnglet('avenir')"><span aria-hidden="true">📅</span>À venir</button>
+    <button id="barre-scanner" onclick="ouvrirScanner()"><span aria-hidden="true">📷</span>Scanner</button>
+  </nav>
 
   <input type="file" id="ia-file-input" style="display: none;" accept="image/*" capture="environment" onchange="analyserImageJaquette(event)">
 
@@ -68,7 +67,6 @@
     <div id="loader-status" style="font-size: 14px; font-weight: 600;">Analyse de la jaquette par l'IA...</div>
   </div>
 
-  <footer class="version-tag">v3.65</footer>
 
   <!-- Modal Réglages / Paramètres -->
   <div id="settings-modal" class="modal-overlay">
@@ -115,6 +113,7 @@
         </div>
       </details>
 
+      <div class="version-tag">v3.66</div>
       <div class="settings-credits">Données de parution : <a href="https://mangainsight.fr/" style="color: inherit;">Manga Insight</a> (CC BY 4.0) et catalogue de la BnF.</div>
       <input type="file" id="file-input" style="display: none;" accept=".json" onchange="importerSauvegarde(event)">
       <input type="file" id="csv-input" style="display: none;" accept=".csv" onchange="importerCSV(event)">
@@ -401,23 +400,23 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.65"></script>
-  <script src="js/recherche-infos.js?v=3.65"></script>
-  <script src="js/isbn-scanner.js?v=3.65"></script>
-  <script src="js/mise-a-jour.js?v=3.65"></script>
-  <script src="js/stockage.js?v=3.65"></script>
-  <script src="js/jaquettes.js?v=3.65"></script>
-  <script src="js/import-export.js?v=3.65"></script>
-  <script src="js/vues.js?v=3.65"></script>
-  <script src="js/fiche.js?v=3.65"></script>
-  <script src="js/maj-serie.js?v=3.65"></script>
-  <script src="js/sagas.js?v=3.65"></script>
-  <script src="js/ajout-serie.js?v=3.65"></script>
-  <script src="js/inventaire.js?v=3.65"></script>
-  <script src="js/rafale.js?v=3.65"></script>
-  <script src="js/magasin.js?v=3.65"></script>
-  <script src="js/nouveautes.js?v=3.65"></script>
-  <script src="js/notifications.js?v=3.65"></script>
-  <script src="js/demarrage.js?v=3.65"></script>
+  <script src="js/outils.js?v=3.66"></script>
+  <script src="js/recherche-infos.js?v=3.66"></script>
+  <script src="js/isbn-scanner.js?v=3.66"></script>
+  <script src="js/mise-a-jour.js?v=3.66"></script>
+  <script src="js/stockage.js?v=3.66"></script>
+  <script src="js/jaquettes.js?v=3.66"></script>
+  <script src="js/import-export.js?v=3.66"></script>
+  <script src="js/vues.js?v=3.66"></script>
+  <script src="js/fiche.js?v=3.66"></script>
+  <script src="js/maj-serie.js?v=3.66"></script>
+  <script src="js/sagas.js?v=3.66"></script>
+  <script src="js/ajout-serie.js?v=3.66"></script>
+  <script src="js/inventaire.js?v=3.66"></script>
+  <script src="js/rafale.js?v=3.66"></script>
+  <script src="js/magasin.js?v=3.66"></script>
+  <script src="js/nouveautes.js?v=3.66"></script>
+  <script src="js/notifications.js?v=3.66"></script>
+  <script src="js/demarrage.js?v=3.66"></script>
 </body>
 </html>

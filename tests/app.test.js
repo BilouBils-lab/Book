@@ -159,9 +159,12 @@ test('Configuration du déploiement du Worker cohérente', async () => {
   egal(utilises.filter(n => !kv.includes(n)), ['BACKUP_TOKEN', 'GEMINI_API_KEY', 'GEMINI_MODELES'], 'secrets et variables attendus dans Cloudflare (sinon : les déclarer)');
 });
 
-test("L'app démarre sans erreur, avec ses trois onglets", async ({ navigateur, base }) => {
+test("L'app démarre sans erreur, avec sa barre d'onglets en bas", async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
-  egal(await page.$$eval('.tab-btn', b => b.map(x => x.textContent.replace(/\s*\(\d+\)/, ''))), ['Pile à lire', 'Collection', 'À venir'], 'onglets');
+  egal(await page.$$eval('.barre-onglets button', b => b.map(x => x.getAttribute('aria-label') || x.textContent.replace(/\d+$/, ''))), ['📖Pile', '📚Collection', 'Ajouter une série', '📅À venir', '📷Scanner'], 'barre d\u2019onglets');
+  egal(await page.$eval('.barre-onglets .active', b => b.id), 'tab-col-btn', 'Collection affichée au démarrage');
+  await page.click('#tab-pal-btn');
+  egal(await page.evaluate(() => [ongletActif, document.getElementById('view-pal').style.display]), ['pal', 'block'], 'onglet Pile');
   egal(erreurs, [], 'erreurs JavaScript au démarrage');
   await fermer();
 });
@@ -1345,7 +1348,7 @@ test('ISBN inconnu des catalogues (tome tout juste paru) : l’app demande sa s�
 test('Ajouter une série : éditions proposées pendant la saisie du titre', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: [{ numero: 1, possede: true, lu: false }] }]);
-  await page.click('button:has-text("➕ Ajouter")');
+  await page.click('.barre-plus');
   await page.fill('#form-serie-titre', 'one pi');
   await page.waitForSelector('#form-serie-suggestions .suggestion');
   const suggestions = () => page.$$eval('#form-serie-suggestions .suggestion', l => l.map(x => x.querySelector('.suggestion-titre').textContent + ' | ' + x.querySelector('.suggestion-detail').textContent));
@@ -1371,7 +1374,7 @@ test('Ajouter une série : éditions proposées pendant la saisie du titre', asy
   egal(await page.textContent('#toast span'), '✓ Kagurabachi ajoutée · Édition standard · 10 tomes · Kana · 2025–2026', 'message');
 
   // Titre modifié après le choix : l'édition est oubliée, saisie libre comme avant
-  await page.click('button:has-text("➕ Ajouter")');
+  await page.click('.barre-plus');
   await page.fill('#form-serie-titre', 'kagura');
   await page.waitForSelector('#form-serie-suggestions .suggestion');
   await page.click('#form-serie-suggestions .suggestion >> nth=1');
