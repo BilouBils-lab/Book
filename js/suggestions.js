@@ -1,5 +1,6 @@
-// Suggestions « Pour toi » sur la page d'un éditeur. AniList donne, pour tes séries et celles de l'éditeur :
-// les genres, les auteurs, les séries liées (suites, spin-off) et les recommandations des lecteurs.
+// Suggestions « Pour toi », sur la page d'un éditeur et dans la rubrique « ✨ Pour toi » (onglet À venir).
+// AniList donne, pour tes séries et d'autres : les genres, les auteurs, les séries liées (suites, spin-off)
+// et les recommandations des lecteurs ; Manga Insight dit si une série est publiée en France.
 // Chaque suggestion affiche sa raison. Les réponses AniList sont gardées 30 jours sur l'appareil.
 
 const MAX_POUR_TOI = 4;
@@ -30,31 +31,44 @@ function rechercheAniList(titre) {
 }
 
 function cleAniList(titre, avecLecteurs) {
-  return (avecLecteurs ? 'l:' : '') + normaliserRecherche(rechercheAniList(titre));
+  return (avecLecteurs ? 'l2:' : '') + normaliserRecherche(rechercheAniList(titre));
+}
+
+// Titres d'une fiche AniList (romaji, anglais, autres noms) : pour la retrouver dans Manga Insight
+function titresMedia(m) {
+  return [m.title && m.title.romaji, m.title && m.title.english, ...(m.synonyms || [])].filter(Boolean);
 }
 
 // Ce qu'on garde d'une fiche AniList
 function resumerMedia(m) {
-  const auteurs = [];
+  const auteurs = [], auteursIds = [];
   for (const e of (m.staff && m.staff.edges) || []) {
     const nom = e.node && e.node.name && e.node.name.full;
-    if (/story|art/i.test(e.role || '') && nom && !auteurs.includes(nom)) auteurs.push(nom);
+    if (/story|art/i.test(e.role || '') && nom && !auteurs.includes(nom)) {
+      auteurs.push(nom);
+      if (e.node.id) auteursIds.push(e.node.id);
+    }
   }
+  // Titres des séries liées et recommandées (quand AniList les donne)
+  const titres = {};
+  for (const e of (m.relations && m.relations.edges) || []) if (e.node && e.node.title) titres[e.node.id] = titresMedia(e.node);
+  for (const n of (m.recommendations && m.recommendations.nodes) || []) if (n.mediaRecommendation && n.mediaRecommendation.title) titres[n.mediaRecommendation.id] = titresMedia(n.mediaRecommendation);
   return {
     id: m.id,
     genres: m.genres || [],
     auteurs,
-    lies: ((m.relations && m.relations.edges) || []).filter(e => RELATIONS_UNIVERS.includes(e.relationType) && e.node).map(e => e.node.id),
+    auteursIds,
+    titres,
+    lies: ((m.relations && m.relations.edges) || []).filter(e => RELATIONS_UNIVERS.includes(e.relationType) && e.node && (!e.node.type || e.node.type === 'MANGA')).map(e => e.node.id),
     lecteurs: ((m.recommendations && m.recommendations.nodes) || []).filter(n => n.mediaRecommendation && (n.rating || 0) > 0).map(n => n.mediaRecommendation.id)
   };
 }
 
-// Une requête AniList pour un lot de séries → la fiche brute de chacune (null si introuvable).
-// Chaque série passe par une recherche (Page) : une série introuvable donne une liste vide, pas une erreur.
-// Requête refusée (trop « complexe » pour AniList) : on la coupe en deux. Trop de requêtes : on attend un peu.
-async function demanderLotAniList(lot, champs, essai = 0) {
-  const query = 'query {\n' + lot.map((t, j) =>
-    `m${j}: Page(perPage: 1) { media(search: ${JSON.stringify(rechercheAniList(t))}, type: MANGA, format_in: [MANGA, ONE_SHOT], sort: [SEARCH_MATCH]) { ${champs} } }`).join('\n') + '\n}';
+// Une requête AniList groupée : `fragment(x)` décrit ce qu'on demande pour chaque élément du lot,
+// `extraire(réponse)` en tire le résultat. Requête refusée (trop « complexe » pour AniList) : on la coupe
+// en deux. Trop de requêtes : on attend un peu et on réessaie.
+async function requeteGroupeeAniList(lot, fragment, extraire, essai = 0) {
+  const query = 'query {\n' + lot.map((x, j) => `m${j}: ${fragment(x)}`).join('\n') + '\n}';
   const r = await fetchAvecTimeout('https://graphql.anilist.co', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -62,16 +76,23 @@ async function demanderLotAniList(lot, champs, essai = 0) {
   }, 15000);
   if (r.status === 429 && essai < 2) {
     await pause(Math.min(parseInt(r.headers.get('Retry-After'), 10) || 5, 20) * 1000);
-    return demanderLotAniList(lot, champs, essai + 1);
+    return requeteGroupeeAniList(lot, fragment, extraire, essai + 1);
   }
   const json = await r.json().catch(() => null);
-  if (json && json.data) return lot.map((t, j) => { const p = json.data['m' + j]; return (p && p.media && p.media[0]) || null; });
+  if (json && json.data) return lot.map((x, j) => extraire(json.data['m' + j]));
   if (lot.length > 1) {
     const moitie = Math.ceil(lot.length / 2);
-    return [...await demanderLotAniList(lot.slice(0, moitie), champs), ...await demanderLotAniList(lot.slice(moitie), champs)];
+    return [...await requeteGroupeeAniList(lot.slice(0, moitie), fragment, extraire), ...await requeteGroupeeAniList(lot.slice(moitie), fragment, extraire)];
   }
   const detail = json && json.errors ? json.errors.map(e => e.message).join(' ; ') : '';
   throw new Error('AniList : HTTP ' + r.status + (detail ? ' — ' + detail : ''));
+}
+
+// Chaque série passe par une recherche (Page) : une série introuvable donne une liste vide, pas une erreur
+function demanderLotAniList(lot, champs) {
+  return requeteGroupeeAniList(lot,
+    t => `Page(perPage: 1) { media(search: ${JSON.stringify(rechercheAniList(t))}, type: MANGA, format_in: [MANGA, ONE_SHOT], sort: [SEARCH_MATCH]) { ${champs} } }`,
+    p => (p && p.media && p.media[0]) || null);
 }
 
 // Fiches AniList de plusieurs séries (null si introuvable) : d'abord le cache, sinon par lots
@@ -82,9 +103,13 @@ async function fichesAniList(titres, avecLecteurs) {
     const c = cache[cleAniList(t, avecLecteurs)];
     return !c || maintenant - c.t > DUREE_CACHE_ANILIST;
   });
-  const champs = `id genres staff(perPage: 6) { edges { role node { name { full } } } }
-    relations { edges { relationType node { id } } }` +
-    (avecLecteurs ? ' recommendations(perPage: 10, sort: RATING_DESC) { nodes { rating mediaRecommendation { id } } }' : '');
+  // Pour tes séries (avecLecteurs) : aussi les titres des séries liées et recommandées, et l'identifiant des auteurs
+  const champs = avecLecteurs
+    ? `id genres staff(perPage: 6) { edges { role node { id name { full } } } }
+      relations { edges { relationType node { id type title { romaji english } synonyms } } }
+      recommendations(perPage: 10, sort: RATING_DESC) { nodes { rating mediaRecommendation { id title { romaji english } synonyms } } }`
+    : `id genres staff(perPage: 6) { edges { role node { name { full } } } }
+      relations { edges { relationType node { id } } }`;
   const parLot = avecLecteurs ? PAR_REQUETE_AVEC_LECTEURS : PAR_REQUETE_ANILIST;
   try {
     for (let i = 0; i < aDemander.length; i += parLot) {
@@ -182,5 +207,179 @@ function cartePourToi({ serie: g, raison }) {
   ajouter.textContent = '＋';
   ajouter.onclick = () => choisirSerieEditeur(g);
   carte.append(jaquetteSerieEditeur(g, 'editeur-serie-jaquette'), infos, ajouter);
+  return carte;
+}
+
+// --- Rubrique « ✨ Pour toi » (onglet À venir) : des rangées, à travers tous les éditeurs français ---
+const RANGEES_LECTEURS_MAX = 6;
+const PAR_RANGEE_MAX = 10;
+const AUTEURS_MAX = 15;
+
+// Autres œuvres de chaque auteur (identifiants AniList), gardées 30 jours
+async function oeuvresAuteurs(ids) {
+  const cache = await lireCacheAniList();
+  const maintenant = Date.now();
+  const aDemander = [...new Set(ids)].filter(id => {
+    const c = cache['auteur:' + id];
+    return !c || maintenant - c.t > DUREE_CACHE_ANILIST;
+  });
+  try {
+    for (let i = 0; i < aDemander.length; i += PAR_REQUETE_ANILIST) {
+      const lot = aDemander.slice(i, i + PAR_REQUETE_ANILIST);
+      const oeuvres = await requeteGroupeeAniList(lot,
+        id => `Staff(id: ${Number(id)}) { staffMedia(type: MANGA, perPage: 15, sort: [POPULARITY_DESC]) { nodes { id format title { romaji english } synonyms } } }`,
+        st => (st && st.staffMedia && st.staffMedia.nodes) || []);
+      lot.forEach((id, j) => {
+        cache['auteur:' + id] = { t: maintenant, d: oeuvres[j].filter(m => m.format !== 'NOVEL').map(m => ({ id: m.id, titres: titresMedia(m) })) };
+      });
+    }
+  } finally {
+    if (aDemander.length && db) dbSet('anilist-suggestions', cache).catch(() => {});
+  }
+  return ids.map(id => cache['auteur:' + id].d);
+}
+
+// Séries publiées en France (Manga Insight), retrouvées par leur titre
+function normaliserTitreFrance(t) {
+  return normaliserRecherche((t || '').replace(/×/g, ' x '));
+}
+let indexFrance = null, dateIndexFrance = null;
+function serieEnFrance(titres) {
+  if (!indexFrance || dateIndexFrance !== dateMI) {
+    indexFrance = new Map();
+    for (const g of groupesMangaInsight(() => true)) {
+      for (const cle of new Set([normaliserTitreFrance(g.titre), normaliserTitreFrance(g.titre.replace(/ - /g, ' '))])) {
+        const deja = indexFrance.get(cle);
+        if (!deja || g.tomes > deja.tomes) indexFrance.set(cle, g);
+      }
+    }
+    dateIndexFrance = dateMI;
+  }
+  for (const t of titres || []) {
+    const g = indexFrance.get(normaliserTitreFrance(t));
+    if (g) return g;
+  }
+  return null;
+}
+
+// Les rangées de la rubrique : même univers, « parce que tu lis … », mêmes auteurs.
+// Une série n'apparaît qu'une fois, seulement si elle est publiée en France et qu'on ne l'a pas.
+async function rangeesPourToi() {
+  if (!indexMI) await chargerMangaInsight(false);
+  if (!indexMI || !bibliotheque.length) return [];
+  const fiches = await fichesAniList(bibliotheque.map(s => s.titre), true);
+  const possedees = bibliotheque.map((serie, i) => ({ serie, fiche: fiches[i] })).filter(p => p.fiche);
+  const idsPossedes = new Set(possedees.map(p => p.fiche.id));
+  const montrees = new Set();
+  const candidate = (id, titres) => {
+    if (idsPossedes.has(id)) return null;
+    const g = serieEnFrance(titres);
+    return g && indexSeriePossedee(g.titre) === -1 ? g : null;
+  };
+  const garder = (liste) => {
+    const items = [];
+    for (const it of liste) {
+      if (items.length >= PAR_RANGEE_MAX || montrees.has(it.serie.titre)) continue;
+      montrees.add(it.serie.titre);
+      items.push(it);
+    }
+    return items;
+  };
+  const rangees = [];
+
+  const univers = [];
+  for (const { serie, fiche } of possedees) {
+    for (const id of fiche.lies) { const g = candidate(id, fiche.titres[id]); if (g) univers.push({ serie: g, comme: serie.titre }); }
+  }
+  const itemsUnivers = garder(univers);
+  if (itemsUnivers.length) rangees.push({ titre: '🔗 Dans le même univers', sous: 'Suites et séries dérivées de tes séries', items: itemsUnivers });
+
+  // « Parce que tu lis … » : d'abord les séries qui ont le plus de recommandations publiées en France
+  const parSerie = possedees.map(({ serie, fiche }) => ({
+    serie,
+    items: fiche.lecteurs.map(id => candidate(id, fiche.titres[id])).filter(Boolean).map(g => ({ serie: g }))
+  })).filter(r => r.items.length).sort((a, b) => b.items.length - a.items.length);
+  for (const { serie, items } of parSerie) {
+    if (rangees.filter(r => r.lecteurs).length >= RANGEES_LECTEURS_MAX) break;
+    const gardes = garder(items);
+    if (gardes.length) rangees.push({ titre: '👥 Parce que tu lis ' + serie.titre, sous: 'Recommandées par ses lecteurs', items: gardes, lecteurs: true });
+  }
+
+  const auteurs = new Map(); // identifiant AniList de l'auteur → une de tes séries
+  for (const { serie, fiche } of possedees) for (const id of fiche.auteursIds || []) if (!auteurs.has(id)) auteurs.set(id, serie.titre);
+  const ids = [...auteurs.keys()].slice(0, AUTEURS_MAX);
+  if (ids.length) {
+    const oeuvres = await oeuvresAuteurs(ids);
+    const memesAuteurs = [];
+    ids.forEach((id, i) => {
+      for (const o of oeuvres[i] || []) { const g = candidate(o.id, o.titres); if (g) memesAuteurs.push({ serie: g, comme: auteurs.get(id) }); }
+    });
+    const itemsAuteurs = garder(memesAuteurs);
+    if (itemsAuteurs.length) rangees.push({ titre: '✍️ Des mêmes auteurs', sous: 'D’autres œuvres des auteurs de tes séries', items: itemsAuteurs });
+  }
+  return rangees;
+}
+
+async function afficherRubriquePourToi(zone) {
+  zone.innerHTML = '';
+  const message = document.createElement('div');
+  message.className = 'avenir-intro';
+  message.textContent = 'Recherche de suggestions…';
+  zone.appendChild(message);
+  try {
+    const rangees = await rangeesPourToi();
+    if (!zone.isConnected) return; // on a changé de vue entre-temps
+    if (!rangees.length) {
+      message.textContent = bibliotheque.length ? 'Pas encore de suggestion d’après ta collection.' : 'Ajoute des séries à ta collection pour recevoir des suggestions.';
+      return;
+    }
+    message.remove();
+    for (const r of rangees) zone.appendChild(rangeePourToi(r));
+  } catch (e) {
+    console.error('Rubrique Pour toi indisponible', e);
+    if (zone.isConnected) message.textContent = 'Suggestions indisponibles pour l’instant (' + messageErreur(e) + ').';
+  }
+}
+
+function rangeePourToi({ titre, sous, items }) {
+  const rangee = document.createElement('section');
+  rangee.className = 'pt-rangee';
+  const h = document.createElement('h2');
+  h.className = 'pt-rangee-titre';
+  h.textContent = titre;
+  const p = document.createElement('div');
+  p.className = 'pt-rangee-sous';
+  p.textContent = sous;
+  const defile = document.createElement('div');
+  defile.className = 'pt-defile';
+  for (const it of items) defile.appendChild(cartePourToiRubrique(it));
+  rangee.append(h, p, defile);
+  return rangee;
+}
+
+function cartePourToiRubrique({ serie: g, comme }) {
+  const carte = document.createElement('div');
+  carte.className = 'pt-carte';
+  const visuel = document.createElement('div');
+  visuel.className = 'pt-visuel';
+  const ajouter = document.createElement('button');
+  ajouter.className = 'pt-ajouter';
+  ajouter.setAttribute('aria-label', 'Ajouter ' + g.titre);
+  ajouter.textContent = '＋';
+  ajouter.onclick = () => choisirSerieEditeur({ ...g, possedee: false });
+  visuel.append(jaquetteSerieEditeur(g, 'pt-jaquette'), ajouter);
+  const titre = document.createElement('div');
+  titre.className = 'pt-titre';
+  titre.textContent = g.titre;
+  const detail = document.createElement('div');
+  detail.className = 'pt-detail';
+  detail.textContent = `${editeurFrancais(g.editeur) || g.editeur} · ${g.tomes} t.`;
+  carte.append(visuel, titre, detail);
+  if (comme) {
+    const lien = document.createElement('div');
+    lien.className = 'pt-detail pt-comme';
+    lien.textContent = 'comme ' + comme;
+    carte.appendChild(lien);
+  }
   return carte;
 }
