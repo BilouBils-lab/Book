@@ -3,6 +3,7 @@
 // Toucher le fond sombre autour d'une fenêtre la ferme, comme sa croix ou son bouton « Annuler »
 const FERMETURE_PAR_FOND = {
   'detail-modal': () => fermerModal(),
+  'editeur-modal': () => fermerEditeur(),
   'nouveautes-modal': () => fermerNouveautes(),
   'settings-modal': () => fermerParametres(),
   'inventaire-modal': () => fermerInventaire(),

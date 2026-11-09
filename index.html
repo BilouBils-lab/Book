@@ -13,15 +13,15 @@
   <meta name="theme-color" content="#1c1a17" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-title" content="MangaThèque">
   <!-- Icône de l'écran d'accueil : dessinée dans icones/icone.svg -->
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.69">
-  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.69">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png?v=3.70">
+  <link rel="icon" type="image/png" href="icones/favicon.png?v=3.70">
   <!-- Manifeste : nécessaire aux notifications sur iPhone (app installée sur l'écran d'accueil) -->
   <link rel="manifest" href="manifest.webmanifest">
 
   <!-- Thème choisi dans les Paramètres, appliqué avant l'affichage (pas de flash de la mauvaise couleur) -->
   <script>try { var t = localStorage.getItem('theme'); if (t === 'clair' || t === 'sombre') { document.documentElement.dataset.theme = t; document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = t === 'sombre' ? '#1c1a17' : '#f6f1e7'; }); } } catch (e) {}</script>
   <link rel="preload" href="polices/bangers-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css?v=3.69">
+  <link rel="stylesheet" href="css/style.css?v=3.70">
 </head>
 <body>
 
@@ -112,7 +112,7 @@
         </div>
       </details>
 
-      <div class="version-tag">v3.69</div>
+      <div class="version-tag">v3.70</div>
       <div class="settings-credits">Données de parution : <a href="https://mangainsight.fr/" style="color: inherit;">Manga Insight</a> (CC BY 4.0) et catalogue de la BnF.</div>
       <input type="file" id="file-input" style="display: none;" accept=".json" onchange="importerSauvegarde(event)">
       <input type="file" id="csv-input" style="display: none;" accept=".csv" onchange="importerCSV(event)">
@@ -190,6 +190,24 @@
           <button class="btn" id="fiche-inventaire-valider" onclick="validerSerieInventaire()"></button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Page d'un éditeur : ses séries françaises, ses prochaines sorties (Manga Insight) -->
+  <div id="editeur-modal" class="modal-overlay">
+    <div role="dialog" aria-modal="true" aria-labelledby="editeur-titre" class="modal-content editeur">
+      <div class="editeur-haut">
+        <button id="editeur-retour" class="editeur-retour" onclick="fermerEditeur()">‹ Retour</button>
+        <button class="icone-btn" onclick="fermerEditeur(); fermerModal()" aria-label="Fermer">✕</button>
+      </div>
+      <h2 id="editeur-titre" class="fiche-titre editeur-titre"></h2>
+      <div id="editeur-resume" class="editeur-resume"></div>
+      <div id="editeur-sorties-titre" class="editeur-section" hidden>📅 Prochaines sorties</div>
+      <div id="editeur-sorties" class="editeur-sorties"></div>
+      <div class="editeur-section">Toutes les séries</div>
+      <div id="editeur-filtres" class="selecteur-vue editeur-filtres"></div>
+      <input type="search" id="editeur-recherche" class="modal-input editeur-recherche" placeholder="Chercher une série de cet éditeur…" aria-label="Chercher une série de cet éditeur" oninput="rechercherDansEditeur(this.value)" hidden>
+      <div id="editeur-liste"></div>
     </div>
   </div>
 
@@ -400,23 +418,24 @@
   </div>
 
   <!-- Code de l'app, découpé par thème. L'ordre compte : demarrage.js en dernier. -->
-  <script src="js/outils.js?v=3.69"></script>
-  <script src="js/recherche-infos.js?v=3.69"></script>
-  <script src="js/isbn-scanner.js?v=3.69"></script>
-  <script src="js/mise-a-jour.js?v=3.69"></script>
-  <script src="js/stockage.js?v=3.69"></script>
-  <script src="js/jaquettes.js?v=3.69"></script>
-  <script src="js/import-export.js?v=3.69"></script>
-  <script src="js/vues.js?v=3.69"></script>
-  <script src="js/fiche.js?v=3.69"></script>
-  <script src="js/maj-serie.js?v=3.69"></script>
-  <script src="js/sagas.js?v=3.69"></script>
-  <script src="js/ajout-serie.js?v=3.69"></script>
-  <script src="js/inventaire.js?v=3.69"></script>
-  <script src="js/rafale.js?v=3.69"></script>
-  <script src="js/magasin.js?v=3.69"></script>
-  <script src="js/nouveautes.js?v=3.69"></script>
-  <script src="js/notifications.js?v=3.69"></script>
-  <script src="js/demarrage.js?v=3.69"></script>
+  <script src="js/outils.js?v=3.70"></script>
+  <script src="js/recherche-infos.js?v=3.70"></script>
+  <script src="js/isbn-scanner.js?v=3.70"></script>
+  <script src="js/mise-a-jour.js?v=3.70"></script>
+  <script src="js/stockage.js?v=3.70"></script>
+  <script src="js/jaquettes.js?v=3.70"></script>
+  <script src="js/import-export.js?v=3.70"></script>
+  <script src="js/vues.js?v=3.70"></script>
+  <script src="js/fiche.js?v=3.70"></script>
+  <script src="js/maj-serie.js?v=3.70"></script>
+  <script src="js/sagas.js?v=3.70"></script>
+  <script src="js/ajout-serie.js?v=3.70"></script>
+  <script src="js/inventaire.js?v=3.70"></script>
+  <script src="js/rafale.js?v=3.70"></script>
+  <script src="js/magasin.js?v=3.70"></script>
+  <script src="js/nouveautes.js?v=3.70"></script>
+  <script src="js/notifications.js?v=3.70"></script>
+  <script src="js/editeur.js?v=3.70"></script>
+  <script src="js/demarrage.js?v=3.70"></script>
 </body>
 </html>

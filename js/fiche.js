@@ -54,7 +54,17 @@ function remplirInfosSerie(serie) {
     const dt = document.createElement('dt');
     dt.textContent = nom;
     const dd = document.createElement('dd');
-    dd.textContent = valeur;
+    if (nom === 'Éditeur') {
+      // Lien vers la page de l'éditeur : ses autres séries, ses prochaines sorties
+      const lien = document.createElement('button');
+      lien.id = 'fiche-lien-editeur';
+      lien.className = 'fiche-lien';
+      lien.textContent = valeur + ' ›';
+      lien.onclick = () => ouvrirEditeur(serie.miEditeur || serie.editeur);
+      dd.appendChild(lien);
+    } else {
+      dd.textContent = valeur;
+    }
     liste.append(dt, dd);
   }
   document.getElementById('fiche-infos-apercu').textContent = [serie.auteur, serie.editeur].filter(Boolean).join(' · ') || 'Auteur, éditeur, genres';
