@@ -1417,7 +1417,9 @@ test('ISBN inconnu des catalogues (tome tout juste paru) : l’app demande sa s�
 
 test('Découverte par éditeur : depuis les infos de la fiche, ses séries et ses sorties', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
-  await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: tomes(3) }]);
+  // « PUQ » (venu d'une recherche automatique) ne publie pas Ao Ashi en France : remplacé par l'éditeur de l'édition reconnue
+  await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: tomes(3) }, { titre: 'Ao Ashi', editeur: 'PUQ', tomes: tomes(2) }]);
+  egal(await page.evaluate(() => bibliotheque.map(s => s.editeur)), ['Glénat', 'Mangetsu'], 'éditeur corrigé d’après l’édition française');
   await page.evaluate(() => ouvrirModalSerie(0));
   await page.click('#fiche-infos-serie summary');
   egal(await page.textContent('#fiche-lien-editeur'), 'Glénat ›', 'lien vers l’éditeur');

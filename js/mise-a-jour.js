@@ -372,8 +372,13 @@ function appliquerMangaInsight(serie) {
   serie.tomesParus = mi.tomesParus;
   serie.tomesParusSource = 'Manga Insight';
   serie.tomesParusMaj = Date.now();
-  serie.parution = { nom: mi.nom, dernier: mi.dernier, rythme: mi.rythme, ...(mi.parties ? { noms: mi.noms, parties: mi.parties } : {}) };
-  if (!serie.editeur && mi.editeur) serie.editeur = editeurFrancais(mi.editeur) || mi.editeur;
+  serie.parution = { nom: mi.nom, editeur: mi.editeur, dernier: mi.dernier, rythme: mi.rythme, ...(mi.parties ? { noms: mi.noms, parties: mi.parties } : {}) };
+  // L'éditeur est celui de l'édition française reconnue. Un éditeur enregistré qui ne publie aucune édition
+  // française de la série (« PUQ », « VIZ Media » venus d'une recherche automatique) est remplacé.
+  if (mi.editeur) {
+    const editeurMI = editeurFrancais(mi.editeur) || mi.editeur;
+    if (normaliserRecherche(editeurFrancais(serie.editeur) || serie.editeur) !== normaliserRecherche(editeurMI)) serie.editeur = editeurMI;
+  }
   // ISBN déduits de l'édition supposée : marqués « auto » pour ne pas les confondre avec des tomes scannés
   for (const tome of serie.tomes) {
     const isbn = mi.isbnParTome[tome.numero];
