@@ -13,7 +13,7 @@ let db = null;
 function confirmerAction(message, options = {}) {
   return new Promise((resolve) => {
     const modal = document.getElementById('confirm-modal');
-    document.getElementById('confirm-message').textContent = message;
+    afficherMessageDialogue(document.getElementById('confirm-message'), message);
     modal.classList.add('active');
 
     const btnOk = document.getElementById('confirm-ok');
@@ -37,6 +37,25 @@ function confirmerAction(message, options = {}) {
     btnOk.addEventListener('click', onOk);
     btnCancel.addEventListener('click', onCancel);
   });
+}
+
+// Boîte de question à la façon d'iOS : la première phrase en titre gras, la suite en gris dessous
+// (le texte complet reste lisible tel quel par les lecteurs d'écran et les tests)
+function afficherMessageDialogue(zone, message) {
+  const [titre, ...suite] = String(message).split('\n\n');
+  zone.innerHTML = '';
+  const t = document.createElement('div');
+  t.className = 'dialogue-titre';
+  t.textContent = titre;
+  zone.appendChild(t);
+  if (!suite.length) return;
+  const saut = document.createElement('span');
+  saut.className = 'dialogue-saut';
+  saut.textContent = '\n\n';
+  const texte = document.createElement('div');
+  texte.className = 'dialogue-texte';
+  texte.textContent = suite.join('\n\n');
+  zone.append(saut, texte);
 }
 
 // avecSuggestions : propose les éditions connues pendant la saisie du titre (ajout d'une nouvelle série).
@@ -95,7 +114,7 @@ function demanderSerieEtTome(titreParDefaut, tomeParDefaut, entete, avecSuggesti
 function choisirAction(message, choix) {
   return new Promise((resolve) => {
     const modal = document.getElementById('choix-modal');
-    document.getElementById('choix-message').textContent = message;
+    afficherMessageDialogue(document.getElementById('choix-message'), message);
     const zone = document.getElementById('choix-boutons');
     zone.innerHTML = '';
     const terminer = (valeur) => { modal.classList.remove('active'); resolve(valeur); };

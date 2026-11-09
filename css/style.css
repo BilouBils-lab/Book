@@ -29,7 +29,7 @@
   --surface-relief: #e9dfcc;
   --fond-entete: rgba(246, 241, 231, 0.94);
   --barre-etat: #26231e;
-  --voile: rgba(38, 35, 30, 0.45);
+  --voile: rgba(38, 35, 30, 0.22);
   --alerte: #8a5a12;
   --danger: #b42318;
   --alerte-doux: rgba(183, 121, 31, 0.12);
@@ -38,6 +38,12 @@
   --success: #2f7d4f;
   --titre-app: #26231e;
   --surligneur: #ffd60a;
+  --verre: rgba(255, 253, 248, 0.82);
+  --verre-bord: rgba(255, 255, 255, 0.8);
+  --verre-reflet: rgba(255, 255, 255, 0.75);
+  --verre-ombre: rgba(38, 35, 30, 0.22);
+  --verre-bouton: rgba(255, 255, 255, 0.5);
+  --verre-groupe: rgba(255, 255, 255, 0.4);
   color-scheme: light;
   --police-titre: 'Bangers', 'Arial Black', sans-serif;
 }
@@ -62,7 +68,7 @@
   --surface-relief: #322e28;
   --fond-entete: rgba(28, 26, 23, 0.94);
   --barre-etat: rgba(28, 26, 23, 0.94);
-  --voile: rgba(0, 0, 0, 0.6);
+  --voile: rgba(0, 0, 0, 0.35);
   --alerte: #e9a23b;
   --danger: #f87171;
   --alerte-doux: rgba(233, 162, 59, 0.14);
@@ -71,6 +77,12 @@
   --success: #7fb685;
   --titre-app: #e9bd4c;
   --surligneur: transparent;
+  --verre: rgba(40, 36, 31, 0.8);
+  --verre-bord: rgba(255, 255, 255, 0.16);
+  --verre-reflet: rgba(255, 255, 255, 0.14);
+  --verre-ombre: rgba(0, 0, 0, 0.5);
+  --verre-bouton: rgba(255, 255, 255, 0.1);
+  --verre-groupe: rgba(255, 255, 255, 0.06);
   color-scheme: dark;
   }
 }
@@ -94,7 +106,7 @@
   --surface-relief: #322e28;
   --fond-entete: rgba(28, 26, 23, 0.94);
   --barre-etat: rgba(28, 26, 23, 0.94);
-  --voile: rgba(0, 0, 0, 0.6);
+  --voile: rgba(0, 0, 0, 0.35);
   --alerte: #e9a23b;
   --danger: #f87171;
   --alerte-doux: rgba(233, 162, 59, 0.14);
@@ -103,6 +115,12 @@
   --success: #7fb685;
   --titre-app: #e9bd4c;
   --surligneur: transparent;
+  --verre: rgba(40, 36, 31, 0.8);
+  --verre-bord: rgba(255, 255, 255, 0.16);
+  --verre-reflet: rgba(255, 255, 255, 0.14);
+  --verre-ombre: rgba(0, 0, 0, 0.5);
+  --verre-bouton: rgba(255, 255, 255, 0.1);
+  --verre-groupe: rgba(255, 255, 255, 0.06);
   color-scheme: dark;
 }
 
@@ -118,7 +136,7 @@
 body {
   background-color: var(--bg-color);
   color: var(--text-main);
-  padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  padding-bottom: calc(120px + env(safe-area-inset-bottom));
 }
 
 header {
@@ -366,7 +384,7 @@ main {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: max(90px, calc(78px + env(safe-area-inset-bottom)));
+  bottom: max(112px, calc(100px + env(safe-area-inset-bottom)));
   transform: translate(-50%, 20px);
   opacity: 0;
   pointer-events: none;
@@ -555,16 +573,21 @@ main {
 }
 
 .modal-overlay.active {
-  display: block;
+  display: flex; /* la fenêtre se centre (marges automatiques) et défile si elle est plus haute que l'écran */
 }
 
 .modal-content {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 16px;
+  /* Verre dépoli : la collection se devine en flou derrière la fenêtre */
+  background: var(--verre);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  backdrop-filter: blur(26px) saturate(180%);
+  border: 1px solid var(--verre-bord);
+  border-radius: 30px;
+  box-shadow: 0 24px 60px var(--verre-ombre), inset 0 1px 0 var(--verre-reflet);
+  width: 100%;
   max-width: 500px;
-  margin: 20px auto;
-  padding: 20px;
+  margin: auto;
+  padding: 22px;
   position: relative;
 }
 
@@ -757,14 +780,11 @@ main {
 }
 
 .version-tag {
-  position: fixed;
-  /* Zones de sécurité iOS : évite le coin arrondi de l'écran et la barre d'accueil */
-  bottom: calc(6px + env(safe-area-inset-bottom));
-  right: calc(10px + env(safe-area-inset-right));
-  font-size: 10px;
+  margin-top: 8px;
+  font-size: 11px;
   color: var(--text-sub);
   font-family: monospace;
-  pointer-events: none;
+  text-align: center;
 }
 
 .scanner-zone {
@@ -840,7 +860,7 @@ main {
 }
 .verdict-icone { font-size: 34px; line-height: 1; }
 .verdict-titre { font-size: 18px; font-weight: 700; }
-.verdict-detail { font-size: 13px; color: var(--text-sub); margin-top: 2px; line-height: 1.35; }
+.verdict-detail { font-size: 13px; color: var(--text-main); margin-top: 2px; line-height: 1.35; }
 .verdict.ok { border-color: var(--ok); background: var(--ok-doux); }
 .verdict.manque { border-color: var(--accent); background: var(--accent-doux); }
 .verdict.alerte { border-color: var(--alerte); background: var(--alerte-doux); }
@@ -991,3 +1011,65 @@ select.filtre { appearance: none; -webkit-appearance: none; max-width: 170px; te
 .pal-fond { position: absolute; inset: 0 0 10px 0; border-radius: 10px; background: var(--ok-doux); color: var(--ok); font-weight: 700; font-size: 14px; display: flex; align-items: center; padding-left: 18px; }
 .pal-fond.pret { background: var(--ok); color: var(--card-bg); }
 .astuce-glisser { margin-top: -2px; }
+
+/* --- Style « verre » (inspiré d'iOS) : boutons en pilule, barre d'onglets en bas --- */
+.modal-content .btn { border-radius: 999px; padding: 13px 16px; font-size: 15px; }
+.modal-content .btn-secondary { background: var(--verre-bouton); border: 1px solid var(--verre-bord); }
+.modal-content .settings-groupe { background: var(--verre-groupe); border-color: var(--verre-bord); border-radius: 22px; }
+.modal-content .settings-groupe button { border-color: var(--verre-bord); }
+.modal-content .modal-input { border-radius: 14px; }
+.dialogue-titre { font-size: 18px; font-weight: 700; line-height: 1.3; color: var(--text-main); }
+.dialogue-texte { font-size: 15px; line-height: 1.4; color: var(--text-sub); margin-top: 6px; }
+.dialogue-saut { display: none; }
+
+.tabs-nav { display: none; }
+.barre-onglets {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: max(16px, calc(4px + env(safe-area-inset-bottom)));
+  z-index: 99;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--verre);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid var(--verre-bord);
+  border-radius: 999px;
+  box-shadow: 0 12px 30px var(--verre-ombre), inset 0 1px 0 var(--verre-reflet);
+  white-space: nowrap;
+}
+.barre-onglets button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 62px;
+  padding: 4px 0;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-sub);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.barre-onglets button span[aria-hidden] { font-size: 22px; line-height: 1.1; }
+.barre-onglets button.active { color: var(--text-main); background: var(--verre-bouton); }
+.barre-onglets .compteur-pile { position: absolute; top: -2px; right: 6px; min-width: 18px; padding: 1px 5px; border-radius: 9px; background: var(--accent); color: var(--texte-sur-accent); font-size: 10px; }
+.barre-onglets .barre-plus {
+  width: 56px;
+  height: 56px;
+  margin: 0 4px;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--texte-sur-accent);
+  font-size: 30px;
+  font-weight: 400;
+  box-shadow: 0 6px 16px var(--ombre-accent);
+}
