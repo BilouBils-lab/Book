@@ -1138,3 +1138,15 @@ select.filtre { appearance: none; -webkit-appearance: none; max-width: 170px; te
 .pour-toi-profil { font-size: 13px; color: var(--text-sub); margin: -6px 0 10px; }
 .pour-toi-carte { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 8px; border-radius: 16px; background: var(--surface-creuse); }
 .pour-toi-raison { font-size: 12.5px; color: var(--text-main); margin-top: 4px; }
+
+/* Rubrique « ✨ Pour toi » (onglet À venir) : des rangées de jaquettes qui défilent sur le côté */
+.pt-rangee { margin-top: 18px; }
+.pt-rangee-titre { font-size: 16px; font-weight: 700; margin: 0; }
+.pt-rangee-sous { font-size: 12.5px; color: var(--text-sub); margin-bottom: 6px; }
+.pt-defile { display: flex; gap: 12px; overflow-x: auto; margin: 0 -16px; padding: 4px 16px 8px; scrollbar-width: none; }
+.pt-carte { flex: 0 0 104px; min-width: 0; }
+.pt-visuel { position: relative; }
+.pt-jaquette { width: 104px; height: 156px; border-radius: 10px; object-fit: cover; display: block; background: var(--surface-relief); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18); }
+.pt-ajouter { position: absolute; right: 6px; bottom: 6px; width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--accent); color: var(--texte-sur-accent); font-size: 18px; cursor: pointer; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
+.pt-titre { font-size: 13px; font-weight: 600; margin-top: 6px; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } /* titre sur 2 lignes au plus */
+.pt-detail { font-size: 12px; color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

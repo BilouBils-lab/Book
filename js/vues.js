@@ -174,7 +174,7 @@ function rendreAVenir() {
   const nbTomesAAcheter = achats.reduce((total, a) => total + a.manquants.length, 0);
   const selecteur = document.createElement('div');
   selecteur.className = 'selecteur-vue';
-  for (const [cle, libelle] of [['sorties', '📅 Prochaines sorties'], ['achats', `🛒 À acheter${nbTomesAAcheter ? ' (' + nbTomesAAcheter + ')' : ''}`]]) {
+  for (const [cle, libelle] of [['sorties', '📅 Sorties'], ['achats', `🛒 À acheter${nbTomesAAcheter ? ' (' + nbTomesAAcheter + ')' : ''}`], ['pourtoi', '✨ Pour toi']]) {
     const bouton = document.createElement('button');
     bouton.textContent = libelle;
     bouton.className = vueAVenir === cle ? 'actif' : '';
@@ -182,6 +182,18 @@ function rendreAVenir() {
     selecteur.appendChild(bouton);
   }
   container.appendChild(selecteur);
+
+  // Suggestions d'après la collection, à travers tous les éditeurs français
+  if (vueAVenir === 'pourtoi') {
+    const intro = document.createElement('div');
+    intro.className = 'avenir-intro';
+    intro.textContent = 'Des séries publiées en France, choisies d’après ta collection.';
+    const zone = document.createElement('div');
+    zone.id = 'rubrique-pour-toi';
+    container.append(intro, zone);
+    afficherRubriquePourToi(zone);
+    return;
+  }
 
   if (vueAVenir === 'achats') {
     if (!achats.length) {

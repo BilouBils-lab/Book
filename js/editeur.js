@@ -25,12 +25,17 @@ function memeEditeur(a, b) {
 
 // Les séries de cet éditeur, regroupées (éditions spéciales sous la série), les plus actives d'abord
 function seriesEditeur(editeur) {
+  return groupesMangaInsight(s => memeEditeur(s.editeur, editeur));
+}
+
+// Séries françaises de Manga Insight (celles que `garder` retient), regroupées : éditions spéciales sous la série
+function groupesMangaInsight(garder) {
   if (!indexMI) return [];
   const maintenant = moisActuel();
   const groupes = new Map();
   for (const entrees of indexMI.values()) {
     for (const s of entrees) {
-      if (!memeEditeur(s.editeur, editeur) || HORS_SERIE_MI.test(s.nom)) continue;
+      if (!garder(s) || HORS_SERIE_MI.test(s.nom)) continue;
       const titre = serieSansEdition(s.nom);
       const cle = normaliserRecherche(titre);
       if (!groupes.has(cle)) groupes.set(cle, { titre, base: s.base, entrees: [] });
@@ -41,13 +46,14 @@ function seriesEditeur(editeur) {
     // Tomes et sorties : ceux de l'édition principale (sans suffixe d'édition) quand elle existe
     const principale = entrees.filter(s => s.nom === titre);
     const retenues = principale.length ? principale : entrees;
-    let dernier = 0, prochaine = null;
+    let dernier = 0, prochaine = null, editeur = retenues[0].editeur, kEditeur = -1;
     for (const s of retenues) {
+      if (s.k > kEditeur) { kEditeur = s.k; editeur = s.editeur; } // éditeur de la sortie la plus récente
       if (s.k <= maintenant) dernier = Math.max(dernier, s.k);
       else if (!prochaine || s.k < prochaine.k || (s.k === prochaine.k && s.vol < prochaine.vol)) prochaine = { vol: s.vol, k: s.k };
     }
     return {
-      titre, base, dernier, prochaine,
+      titre, base, editeur, dernier, prochaine,
       tomes: Math.max(0, ...retenues.filter(s => s.k <= maintenant).map(s => s.vol)) || Math.max(...retenues.map(s => s.vol)),
       active: !!prochaine || maintenant - dernier <= ACTIVE_DEPUIS_MOIS,
       possedee: indexSeriePossedee(titre) !== -1

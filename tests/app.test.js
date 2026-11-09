@@ -907,7 +907,7 @@ egal(erreurs, [], 'erreurs JavaScript');
 
 // Les textes posés directement sur le fond (halos en dégradé) : axe ne sait pas mesurer leur contraste.
 // On le mesure sur les vrais pixels du fond, texte caché, au pire endroit derrière chaque texte (seuil : 4,5).
-const ECRANS_SUR_FOND = ['pile à lire', 'collection', 'à venir : sorties', 'à venir : à acheter'];
+const ECRANS_SUR_FOND = ['pile à lire', 'collection', 'à venir : sorties', 'à venir : à acheter', 'à venir : pour toi'];
 async function contrastesSurFond(page) {
   const textes = await page.evaluate(() => {
     const r = [];
@@ -966,6 +966,7 @@ test('Accessibilité : aucun problème détecté sur les écrans principaux (th�
       ['collection', () => { fermerToutesLesFenetres(); changerOnglet('collection'); }],
       ['à venir : sorties', () => { fermerToutesLesFenetres(); vueAVenir = 'sorties'; changerOnglet('avenir'); }],
       ['à venir : à acheter', () => { fermerToutesLesFenetres(); vueAVenir = 'achats'; changerOnglet('avenir'); }],
+      ['à venir : pour toi', () => { fermerToutesLesFenetres(); vueAVenir = 'pourtoi'; changerOnglet('avenir'); }],
       ['fiche', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); }],
       ['infos de la série', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); allerPage('infos'); }],
       ['page d’un éditeur', () => { fermerToutesLesFenetres(); ouvrirModalSerie(0); ouvrirEditeur('Glénat'); }],
@@ -1537,6 +1538,54 @@ test('Suggestions « Pour toi » sur la page d’un éditeur, avec leur raison',
   await page.click('.pour-toi-carte >> nth=3 >> .editeur-ajouter');
   await page.waitForSelector('#form-serie-modal.active');
   egal(await page.inputValue('#form-serie-titre'), 'Berserk', 'ajout depuis une suggestion');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
+test('Rubrique « ✨ Pour toi » (À venir) : rangées de séries publiées en France', async ({ navigateur, base }) => {
+  const titre = (romaji) => ({ title: { romaji, english: null }, synonyms: [] });
+  const media = (id, extra = {}) => ({ id, genres: ['Action'], staff: { edges: [] }, relations: { edges: [] }, recommendations: { nodes: [] }, ...extra });
+  const FICHES = {
+    'One Piece': media(1, {
+      relations: { edges: [{ relationType: 'SPIN_OFF', node: { id: 40, type: 'MANGA', ...titre('One Piece Party') } }, { relationType: 'ADAPTATION', node: { id: 41, type: 'ANIME', ...titre('One Piece Film') } }] },
+      recommendations: { nodes: [{ rating: 50, mediaRecommendation: { id: 30, ...titre('Berserk') } }, { rating: 40, mediaRecommendation: { id: 60, ...titre('Vinland Saga') } }, { rating: 30, mediaRecommendation: { id: 11, ...titre('Dragon Ball') } }] }
+    }),
+    'Dragon Ball': media(11, {
+      staff: { edges: [{ role: 'Story & Art', node: { id: 99, name: { full: 'Akira Toriyama' } } }] },
+      relations: { edges: [{ relationType: 'SEQUEL', node: { id: 20, type: 'MANGA', ...titre('Dragon Ball Super') } }] }
+    })
+  };
+  const OEUVRES = { 99: [{ id: 11, format: 'MANGA', ...titre('Dragon Ball') }, { id: 20, format: 'MANGA', ...titre('Dragon Ball Super') }, { id: 21, format: 'MANGA', ...titre('Dragon Ball SD') }, { id: 22, format: 'NOVEL', ...titre('Dragon Ball Roman') }] };
+  let requetes = 0;
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base, {
+    anilist: (req) => {
+      requetes++;
+      const q = JSON.parse(req.postData()).query, data = {};
+      for (const [, cle, t] of q.matchAll(/(m\d+): Page\(perPage: 1\) \{ media\(search: ("(?:[^"\\]|\\.)*")/g)) data[cle] = { media: FICHES[JSON.parse(t)] ? [FICHES[JSON.parse(t)]] : [] };
+      for (const [, cle, id] of q.matchAll(/(m\d+): Staff\(id: (\d+)\)/g)) data[cle] = { staffMedia: { nodes: OEUVRES[id] || [] } };
+      return { status: 200, body: { data } };
+    }
+  });
+  await avecMangaInsight(page, [{ titre: 'One Piece', editeur: 'Glénat', tomes: tomes(3) }, { titre: 'Dragon Ball', editeur: 'Glénat', tomes: tomes(2) }]);
+  await page.evaluate(() => changerOnglet('avenir'));
+  egal(await page.$$eval('#view-avenir .selecteur-vue button', l => l.map(b => b.textContent.replace(/\s*\(\d+\)/, ''))), ['📅 Sorties', '🛒 À acheter', '✨ Pour toi'], 'trois choix');
+  await page.click('#view-avenir .selecteur-vue button >> text=Pour toi');
+  await page.waitForSelector('#rubrique-pour-toi .pt-rangee');
+  const rangees = () => page.$$eval('.pt-rangee', l => l.map(r => [r.querySelector('.pt-rangee-titre').textContent, ...[...r.querySelectorAll('.pt-carte')].map(c => [...c.querySelectorAll('.pt-titre, .pt-detail')].map(x => x.textContent).join(' | '))]));
+  egal(await rangees(), [
+    ['🔗 Dans le même univers', 'One Piece - Party | Glénat · 7 t. | comme One Piece', 'Dragon Ball Super | Glénat · 24 t. | comme Dragon Ball'],
+    ['👥 Parce que tu lis One Piece', 'Berserk | Glénat · 43 t.'],
+    ['✍️ Des mêmes auteurs', 'Dragon Ball SD | Glénat · 11 t. | comme Dragon Ball']
+  ], 'rangées : publiées en France, pas déjà possédées, chacune une seule fois, sans les romans ni les animés');
+  // Revenir sur la rubrique : tout vient du cache de l'appareil
+  const avant = requetes;
+  await page.click('#view-avenir .selecteur-vue button >> text=Sorties');
+  await page.click('#view-avenir .selecteur-vue button >> text=Pour toi');
+  await page.waitForSelector('#rubrique-pour-toi .pt-rangee');
+  egal(requetes, avant, 'aucune nouvelle requête AniList');
+  await page.click('.pt-rangee >> nth=1 >> .pt-ajouter');
+  await page.waitForSelector('#form-serie-modal.active');
+  egal(await page.inputValue('#form-serie-titre'), 'Berserk', 'ajout depuis la rubrique');
   egal(erreurs, [], 'erreurs JavaScript');
   await fermer();
 });
