@@ -41,6 +41,9 @@ const verifications = [
     const avecTome = rows.title.filter(t => /\sVol\.\s*\d+\s*$/.test(t || '')).length;
     exiger(avecTome > rows.n * 0.5, `le format « Titre Vol.N » a changé (${avecTome} / ${rows.n})`);
     exiger(rows.title.some(t => /^One Piece Vol\./i.test(t || '')), 'One Piece introuvable');
+    // Le Worker sert sa copie de secours quand le site ne répond plus : on le signale
+    const source = await fetch(WORKER + '/mangainsight/core', { method: 'HEAD', signal: AbortSignal.timeout(60000) }).then(r => r.headers.get('X-Source')).catch(() => null);
+    exiger(source !== 'copie', 'mangainsight.fr ne répond plus : l’app reçoit la copie de secours du Worker');
     const age = (Date.now() - new Date(core.generated_at)) / 86400000;
     // Manga Insight est mis à jour à la main, de façon irrégulière : on ne s'alarme qu'après 3 mois sans nouvelles données
     exiger(!(age > 90), `données plus mises à jour depuis ${Math.round(age)} jours (${core.generated_at})`);

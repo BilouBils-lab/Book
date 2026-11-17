@@ -218,8 +218,49 @@ async function lireAbonnements(env) {
   return JSON.parse((await env.MANGA_KV.get("push:abonnements")) || "[]");
 }
 
+// --- Manga Insight : le site, sinon la copie de secours ---
+const MI_COPIE_TOUS_LES = 7 * 24 * 3600 * 1000; // copie rafraîchie au plus une fois par semaine
+
+// Contrôle léger (sans lire tout le JSON, trop coûteux pour le Worker) : un objet JSON, pas une page d'erreur HTML
+function fichierMIPlausible(texte) {
+  return texte.trimStart().startsWith("{");
+}
+
+async function garderCopieMI(env, fichier, texte) {
+  const derniere = Number(await env.MANGA_KV.get("mangainsight-date:" + fichier)) || 0;
+  if (Date.now() - derniere < MI_COPIE_TOUS_LES) return;
+  await env.MANGA_KV.put("mangainsight:" + fichier, texte);
+  await env.MANGA_KV.put("mangainsight-date:" + fichier, String(Date.now()));
+}
+
+async function mangaInsight(fichier, env, ctx, corsHeaders, json) {
+  // « X-Source » dit d'où viennent les données : le site, ou la copie de secours (lu par la surveillance)
+  const reponse = (texte, source) => new Response(texte, {
+    headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=86400", "X-Source": source, "Access-Control-Expose-Headers": "X-Source" }
+  });
+  let probleme;
+  try {
+    const res = await fetch(`https://mangainsight.fr/data/dashboard/${fichier}.json`, { cf: { cacheTtl: 86400, cacheEverything: true } });
+    if (res.ok) {
+      const texte = await res.text();
+      if (fichierMIPlausible(texte)) {
+        if (ctx) ctx.waitUntil(garderCopieMI(env, fichier, texte).catch(() => {}));
+        return reponse(texte, "site");
+      }
+      probleme = "réponse inattendue";
+    } else {
+      probleme = "HTTP " + res.status;
+    }
+  } catch (e) {
+    probleme = e.message;
+  }
+  const copie = await env.MANGA_KV.get("mangainsight:" + fichier);
+  if (copie) return reponse(copie, "copie");
+  return json({ erreur: "Manga Insight : " + probleme + " (pas encore de copie de secours)" }, 502);
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "https://biloubils-lab.github.io",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -332,13 +373,9 @@ export default {
 
     // --- Données de parution Manga Insight (CC BY 4.0), relayées telles quelles avec CORS ---
     // L'app les garde en mémoire une semaine ; Cloudflare en garde une copie 24 h.
+    // Copie de secours dans le stockage du Worker : si le site ne répond plus, l'app reçoit la dernière copie.
     if (pathname === "/mangainsight/core" || pathname === "/mangainsight/rows") {
-      const fichier = pathname.endsWith("core") ? "core" : "rows";
-      const res = await fetch(`https://mangainsight.fr/data/dashboard/${fichier}.json`, { cf: { cacheTtl: 86400, cacheEverything: true } });
-      if (!res.ok) return json({ erreur: "Manga Insight HTTP " + res.status }, 502);
-      return new Response(res.body, {
-        headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=86400" }
-      });
+      return mangaInsight(pathname.endsWith("core") ? "core" : "rows", env, ctx, corsHeaders, json);
     }
 
     // --- Notices BnF d'une édition (GET /edition?mots=Berserk prestige&editeur=Glénat) ---
