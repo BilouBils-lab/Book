@@ -42,7 +42,8 @@ const verifications = [
     exiger(avecTome > rows.n * 0.5, `le format « Titre Vol.N » a changé (${avecTome} / ${rows.n})`);
     exiger(rows.title.some(t => /^One Piece Vol\./i.test(t || '')), 'One Piece introuvable');
     const age = (Date.now() - new Date(core.generated_at)) / 86400000;
-    exiger(!(age > 45), `données plus mises à jour depuis ${Math.round(age)} jours (${core.generated_at})`);
+    // Manga Insight est mis à jour à la main, de façon irrégulière : on ne s'alarme qu'après 3 mois sans nouvelles données
+    exiger(!(age > 90), `données plus mises à jour depuis ${Math.round(age)} jours (${core.generated_at})`);
     return `${rows.n} sorties, données du ${new Date(core.generated_at).toLocaleDateString('fr-FR')}`;
   }],
 
