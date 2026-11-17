@@ -93,7 +93,7 @@ tests/                Tests automatiques (voir tests/README.md)
 | `GET /backup/versions`, `GET /backup?version=…` | Historique : une version par jour d'utilisation, 30 au plus |
 | `GET /isbn?isbn=…` | Livre d'après son ISBN (BnF) |
 | `GET /edition?mots=…` | Tomes d'une édition à la BnF |
-| `GET /mangainsight/core`, `/mangainsight/rows` | Données de sorties Manga Insight, relayées |
+| `GET /mangainsight/core`, `/mangainsight/rows` | Données de sorties Manga Insight, relayées. Le Worker en garde une **copie de secours** (stockage KV, rafraîchie chaque semaine) et la sert si le site ne répond plus ; l'en-tête `X-Source` dit `site` ou `copie`. |
 | `GET /infos?titre=…` | Infos d'une série par l'IA (Gemini) |
 | `GET /modeles` | Modèles Gemini disponibles (diagnostic) |
 | `GET /push/cle`, `POST /push/abonnement`, `POST /push/desabonnement` | Notifications : clé publique, abonner / désabonner un appareil (code de sauvegarde) |
@@ -149,7 +149,7 @@ Des tests de bout en bout (Playwright) ouvrent l'app dans un vrai navigateur, av
 
 ## Surveillance des sources
 
-Chaque lundi, le workflow **Surveillance des sources** (`tests/surveillance.js`) interroge les vrais services — Manga Insight, BnF et Gemini à travers le Worker, AniList et Jikan en direct — et vérifie que leurs réponses ont toujours la forme attendue. En cas d'échec, GitHub envoie un e-mail ; le détail (quelle source, quelle fonction de l'app est touchée) est dans l'onglet **Actions**. Lancement à la main : **Actions → Surveillance des sources → Run workflow**.
+Chaque lundi, le workflow **Surveillance des sources** (`tests/surveillance.js`) interroge les vrais services — Manga Insight, BnF et Gemini à travers le Worker, AniList et Jikan en direct — et vérifie que leurs réponses ont toujours la forme attendue. Manga Insight étant mis à jour à la main, l'alerte « données anciennes » n'arrive qu'après 90 jours ; une autre alerte prévient si le Worker sert sa copie de secours (site injoignable). En cas d'échec, GitHub envoie un e-mail ; le détail (quelle source, quelle fonction de l'app est touchée) est dans l'onglet **Actions**. Lancement à la main : **Actions → Surveillance des sources → Run workflow**.
 
 ## En cas de problème
 

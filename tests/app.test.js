@@ -146,6 +146,52 @@ test('Le numéro de version est le même partout', async () => {
   verifier(icone && fs.existsSync(path.join(RACINE, icone)), "l'icône de l'écran d'accueil est un fichier du dépôt : " + icone);
 });
 
+test('Worker : copie de secours de Manga Insight quand le site ne répond plus', async () => {
+  const worker = (await import(path.join(RACINE, 'worker', 'worker.js'))).default;
+  const stockage = new Map();
+  const env = { MANGA_KV: { get: async (k) => stockage.get(k) ?? null, put: async (k, v) => { stockage.set(k, v); } } };
+  const fetchOrigine = global.fetch;
+  let site = 'ok', ecritures = 0;
+  const contenu = '{"generated_at":"2026-10-02","n":1,"col":{}}' + ' '.repeat(200000);
+  global.fetch = async (url) => {
+    if (!String(url).includes('mangainsight.fr')) throw new Error('requête inattendue');
+    if (site === 'panne') throw new Error('connexion impossible');
+    if (site === 'erreur') return new Response('indisponible', { status: 503 });
+    if (site === 'html') return new Response('<html>Maintenance</html>');
+    return new Response(contenu);
+  };
+  const appel = async () => {
+    const enAttente = [];
+    const r = await worker.fetch(new Request('https://w.dev/mangainsight/core'), env, { waitUntil: (p) => enAttente.push(p) });
+    await Promise.all(enAttente);
+    return r;
+  };
+  try {
+    // Site en panne et pas encore de copie : erreur claire
+    site = 'panne';
+    let r = await appel();
+    egal(r.status, 502, 'pas encore de copie');
+    // Site en ligne : données du site, copie gardée
+    site = 'ok';
+    r = await appel();
+    egal([r.status, r.headers.get('X-Source'), (await r.text()).length], [200, 'site', contenu.length], 'données du site');
+    verifier(stockage.get('mangainsight:core') === contenu, 'copie de secours gardée');
+    // Copie rafraîchie au plus une fois par semaine
+    const put = env.MANGA_KV.put;
+    env.MANGA_KV.put = async (k, v) => { ecritures++; return put(k, v); };
+    await appel();
+    egal(ecritures, 0, 'pas de nouvelle copie dans la semaine');
+    // Site en erreur ou injoignable : la copie est servie
+    for (const etat of ['erreur', 'panne', 'html']) {
+      site = etat;
+      r = await appel();
+      egal([r.status, r.headers.get('X-Source'), (await r.text()).length], [200, 'copie', contenu.length], 'copie servie (' + etat + ')');
+    }
+  } finally {
+    global.fetch = fetchOrigine;
+  }
+});
+
 test('Configuration du déploiement du Worker cohérente', async () => {
   const toml = fs.readFileSync(path.join(RACINE, 'worker', 'wrangler.toml'), 'utf8');
   const nom = (toml.match(/^name = "([^"]+)"/m) || [])[1];
@@ -1748,7 +1794,7 @@ test('Worker : IA Gemini, Manga Insight, BnF en erreur, CORS et requêtes invali
     egal(appels[0].url, 'https://mangainsight.fr/data/dashboard/rows.json', 'bon fichier demandé');
     repondre = () => new Response('', { status: 503 });
     rep = await appel('/mangainsight/core');
-    egal([rep.status, await rep.json()], [502, { erreur: 'Manga Insight HTTP 503' }], 'Manga Insight en panne');
+    egal([rep.status, await rep.json()], [502, { erreur: 'Manga Insight : HTTP 503 (pas encore de copie de secours)' }], 'Manga Insight en panne');
 
     // BnF : on se présente (User-Agent), et un refus est expliqué
     appels = [];
