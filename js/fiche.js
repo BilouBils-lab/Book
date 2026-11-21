@@ -572,6 +572,7 @@ async function enregistrerSerie(titre, tomeNum) {
       couverture: '',
       tomes: initialTomes
     });
+    rattacherSagaAuto(bibliotheque[bibliotheque.length - 1]); // ex. une nouvelle partie de Sword Art Online
   }
 
   sauvegarder();

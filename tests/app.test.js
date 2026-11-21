@@ -1412,6 +1412,37 @@ test('Saga : parties qui repartent au tome 1 regroupées (SAO), saison 2 sépar�
   await fermer();
 });
 
+test('Saga : une nouvelle partie la rejoint (titre sans tiret), sinon proposée au lancement (SAO Phantom Bullet)', async ({ navigateur, base }) => {
+  const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
+  const sao = () => [
+    { titre: 'Sword Art Online - Aincrad', saga: 'Sword Art Online', tomes: tomes(2) },
+    { titre: 'Sword Art Online (Fairy Dance)', saga: 'Sword Art Online', tomes: tomes(3) }];
+  // Ajoutée directement (scan, saisie à la main…), titre sans tiret ni parenthèses : elle rejoint la saga
+  await definirBibliotheque(page, sao());
+  await page.evaluate(() => enregistrerSerie('Sword Art Online Phantom Bullet', 1));
+  egal(await page.evaluate(() => bibliotheque[2].saga), 'Sword Art Online', 'nouvelle partie rangée dans la saga');
+  await page.evaluate(() => enregistrerSerie('One Piece', 1));
+  egal(await page.evaluate(() => bibliotheque[3].saga ?? null), null, 'une autre série reste à part');
+
+  // Déjà ajoutée sans saga (avant cette version) : proposée au lancement
+  await definirBibliotheque(page, [...sao(), { titre: 'Sword Art Online Phantom Bullet', tomes: tomes(1) }]);
+  page.evaluate(() => proposerRattachementSaga());
+  await page.waitForSelector('#choix-modal.active');
+  egal(await page.textContent('#choix-message'), '« Sword Art Online Phantom Bullet » semble faire partie de la saga « Sword Art Online » (Sword Art Online - Aincrad, Sword Art Online (Fairy Dance)).\n\nLa ranger dans la saga ? Elle garde ses tomes et ses sorties, et rejoint la carte de la saga dans ta Collection.', 'proposition');
+  await page.click('#choix-boutons button >> text=Ranger');
+  await page.waitForFunction(() => bibliotheque[2].saga === 'Sword Art Online');
+  egal(await page.evaluate(() => serieARattacher()), null, 'plus rien à ranger');
+  // « Non » : la question n'est plus posée, et elle ne sera plus rangée d'elle-même
+  await page.evaluate((s) => { bibliotheque = s; }, [...sao(), { titre: 'Sword Art Online Phantom Bullet', tomes: tomes(1) }]);
+  page.evaluate(() => proposerRattachementSaga());
+  await page.waitForSelector('#choix-modal.active');
+  await page.click('#choix-boutons button >> text=Non');
+  await page.waitForFunction(() => bibliotheque[2].sagaRefusee === true);
+  egal(await page.evaluate(() => { rattacherSagaAuto(bibliotheque[2]); return [serieARattacher(), bibliotheque[2].saga ?? null]; }), [null, null], 'refus retenu');
+  egal(erreurs, [], 'erreurs JavaScript');
+  await fermer();
+});
+
 test('Au lancement : saison 2 rangée par erreur dans la saison 1, proposée au rangement (Jungle Juice)', async ({ navigateur, base }) => {
   const { page, erreurs, fermer } = await ouvrirApp(navigateur, base);
   const jj = () => ({ titre: 'Jungle Juice', editeur: 'Kbooks', tomesParus: 6, tomesParusSource: 'Manga Insight',
