@@ -26,12 +26,50 @@ function nomDeSagaPropose(serie) {
   return decomposerTitreSerie(serie.titre).base.split(' - ')[0].trim();
 }
 
-// Nouvelle série dont le titre correspond à une saga existante : elle la rejoint d'elle-même
+// Saga existante dont cette série semble faire partie (null sinon) : même nom de saga proposé, ou titre
+// (ou édition Manga Insight) qui commence par le nom de la saga — « Sword Art Online Phantom Bullet »
+function sagaPourSerie(serie) {
+  const sagas = [...new Set(bibliotheque.filter(s => s !== serie && s.saga).map(s => s.saga))];
+  const propose = normaliserRecherche(nomDeSagaPropose(serie));
+  const noms = [serie.titre, serie.miNom, serie.parution && serie.parution.nom].filter(Boolean)
+    .map(t => normaliserRecherche(decomposerTitreSerie(t).base));
+  return sagas.find(saga => normaliserRecherche(saga) === propose)
+    || sagas.find(saga => { const cle = normaliserRecherche(saga); return noms.some(n => n === cle || n.startsWith(cle + ' ')); })
+    || null;
+}
+
+// Nouvelle série qui correspond à une saga existante : elle la rejoint d'elle-même
+// (sauf si on l'a déjà retirée de la saga, ou refusé de l'y ranger)
 function rattacherSagaAuto(serie) {
-  if (serie.saga) return;
-  const cle = normaliserRecherche(nomDeSagaPropose(serie));
-  const autre = bibliotheque.find(s => s !== serie && s.saga && normaliserRecherche(s.saga) === cle);
-  if (autre) serie.saga = autre.saga;
+  if (serie.saga || serie.sagaRefusee) return;
+  const saga = sagaPourSerie(serie);
+  if (saga) serie.saga = saga;
+}
+
+// --- Au lancement : une série ajoutée sans être rangée dans la saga dont elle semble faire partie ---
+function serieARattacher() {
+  return bibliotheque.find(s => !s.saga && !s.sagaRefusee && sagaPourSerie(s)) || null;
+}
+
+// Renvoie true si une proposition a été faite
+async function proposerRattachementSaga() {
+  const serie = serieARattacher();
+  if (!serie || document.querySelector('.modal-overlay.active')) return false;
+  const saga = sagaPourSerie(serie);
+  const parties = partiesDeSaga(saga).map(p => p.serie.titre).join(', ');
+  const reponse = await choisirAction(`« ${serie.titre} » semble faire partie de la saga « ${saga} » (${parties}).\n\nLa ranger dans la saga ? Elle garde ses tomes et ses sorties, et rejoint la carte de la saga dans ta Collection.`, [
+    { libelle: `✓ Ranger dans « ${saga} »`, valeur: 'ranger', principal: true },
+    { libelle: 'Non, c\u2019est une série à part', valeur: 'non' }
+  ]);
+  if (reponse === 'ranger') {
+    serie.saga = saga;
+    sauvegarder();
+    afficherToast(`✓ ${serie.titre} rangée dans la saga « ${saga} »`);
+  } else if (reponse === 'non') {
+    serie.sagaRefusee = true;
+    sauvegarder();
+  }
+  return true;
 }
 
 // --- Collection : une carte pour toute la saga ---
@@ -109,6 +147,7 @@ async function gererSaga() {
   if (!reponse) return;
   if (reponse === 'retirer') {
     delete serie.saga;
+    serie.sagaRefusee = true; // elle ne sera plus rangée d'elle-même dans une saga
     sauvegarder();
     afficherToast(`✓ ${serie.titre} retirée de la saga`);
     return;
@@ -117,6 +156,7 @@ async function gererSaga() {
   if (!nom || !nom.trim()) return;
   nom = nom.trim();
   serie.saga = nom;
+  delete serie.sagaRefusee;
   // Les autres parties de la même histoire, pas encore rangées : on propose de les ajouter d'un coup
   const autres = bibliotheque.filter(s => s !== serie && !s.saga && normaliserRecherche(nomDeSagaPropose(s)) === normaliserRecherche(nom));
   if (autres.length && await confirmerAction(`Ajouter aussi à la saga « ${nom} » :\n${autres.map(s => '• ' + s.titre).join('\n')} ?`)) {
