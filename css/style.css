@@ -1150,3 +1150,26 @@ select.filtre { appearance: none; -webkit-appearance: none; max-width: 170px; te
 .pt-ajouter { position: absolute; right: 6px; bottom: 6px; width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--accent); color: var(--texte-sur-accent); font-size: 18px; cursor: pointer; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
 .pt-titre { font-size: 13px; font-weight: 600; margin-top: 6px; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } /* titre sur 2 lignes au plus */
 .pt-detail { font-size: 12px; color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Bouton « Mettre à jour » : en haut de l’écran, quand une nouvelle version est prête */
+.bouton-maj {
+  position: fixed;
+  left: 50%;
+  top: calc(12px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 250;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--texte-sur-accent);
+  font: inherit;
+  font-size: 15px;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  animation: maj-arrivee 0.35s ease-out;
+}
+.bouton-maj[hidden] { display: none; }
+@keyframes maj-arrivee { from { transform: translate(-50%, -20px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .bouton-maj { animation: none; } }

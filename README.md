@@ -155,7 +155,7 @@ Chaque lundi, le workflow **Surveillance des sources** (`tests/surveillance.js`)
 
 | Symptôme | Que faire |
 |---|---|
-| L'app affiche une ancienne version | Vérifier que la PR est fusionnée et que *pages build and deployment* est vert (onglet Actions), puis fermer et rouvrir l'app. |
+| L'app affiche une ancienne version | Vérifier que la PR est fusionnée et que *pages build and deployment* est vert (onglet Actions). En revenant dans l'app, le bouton **✨ Nouvelle version · Mettre à jour** apparaît en haut : le toucher (sinon, fermer et rouvrir l'app). |
 | « Code de sauvegarde incorrect » | ⚙️ → Réglages avancés → 🔑 Code de sauvegarde : coller le même code que `BACKUP_TOKEN`. Code perdu : en choisir un nouveau, le mettre dans Cloudflare **et** dans l'app. |
 | Collection vide (nouveau téléphone, nouveau raccourci) | ⚙️ → 🔑 Code de sauvegarde → « Oui, j'ai un code » → l'app propose de récupérer la collection. |
 | Une erreur a abîmé la collection | ⚙️ → 🕘 Restaurer une sauvegarde : choisir une version de l'historique (l'état actuel y est gardé). |
