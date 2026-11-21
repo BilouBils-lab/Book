@@ -38,6 +38,29 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(e => console.error('Mode hors-ligne indisponible', e));
   // Notification touchée alors que l'app était déjà ouverte : le service worker dit quoi afficher
   navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.ouvrir) ouvrirDepuisNotification(e.data.ouvrir); });
+
+  // Nouvelle version de l'app : le service worker l'installe en arrière-plan et prend la main ;
+  // un bouton « Mettre à jour » recharge alors l'app (plus besoin de la fermer et de la rouvrir).
+  // La toute première installation, elle, ne compte pas.
+  let dejaControlee = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (dejaControlee) proposerMiseAJour();
+    dejaControlee = true;
+  });
+  // Sur iPhone, l'app installée reste ouverte en arrière-plan : on cherche une nouvelle version à chaque retour
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') chercherMiseAJour(); });
+}
+
+const ECART_VERIFICATIONS_MAJ = 60 * 1000; // une vérification par minute au plus
+let derniereVerificationMaj = 0;
+function chercherMiseAJour() {
+  if (Date.now() - derniereVerificationMaj < ECART_VERIFICATIONS_MAJ) return;
+  derniereVerificationMaj = Date.now();
+  navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => { /* hors ligne : on réessaiera */ });
+}
+
+function proposerMiseAJour() {
+  document.getElementById('bouton-maj').hidden = false;
 }
 
 // Badge « hors ligne » et envoi de la sauvegarde en attente quand le réseau revient

@@ -35,6 +35,8 @@ function egal(obtenu, attendu, message) {
 
 // --- Serveur local : sert les fichiers de l'app (la caméra exige http, pas file://) ---
 
+// Version du service worker servie par le serveur de test (null : celle du dépôt)
+let versionSwPubliee = null;
 function demarrerServeur() {
   const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png' };
   const serveur = http.createServer((req, res) => {
@@ -43,6 +45,11 @@ function demarrerServeur() {
       res.writeHead(404); res.end(); return;
     }
     res.writeHead(200, { 'Content-Type': (types[path.extname(chemin)] || 'application/octet-stream') + '; charset=utf-8' });
+    // Test de mise à jour : le service worker publié peut être une « nouvelle version »
+    if (versionSwPubliee && chemin === path.join(RACINE, 'sw.js')) {
+      res.end(fs.readFileSync(chemin, 'utf8').replace(/const VERSION = '[^']+'/, `const VERSION = '${versionSwPubliee}'`));
+      return;
+    }
     fs.createReadStream(chemin).pipe(res);
   });
   return new Promise(resolve => serveur.listen(0, '127.0.0.1', () => resolve(serveur)));
@@ -1067,6 +1074,36 @@ test('Plus de couleurs écrites en dur hors des thèmes', async () => {
   // Seules exceptions : le fond noir de la caméra et quelques ombres noires
   const couleurs = [...apresThemes.matchAll(/#[0-9a-fA-F]{3,6}\b|rgba?\([^)]*\)/g)].map(m => m[0]).filter(c => !/^#000$|rgba\(0, ?0, ?0/.test(c));
   egal(couleurs, [], 'couleurs à remplacer par des variables de thème');
+});
+
+test('Nouvelle version publiée : bouton « Mettre à jour » au retour dans l’app', async ({ navigateur, base }) => {
+  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'allow' });
+  const page = await contexte.newPage();
+  const erreurs = [];
+  page.on('pageerror', e => erreurs.push(e.message));
+  await page.goto(base + '/index.html');
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await page.waitForTimeout(300);
+  egal(await page.isVisible('#bouton-maj'), false, 'pas de bouton à la première installation');
+  // Rien de nouveau : retour dans l'app sans bouton
+  await page.evaluate(() => { derniereVerificationMaj = 0; document.dispatchEvent(new Event('visibilitychange')); });
+  await page.waitForTimeout(800);
+  egal(await page.isVisible('#bouton-maj'), false, 'pas de bouton sans nouvelle version');
+  // Nouvelle version publiée : au retour dans l'app, elle s'installe et le bouton apparaît
+  versionSwPubliee = 'nouvelle-test';
+  await page.evaluate(() => { derniereVerificationMaj = 0; document.dispatchEvent(new Event('visibilitychange')); });
+  await page.waitForSelector('#bouton-maj:not([hidden])', { timeout: 10000 });
+  egal(await page.textContent('#bouton-maj'), '✨ Nouvelle version · Mettre à jour', 'bouton affiché');
+  // Un appui recharge l'app, servie par la nouvelle version
+  await page.evaluate(() => { window.avantRechargement = true; });
+  await Promise.all([page.waitForNavigation(), page.click('#bouton-maj')]);
+  await page.waitForFunction(() => typeof rendreVues === 'function' && document.readyState === 'complete');
+  egal(await page.evaluate(() => [window.avantRechargement ?? null, document.getElementById('bouton-maj').hidden]), [null, true], 'app rechargée, bouton parti');
+  egal(await page.evaluate(async () => (await caches.keys()).includes('mangatheque-nouvelle-test')), true, 'nouvelle version en place');
+  versionSwPubliee = null;
+  egal(erreurs, [], 'erreurs JavaScript');
+  await contexte.close();
 });
 
 test('Jaquettes gardées pour le mode hors-ligne', async ({ navigateur, base }) => {
